@@ -1,0 +1,36 @@
+{
+    "id": "windows-11",
+    "name": "Windows 11 Pro",
+    "description": "Windows 11 Pro installed hands-free from your own installer ISO — bring the ISO (Microsoft doesn't allow us to ship it), and HexOS handles partitioning, setup answers, and your first account.",
+    "icon": "vms/windows",
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "answer-file",
+        "source": {
+            "type": "user-iso"
+        },
+        "answerFile": {
+            "template": "win11-pro"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "diskGb": 64
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "AHCI",
+        "nicModel": "E1000",
+        "tpm": true,
+        "secureBoot": false,
+        "hypervEnlightenments": true,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

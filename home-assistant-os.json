@@ -1,0 +1,39 @@
+{
+    "id": "haos",
+    "name": "Home Assistant OS",
+    "description": "The official Home Assistant appliance OS — full home automation platform with add-on support, managed updates, and backups.",
+    "icon": "vms/haos",
+    "category": "smart-home",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "image",
+        "source": {
+            "url": "https://github.com/home-assistant/operating-system/releases/download/{version}/haos_ova-{version}.qcow2.xz",
+            "version": "18.1",
+            "format": "qcow2",
+            "compression": "xz",
+            "sha256": "60df08773901e1eac9b9cfe03d53e1d939e67b669c172c3a41037fb3cd295b9d"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 2048,
+        "recMemoryMb": 4096,
+        "minVcpus": 1,
+        "recVcpus": 2,
+        "diskGb": 32
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "readiness": {
+            "type": "mdns",
+            "hostname": "homeassistant.local",
+            "port": 8123
+        },
+        "postInstallUrl": "http://{ip}:8123"
+    }
+}

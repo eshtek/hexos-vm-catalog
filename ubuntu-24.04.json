@@ -1,0 +1,40 @@
+{
+    "id": "ubuntu-24.04",
+    "name": "Ubuntu Server 24.04 LTS",
+    "description": "Ubuntu Server 24.04 LTS (Noble Numbat) from Canonical's official cloud image, configured on first boot with your user account and SSH access.",
+    "icon": "vms/ubuntu",
+    "category": "linux",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "cloud-init",
+        "source": {
+            "url": "https://cloud-images.ubuntu.com/releases/noble/{version}/ubuntu-24.04-server-cloudimg-amd64.img",
+            "version": "release-20260615",
+            "format": "qcow2",
+            "compression": "none",
+            "sha256": "5fa5b05e5ec239858c4531485d6023b0896448c2df7c63b34f8dae6ea6051a44"
+        },
+        "cloudInit": {
+            "userDataTemplate": "linux-default"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 1024,
+        "recMemoryMb": 4096,
+        "minVcpus": 1,
+        "recVcpus": 2,
+        "diskGb": 32
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}
