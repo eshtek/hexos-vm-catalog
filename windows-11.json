@@ -8,7 +8,8 @@
     "provisioning": {
         "strategy": "answer-file",
         "source": {
-            "type": "user-iso"
+            "type": "user-iso",
+            "isoHelpUrl": "https://www.microsoft.com/software-download/windows11"
         },
         "answerFile": {
             "template": "win11-pro"
