@@ -60,11 +60,41 @@ Strategy notes:
 
 Version bumps are a two-field change: `source.version` and `source.sha256`.
 
-The authoritative schema is `vmBlueprintSchema` in `hexos-platform/packages/shared/eshtek/vm-blueprints.ts` — documents failing it are rejected at sync time.
+The authoritative schema is `vmBlueprintSchema` in `hexos-platform/packages/shared/eshtek/vm-blueprints.ts` — documents failing it are rejected at sync time. A verbatim copy is vendored here at [`_lib/vm-blueprint.schema.ts`](_lib/vm-blueprint.schema.ts) so blueprints can be validated locally and in CI without the private platform package; the server remains the real gate.
+
+## Validating locally
+
+CI runs on every PR ([`.github/workflows/validate.yml`](.github/workflows/validate.yml)), but you can check your blueprint before pushing. Requires [Bun](https://bun.sh). All tooling lives under [`_lib/`](_lib/) — the catalog sync ingests every non-underscore `*.json` in the repo root, so anything that isn't a blueprint (this tooling, its `package.json`) is kept out of the root.
+
+```bash
+cd _lib
+bun install
+bun run validate
+```
+
+The validator checks each root `*.json` against the vendored schema, then applies a few contract checks the schema can't express ([`_lib/contract.ts`](_lib/contract.ts)):
+
+- `cloudInit.userDataTemplate` / `answerFile.template` must name a template the backend actually ships (`linux-default`, `win11-pro` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
+- a duplicate `id` across two files is an error (the sync skips the duplicate)
+- warnings for an `id` that differs from its filename stem, an off-convention `icon`, a `truenasVersion` with no comparison operator (a no-op gate), or `extraMedia` with no `sha256`
+
+Errors fail the run; warnings don't.
+
+### Keeping the schema copy current
+
+The vendored schema is a copy, so it can drift as the platform schema evolves. Re-vendor from a local platform checkout (defaults to a `../hexos-platform` sibling; override with `HEXOS_PLATFORM`):
+
+```bash
+cd _lib
+bun run sync-schema
+```
+
+When the backend adds a new provisioning template, also update the allowlists in [`_lib/contract.ts`](_lib/contract.ts).
 
 ## Contributing
 
 1. Fork this repository
 2. Add your blueprint JSON in the root directory (filename should match the `id`)
-3. Test it against a staging/dev HexOS environment (sync from your branch, or point `VM_CATALOG_PATH` at your checkout)
-4. Submit a pull request including where the image is published, how its checksum was obtained, and any special guest requirements
+3. Run `bun run validate` and fix any errors
+4. Test it against a staging/dev HexOS environment (sync from your branch, or point `VM_CATALOG_PATH` at your checkout)
+5. Submit a pull request including where the image is published, how its checksum was obtained, and any special guest requirements

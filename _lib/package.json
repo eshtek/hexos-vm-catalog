@@ -1,0 +1,14 @@
+{
+  "name": "hexos-vm-catalog-tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Validation tooling for the HexOS VM blueprint catalog. Lives under _lib/ so the catalog sync (which ingests every non-underscore *.json in the repo root) never sees it.",
+  "scripts": {
+    "validate": "bun validate.ts",
+    "sync-schema": "bash sync-schema.sh"
+  },
+  "dependencies": {
+    "zod": "^4.1.5"
+  }
+}
