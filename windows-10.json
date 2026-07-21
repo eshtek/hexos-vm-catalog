@@ -1,0 +1,45 @@
+{
+    "id": "windows-10",
+    "name": "Windows 10 Pro",
+    "description": "Windows 10 Pro installed hands-free from your own installer ISO — bring the ISO (Microsoft doesn't allow us to ship it), and HexOS handles partitioning, setup answers, and your first account. Note: Windows 10 reached end of support in October 2025 — pick Windows 11 if you want ongoing security updates.",
+    "icon": "vms/windows",
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "answer-file",
+        "source": {
+            "type": "user-iso",
+            "isoHelpUrl": "https://www.microsoft.com/software-download/windows10ISO"
+        },
+        "answerFile": {
+            "template": "win10-pro"
+        },
+        "extraMedia": [
+            {
+                "id": "virtio-drivers",
+                "url": "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.285-1/virtio-win-0.1.285.iso",
+                "sha256": "e14cf2b94492c3e925f0070ba7fdfedeb2048c91eea9c5a5afb30232a3976331"
+            }
+        ]
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "diskGb": 64
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": true,
+        "autostart": false,
+        "gpuPassthrough": true,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

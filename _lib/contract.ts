@@ -12,11 +12,25 @@
 import type { VMBlueprint } from "./vm-blueprint.schema";
 
 export const KNOWN_CLOUD_INIT_TEMPLATES = new Set(["linux-default"]);
-export const KNOWN_ANSWER_FILE_TEMPLATES = new Set(["win11-pro"]);
+export const KNOWN_ANSWER_FILE_TEMPLATES = new Set(["win11-pro", "win10-pro"]);
 
 // parseRange (shared/eshtek/versions.ts) only reads tokens that start with a
 // comparison operator; a range with none is silently "always in range".
 const VERSION_RANGE_OP = /(?:^|\s)(?:>=|<=|>|<)\s*\d/;
+// Common /proc/cpuinfo flag names worth gating on (the x86-64-v2/v3/v4
+// microarchitecture levels plus frequent extras). A typo'd flag passes the
+// schema but hides the blueprint on EVERY host, so unknown names warn rather
+// than error — new flag names do appear as kernels evolve.
+const KNOWN_CPU_FLAGS = new Set([
+  // x86-64-v2
+  "cx16", "lahf_lm", "popcnt", "sse4_1", "sse4_2", "ssse3",
+  // x86-64-v3
+  "abm", "avx", "avx2", "bmi1", "bmi2", "f16c", "fma", "movbe", "xsave",
+  // x86-64-v4
+  "avx512bw", "avx512cd", "avx512dq", "avx512f", "avx512vl",
+  // frequent extras
+  "adx", "aes", "pclmulqdq", "pdpe1gb", "rdrand", "rdseed", "sha_ni", "sse2", "sse3", "svm", "vmx",
+]);
 // Icon keys resolve like VMIcons ("vms/<slug>"); anything else falls back to
 // the OS-derived icon in the UI — a lint, not a hard failure.
 const ICON_KEY = /^vms\/[a-z0-9][a-z0-9-]*$/;
@@ -59,6 +73,14 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
 
   if (bp.icon && !ICON_KEY.test(bp.icon)) {
     warnings.push(`icon "${bp.icon}" doesn't match the "vms/<slug>" convention; the UI will fall back to the OS-derived icon if it can't resolve`);
+  }
+
+  for (const flag of bp.cpuFeatures ?? []) {
+    if (!KNOWN_CPU_FLAGS.has(flag.toLowerCase())) {
+      warnings.push(
+        `cpuFeatures flag "${flag}" isn't a commonly known /proc/cpuinfo flag — double-check the spelling (a typo'd flag hides the blueprint on every host)`,
+      );
+    }
   }
 
   if (bp.truenasVersion && !VERSION_RANGE_OP.test(bp.truenasVersion)) {

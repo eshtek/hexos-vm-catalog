@@ -8,8 +8,14 @@ A blueprint is a JSON document describing a ready-to-run VM: where to get its di
 
 | Blueprint | Description |
 |-----------|-------------|
+| [Debian 13 (Trixie)](debian-13.json) | Official Debian cloud image, configured on first boot |
+| [Fedora 44](fedora-44.json) | Official Fedora Cloud Base image, configured on first boot |
 | [Home Assistant OS](home-assistant-os.json) | Official Home Assistant appliance OS |
+| [Rocky Linux 9](rocky-9.json) | Official Rocky GenericCloud image, RHEL-compatible |
+| [Rocky Linux 10](rocky-10.json) | Official Rocky GenericCloud image; needs an x86-64-v3 CPU |
 | [Ubuntu Server 24.04 LTS](ubuntu-24.04.json) | Canonical's official cloud image, configured on first boot |
+| [Ubuntu Server 26.04 LTS](ubuntu-26.04.json) | Canonical's official cloud image, configured on first boot |
+| [Windows 10 Pro](windows-10.json) | Unattended install from a user-supplied installer ISO |
 | [Windows 11 Pro](windows-11.json) | Unattended install from a user-supplied installer ISO |
 
 ## Blueprint format
@@ -25,6 +31,9 @@ A blueprint is a JSON document describing a ready-to-run VM: where to get its di
     "icon": "vms/haos",
     "category": "smart-home",
     "truenasVersion": ">=25.04.2.6",       // hidden on servers outside this range
+    "cpuFeatures": ["avx2", "fma"],        // optional: /proc/cpuinfo flags the host CPU must have
+                                           // (case-insensitive; hidden on hosts missing any — e.g.
+                                           // list the x86-64-v3 flags for distros with that baseline)
     "internal": false,                     // true = never served from the prod branch
     "provisioning": {
         "strategy": "image",               // "image" | "cloud-init" | "answer-file"
@@ -74,9 +83,9 @@ bun run validate
 
 The validator checks each root `*.json` against the vendored schema, then applies a few contract checks the schema can't express ([`_lib/contract.ts`](_lib/contract.ts)):
 
-- `cloudInit.userDataTemplate` / `answerFile.template` must name a template the backend actually ships (`linux-default`, `win11-pro` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
+- `cloudInit.userDataTemplate` / `answerFile.template` must name a template the backend actually ships (`linux-default`, `win11-pro`, `win10-pro` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
 - a duplicate `id` across two files is an error (the sync skips the duplicate)
-- warnings for an `id` that differs from its filename stem, an off-convention `icon`, a `truenasVersion` with no comparison operator (a no-op gate), or `extraMedia` with no `sha256`
+- warnings for an `id` that differs from its filename stem, an off-convention `icon`, a `truenasVersion` with no comparison operator (a no-op gate), an unrecognized `cpuFeatures` flag name (a typo would hide the blueprint on every host), or `extraMedia` with no `sha256`
 
 Errors fail the run; warnings don't.
 

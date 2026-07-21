@@ -152,6 +152,16 @@ export const vmBlueprintSchema = z.object({
   category: z.string().max(64).optional(),
   /** TrueNAS version range gate, evaluated with isTrueNASVersionInRange (e.g. ">=25.04.2.6"). */
   truenasVersion: z.string().max(64).optional(),
+  /**
+   * CPU feature flags the host must have (as named in /proc/cpuinfo, e.g.
+   * "avx2"; matching is case-insensitive). Guests see the host CPU (VMs are
+   * created with host passthrough), so distros with a baseline like
+   * x86-64-v3 list its flags here. Evaluated with missingCpuFeatures.
+   */
+  cpuFeatures: z
+    .array(z.string().regex(/^[A-Za-z0-9_]{1,32}$/, "letters, digits and _ only"))
+    .max(32)
+    .optional(),
   /** Skipped when syncing the prod catalog branch (mirrors app install scripts). */
   internal: z.boolean().default(false),
   provisioning: vmProvisioningSchema,
@@ -278,6 +288,22 @@ export function computeBlueprintOverride(
   }
 
   return Object.keys(override).length > 0 ? override : null;
+}
+
+/**
+ * Blueprint CPU-feature gate: which of `required` the host CPU lacks. Host
+ * flags come from /proc/cpuinfo. An empty or unknown host list fails OPEN
+ * (returns []) — the gate is a visibility filter and must never empty the
+ * catalog when flags were never collected (older local versions, non-Linux
+ * dev hosts); the real stop is the install pipeline's re-check on the host.
+ */
+export function missingCpuFeatures(
+  hostFlags: string[] | null | undefined,
+  required: string[] | undefined,
+): string[] {
+  if (!required?.length || !hostFlags?.length) return [];
+  const available = new Set(hostFlags.map((flag) => flag.toLowerCase()));
+  return required.filter((flag) => !available.has(flag.toLowerCase()));
 }
 
 /**
