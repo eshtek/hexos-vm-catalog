@@ -1,0 +1,40 @@
+{
+    "id": "ubuntu-26.04",
+    "name": "Ubuntu Server 26.04 LTS",
+    "description": "Ubuntu Server 26.04 LTS (Resolute Raccoon) from Canonical's official cloud image, configured on first boot with your user account and SSH access.",
+    "icon": "vms/ubuntu",
+    "category": "linux",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "cloud-init",
+        "source": {
+            "url": "https://cloud-images.ubuntu.com/releases/26.04/{version}/ubuntu-26.04-server-cloudimg-amd64.img",
+            "version": "release-20260717",
+            "format": "qcow2",
+            "compression": "none",
+            "sha256": "b7daa0ffcb06acf44547a2f7682088d13acf0609937507faa8d7ef0302640ddd"
+        },
+        "cloudInit": {
+            "userDataTemplate": "linux-default"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 1024,
+        "recMemoryMb": 4096,
+        "minVcpus": 1,
+        "recVcpus": 2,
+        "diskGb": 32
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

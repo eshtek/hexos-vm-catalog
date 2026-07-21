@@ -1,0 +1,40 @@
+{
+    "id": "debian-13",
+    "name": "Debian 13 (Trixie)",
+    "description": "Debian 13 \"Trixie\" from the official cloud image — the rock-solid universal server distro, configured on first boot with your user account and SSH access.",
+    "icon": "vms/penguin",
+    "category": "linux",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "cloud-init",
+        "source": {
+            "url": "https://cloud.debian.org/images/cloud/trixie/{version}/debian-13-genericcloud-amd64-{version}.qcow2",
+            "version": "20260712-2537",
+            "format": "qcow2",
+            "compression": "none",
+            "sha256": "2cab162ddebb1ef083cca8f8261f77c93ae70f98252aabfeb1d8a28c30b191b1"
+        },
+        "cloudInit": {
+            "userDataTemplate": "linux-default"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 1024,
+        "recMemoryMb": 4096,
+        "minVcpus": 1,
+        "recVcpus": 2,
+        "diskGb": 32
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

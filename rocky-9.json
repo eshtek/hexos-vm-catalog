@@ -1,0 +1,40 @@
+{
+    "id": "rocky-9",
+    "name": "Rocky Linux 9",
+    "description": "Rocky Linux 9 from the official GenericCloud image — a stable, enterprise-grade server OS binary-compatible with Red Hat Enterprise Linux, supported into 2032.",
+    "icon": "vms/penguin",
+    "category": "linux",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "cloud-init",
+        "source": {
+            "url": "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base-{version}.x86_64.qcow2",
+            "version": "9.8-20260525.0",
+            "format": "qcow2",
+            "compression": "none",
+            "sha256": "92c206cc6f790c61583247eefe87890f8828420662c17cacf247cec78ab4eec8"
+        },
+        "cloudInit": {
+            "userDataTemplate": "linux-default"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 2048,
+        "recMemoryMb": 4096,
+        "minVcpus": 1,
+        "recVcpus": 2,
+        "diskGb": 32
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}
