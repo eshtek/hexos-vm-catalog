@@ -1,0 +1,38 @@
+{
+    "id": "ubuntu-desktop-26.04",
+    "name": "Ubuntu Desktop 26.04 LTS",
+    "description": "The Ubuntu 26.04 LTS desktop, installed hands-free from Canonical's official installer — the most widely used Linux desktop and a popular alternative to Windows.",
+    "icon": "vms/ubuntu",
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "installer-iso",
+        "source": {
+            "url": "https://releases.ubuntu.com/{version}/ubuntu-{version}-desktop-amd64.iso",
+            "version": "26.04",
+            "sha256": "487f87faaf547ea30e0aba4d5b53346292571256b25333a978db1692bcee9dd2"
+        },
+        "seed": {
+            "template": "ubuntu-desktop-autoinstall"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "diskGb": 64
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

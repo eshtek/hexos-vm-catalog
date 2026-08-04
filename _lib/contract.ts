@@ -6,13 +6,15 @@
 //
 // The template allowlists are hand-maintained mirrors of the backend. Keep them
 // in sync when the backend adds a template. Sources of truth:
-//   - cloud-init:  hexos-platform  packages/backend/src/lib/cloudInitSeed.ts   (USER_DATA_TEMPLATES)
-//   - answer-file: hexos-platform  packages/backend/src/lib/autounattend.ts    (ANSWER_FILE_TEMPLATES)
+//   - cloud-init:    hexos-platform  packages/backend/src/lib/cloudInitSeed.ts   (USER_DATA_TEMPLATES)
+//   - answer-file:   hexos-platform  packages/backend/src/lib/autounattend.ts    (ANSWER_FILE_TEMPLATES)
+//   - installer-iso: hexos-platform  packages/backend/src/lib/installerSeed.ts   (INSTALLER_SEED_TEMPLATES)
 
 import type { VMBlueprint } from "./vm-blueprint.schema";
 
 export const KNOWN_CLOUD_INIT_TEMPLATES = new Set(["linux-default"]);
 export const KNOWN_ANSWER_FILE_TEMPLATES = new Set(["win11-pro", "win10-pro"]);
+export const KNOWN_INSTALLER_SEED_TEMPLATES = new Set(["ubuntu-desktop-autoinstall", "fedora-workstation-kickstart"]);
 
 // parseRange (shared/eshtek/versions.ts) only reads tokens that start with a
 // comparison operator; a range with none is silently "always in range".
@@ -69,6 +71,11 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
         warnings.push(`extraMedia "${m.id}" has no sha256 — the ISO will be attached without integrity verification`);
       }
     }
+  }
+  if (p.strategy === "installer-iso" && !KNOWN_INSTALLER_SEED_TEMPLATES.has(p.seed.template)) {
+    errors.push(
+      `unknown installer-seed template "${p.seed.template}" — the backend ships only: ${[...KNOWN_INSTALLER_SEED_TEMPLATES].join(", ")}`,
+    );
   }
 
   if (bp.icon && !ICON_KEY.test(bp.icon)) {

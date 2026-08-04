@@ -10,9 +10,11 @@ A blueprint is a JSON document describing a ready-to-run VM: where to get its di
 |-----------|-------------|
 | [Debian 13 (Trixie)](debian-13.json) | Official Debian cloud image, configured on first boot |
 | [Fedora 44](fedora-44.json) | Official Fedora Cloud Base image, configured on first boot |
+| [Fedora Workstation 44](fedora-workstation-44.json) | GNOME desktop, installed hands-free by Fedora's network installer |
 | [Home Assistant OS](home-assistant-os.json) | Official Home Assistant appliance OS |
 | [Rocky Linux 9](rocky-9.json) | Official Rocky GenericCloud image, RHEL-compatible |
 | [Rocky Linux 10](rocky-10.json) | Official Rocky GenericCloud image; needs an x86-64-v3 CPU |
+| [Ubuntu Desktop 26.04 LTS](ubuntu-desktop-26.04.json) | The Ubuntu desktop, installed hands-free from Canonical's official installer |
 | [Ubuntu Server 24.04 LTS](ubuntu-24.04.json) | Canonical's official cloud image, configured on first boot |
 | [Ubuntu Server 26.04 LTS](ubuntu-26.04.json) | Canonical's official cloud image, configured on first boot |
 | [Windows 10 Pro](windows-10.json) | Unattended install from a user-supplied installer ISO |
@@ -36,7 +38,7 @@ A blueprint is a JSON document describing a ready-to-run VM: where to get its di
                                            // list the x86-64-v3 flags for distros with that baseline)
     "internal": false,                     // true = never served from the prod branch
     "provisioning": {
-        "strategy": "image",               // "image" | "cloud-init" | "answer-file"
+        "strategy": "image",               // "image" | "cloud-init" | "answer-file" | "installer-iso"
         "source": {
             "url": "https://…/{version}/disk-{version}.qcow2.xz",  // {version} is substituted
             "version": "18.1",
@@ -66,6 +68,7 @@ Strategy notes:
 - **image** — a bootable appliance image streamed directly onto the VM disk (HAOS-style).
 - **cloud-init** — a distro cloud image plus a `cloudInit.userDataTemplate` naming a first-boot template shipped in the HexOS backend. Readiness is usually `{ "type": "phone-home" }`.
 - **answer-file** — installer automation (Windows). `source` is `{ "type": "user-iso" }` (the user supplies the installer ISO), `answerFile.template` names a backend template, and `extraMedia` lists additional ISOs (e.g. VirtIO drivers) attached as CD-ROMs.
+- **installer-iso** — installer automation for freely redistributable media (desktop Linux). `source` is a downloadable ISO (`url`/`version`/`sha256`, no `format`/`compression`), and `seed.template` names a backend template that generates the answer-seed ISO attached alongside it (Ubuntu autoinstall on a NoCloud `cidata` volume, Fedora kickstart on `OEMDRV`). The VM disk starts blank; the installer fills it. Readiness is usually `{ "type": "phone-home" }`.
 
 Version bumps are a two-field change: `source.version` and `source.sha256`.
 
@@ -83,7 +86,7 @@ bun run validate
 
 The validator checks each root `*.json` against the vendored schema, then applies a few contract checks the schema can't express ([`_lib/contract.ts`](_lib/contract.ts)):
 
-- `cloudInit.userDataTemplate` / `answerFile.template` must name a template the backend actually ships (`linux-default`, `win11-pro`, `win10-pro` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
+- `cloudInit.userDataTemplate` / `answerFile.template` / `seed.template` must name a template the backend actually ships (`linux-default`, `win11-pro`, `win10-pro`, `ubuntu-desktop-autoinstall`, `fedora-workstation-kickstart` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
 - a duplicate `id` across two files is an error (the sync skips the duplicate)
 - warnings for an `id` that differs from its filename stem, an off-convention `icon`, a `truenasVersion` with no comparison operator (a no-op gate), an unrecognized `cpuFeatures` flag name (a typo would hide the blueprint on every host), or `extraMedia` with no `sha256`
 
