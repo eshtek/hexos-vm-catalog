@@ -170,7 +170,19 @@ export const vmBlueprintSchema = z.object({
     description: z.string().max(1024).default(''),
     /** Icon key, resolved like VMIcons (e.g. "vms/haos"). */
     icon: z.string().max(128).optional(),
-    category: z.string().max(64).optional(),
+    /**
+     * Category slug used to group the user-facing catalog. Deliberately not a
+     * hard enum — sync re-validates every stored document, and an enum would
+     * validationError-hide blueprints whenever the catalog adds a category
+     * before the platform deploys. The strict allowlist (server | desktop |
+     * appliance) lives in hexos-vm-catalog/_lib/contract.ts, enforced by
+     * catalog CI; clients group unknown values into a fallback bucket.
+     */
+    category: z
+        .string()
+        .max(64)
+        .regex(/^[a-z][a-z0-9-]*$/, 'lowercase slug (letters, digits, "-")')
+        .optional(),
     /** TrueNAS version range gate, evaluated with isTrueNASVersionInRange (e.g. ">=25.04.2.6"). */
     truenasVersion: z.string().max(64).optional(),
     /**
@@ -212,6 +224,8 @@ export interface VMBlueprintRecord {
     overridden: boolean;
     enabled: boolean;
     hidden: boolean;
+    /** Admin-curated promotion flag; recommended blueprints sort first within their category. */
+    recommended: boolean;
     /** Set (and the blueprint auto-disabled) when document+override no longer validates after a sync. */
     validationError: string | null;
     /** Catalog rows that disappeared from the repo; excluded from user-facing lists. */
@@ -229,6 +243,7 @@ export interface VMBlueprintAdminRecord {
     overridden: boolean;
     enabled: boolean;
     hidden: boolean;
+    recommended: boolean;
     validationError: string | null;
     removedFromCatalog: boolean;
     lastCatalogSync: Date | null;

@@ -31,7 +31,7 @@ A blueprint is a JSON document describing a ready-to-run VM: where to get its di
     "name": "Home Assistant OS",
     "description": "…",
     "icon": "vms/haos",
-    "category": "smart-home",
+    "category": "appliance",               // "server" | "desktop" | "appliance" (CI-enforced; the UI groups by this)
     "truenasVersion": ">=25.04.2.6",       // hidden on servers outside this range
     "cpuFeatures": ["avx2", "fma"],        // optional: /proc/cpuinfo flags the host CPU must have
                                            // (case-insensitive; hidden on hosts missing any — e.g.

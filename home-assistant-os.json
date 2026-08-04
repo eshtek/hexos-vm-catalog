@@ -3,7 +3,7 @@
     "name": "Home Assistant OS",
     "description": "The official Home Assistant appliance OS — full home automation platform with add-on support, managed updates, and backups.",
     "icon": "vms/haos",
-    "category": "smart-home",
+    "category": "appliance",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {
         "strategy": "image",

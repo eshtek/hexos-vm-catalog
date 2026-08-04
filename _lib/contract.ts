@@ -15,6 +15,11 @@ import type { VMBlueprint } from "./vm-blueprint.schema";
 export const KNOWN_CLOUD_INIT_TEMPLATES = new Set(["linux-default"]);
 export const KNOWN_ANSWER_FILE_TEMPLATES = new Set(["win11-pro", "win10-pro"]);
 export const KNOWN_INSTALLER_SEED_TEMPLATES = new Set(["ubuntu-desktop-autoinstall", "fedora-workstation-kickstart"]);
+// The category vocabulary is enforced HERE (CI error) rather than as an enum in
+// the schema: sync re-validates stored documents against the schema, so a hard
+// enum would auto-hide blueprints whenever the catalog adds a category before
+// the platform deploys. The UI groups these; unknown slugs land in "Other".
+export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
 
 // parseRange (shared/eshtek/versions.ts) only reads tokens that start with a
 // comparison operator; a range with none is silently "always in range".
@@ -75,6 +80,12 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
   if (p.strategy === "installer-iso" && !KNOWN_INSTALLER_SEED_TEMPLATES.has(p.seed.template)) {
     errors.push(
       `unknown installer-seed template "${p.seed.template}" — the backend ships only: ${[...KNOWN_INSTALLER_SEED_TEMPLATES].join(", ")}`,
+    );
+  }
+
+  if (bp.category && !KNOWN_CATEGORIES.has(bp.category)) {
+    errors.push(
+      `unknown category "${bp.category}" — allowed values: ${[...KNOWN_CATEGORIES].join(", ")} (extend KNOWN_CATEGORIES deliberately when adding one)`,
     );
   }
 

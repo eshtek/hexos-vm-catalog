@@ -3,7 +3,7 @@
     "name": "Fedora 44",
     "description": "Fedora 44 from the official Cloud Base image — cutting-edge packages and a recent kernel, configured on first boot with your user account and SSH access.",
     "icon": "vms/penguin",
-    "category": "linux",
+    "category": "server",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {
         "strategy": "cloud-init",

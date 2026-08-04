@@ -3,7 +3,7 @@
     "name": "Rocky Linux 9",
     "description": "Rocky Linux 9 from the official GenericCloud image — a stable, enterprise-grade server OS binary-compatible with Red Hat Enterprise Linux, supported into 2032.",
     "icon": "vms/penguin",
-    "category": "linux",
+    "category": "server",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {
         "strategy": "cloud-init",

@@ -3,7 +3,7 @@
     "name": "Debian 13 (Trixie)",
     "description": "Debian 13 \"Trixie\" from the official cloud image — the rock-solid universal server distro, configured on first boot with your user account and SSH access.",
     "icon": "vms/penguin",
-    "category": "linux",
+    "category": "server",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {
         "strategy": "cloud-init",
