@@ -1,0 +1,38 @@
+{
+    "id": "zorin-os-18",
+    "name": "Zorin OS 18.1 Core",
+    "description": "Zorin OS 18.1 Core, installed hands-free from the official ISO — a polished, Windows-familiar Linux desktop designed to feel instantly at home for people leaving Windows behind.",
+    "icon": "vms/zorin",
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "installer-iso",
+        "source": {
+            "url": "https://mirror.umd.edu/zorin/18/Zorin-OS-{version}-Core-64-bit.iso",
+            "version": "18.1",
+            "sha256": "44649b97bd307fc4c8529205d098ebbf98575a1e1ba2ee7d7005b697af1721d5"
+        },
+        "seed": {
+            "template": "zorin-preseed"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "diskGb": 64
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

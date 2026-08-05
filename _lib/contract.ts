@@ -18,6 +18,8 @@ export const KNOWN_INSTALLER_SEED_TEMPLATES = new Set([
   "ubuntu-desktop-autoinstall",
   "fedora-workstation-kickstart",
   "bazzite-kickstart",
+  "mint-preseed",
+  "zorin-preseed",
 ]);
 // The category vocabulary is enforced HERE (CI error) rather than as an enum in
 // the schema: sync re-validates stored documents against the schema, so a hard
