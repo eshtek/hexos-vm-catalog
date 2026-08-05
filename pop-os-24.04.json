@@ -1,0 +1,38 @@
+{
+    "id": "pop-os-24.04",
+    "name": "Pop!_OS 24.04 LTS",
+    "description": "System76's Pop!_OS 24.04 LTS with the COSMIC desktop, installed hands-free from the official ISO — a keyboard-driven, developer-friendly Linux desktop.",
+    "icon": "vms/pop-os",
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "installer-iso",
+        "source": {
+            "url": "https://iso.pop-os.org/24.04/amd64/intel/20/pop-os_24.04_amd64_intel_20.iso",
+            "version": "24.04-build20",
+            "sha256": "a0ef3842ab710db4f4407cf3499560b59dddbbcd59bee17beab7b0e99dc22b4c"
+        },
+        "seed": {
+            "template": "pop-live-exec"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "diskGb": 64
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}
