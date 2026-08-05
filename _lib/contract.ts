@@ -14,7 +14,11 @@ import type { VMBlueprint } from "./vm-blueprint.schema";
 
 export const KNOWN_CLOUD_INIT_TEMPLATES = new Set(["linux-default"]);
 export const KNOWN_ANSWER_FILE_TEMPLATES = new Set(["win11-pro", "win10-pro"]);
-export const KNOWN_INSTALLER_SEED_TEMPLATES = new Set(["ubuntu-desktop-autoinstall", "fedora-workstation-kickstart"]);
+export const KNOWN_INSTALLER_SEED_TEMPLATES = new Set([
+  "ubuntu-desktop-autoinstall",
+  "fedora-workstation-kickstart",
+  "bazzite-kickstart",
+]);
 // The category vocabulary is enforced HERE (CI error) rather than as an enum in
 // the schema: sync re-validates stored documents against the schema, so a hard
 // enum would auto-hide blueprints whenever the catalog adds a category before
