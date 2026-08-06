@@ -21,6 +21,8 @@ export const KNOWN_INSTALLER_SEED_TEMPLATES = new Set([
   "mint-preseed",
   "zorin-preseed",
   "pop-live-exec",
+  "omarchy-autoinstall",
+  "cachyos-headless",
 ]);
 // The category vocabulary is enforced HERE (CI error) rather than as an enum in
 // the schema: sync re-validates stored documents against the schema, so a hard

@@ -8,10 +8,12 @@ A blueprint is a JSON document describing a ready-to-run VM: where to get its di
 
 | Blueprint | Description |
 |-----------|-------------|
+| [CachyOS](cachyos.json) | Performance-tuned Arch with KDE Plasma, installed hands-free by its own headless installer |
 | [Debian 13 (Trixie)](debian-13.json) | Official Debian cloud image, configured on first boot |
 | [Fedora 44](fedora-44.json) | Official Fedora Cloud Base image, configured on first boot |
 | [Fedora Workstation 44](fedora-workstation-44.json) | GNOME desktop, installed hands-free by Fedora's network installer |
 | [Home Assistant OS](home-assistant-os.json) | Official Home Assistant appliance OS |
+| [Omarchy 3.8](omarchy.json) | DHH's Arch + Hyprland desktop, installed hands-free via the ISO's own autoinstall |
 | [Rocky Linux 9](rocky-9.json) | Official Rocky GenericCloud image, RHEL-compatible |
 | [Rocky Linux 10](rocky-10.json) | Official Rocky GenericCloud image; needs an x86-64-v3 CPU |
 | [Ubuntu Desktop 26.04 LTS](ubuntu-desktop-26.04.json) | The Ubuntu desktop, installed hands-free from Canonical's official installer |
@@ -86,7 +88,7 @@ bun run validate
 
 The validator checks each root `*.json` against the vendored schema, then applies a few contract checks the schema can't express ([`_lib/contract.ts`](_lib/contract.ts)):
 
-- `cloudInit.userDataTemplate` / `answerFile.template` / `seed.template` must name a template the backend actually ships (`linux-default`, `win11-pro`, `win10-pro`, `ubuntu-desktop-autoinstall`, `fedora-workstation-kickstart` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
+- `cloudInit.userDataTemplate` / `answerFile.template` / `seed.template` must name a template the backend actually ships (`linux-default`, `win11-pro`, `win10-pro`, `ubuntu-desktop-autoinstall`, `fedora-workstation-kickstart`, `bazzite-kickstart`, `mint-preseed`, `zorin-preseed`, `pop-live-exec`, `omarchy-autoinstall`, `cachyos-headless` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
 - a duplicate `id` across two files is an error (the sync skips the duplicate)
 - warnings for an `id` that differs from its filename stem, an off-convention `icon`, a `truenasVersion` with no comparison operator (a no-op gate), an unrecognized `cpuFeatures` flag name (a typo would hide the blueprint on every host), or `extraMedia` with no `sha256`
 
