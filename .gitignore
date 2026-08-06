@@ -1,2 +1,7 @@
 _lib/node_modules/
 *.DS_Store
+
+# Draft blueprints and their notes stay local: a draft carries "TODO" digests
+# and unverified URLs, and the point of this directory is that nothing in it is
+# published, synced, or validated.
+_pending/
