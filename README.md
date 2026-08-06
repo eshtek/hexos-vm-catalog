@@ -12,8 +12,13 @@ Grouped by `category`, which is how the HexOS UI groups them too.
 
 | Blueprint | Description |
 |-----------|-------------|
+| [AlmaLinux 9](almalinux-9.json) | Official AlmaLinux GenericCloud image, RHEL-compatible |
+| [AlmaLinux 10](almalinux-10.json) | Official AlmaLinux GenericCloud image; needs an x86-64-v3 CPU |
+| [Debian 12 (Bookworm)](debian-12.json) | Official Debian cloud image, for workloads pinned to oldstable |
 | [Debian 13 (Trixie)](debian-13.json) | Official Debian cloud image, configured on first boot |
 | [Fedora 44](fedora-44.json) | Official Fedora Cloud Base image, configured on first boot |
+| [Fedora CoreOS](fedora-coreos.json) | Minimal auto-updating container host, configured by Ignition |
+| [Flatcar Container Linux](flatcar.json) | Immutable auto-updating container host, configured by Ignition |
 | [Rocky Linux 9](rocky-9.json) | Official Rocky GenericCloud image, RHEL-compatible |
 | [Rocky Linux 10](rocky-10.json) | Official Rocky GenericCloud image; needs an x86-64-v3 CPU |
 | [Ubuntu Server 24.04 LTS](ubuntu-24.04.json) | Canonical's official cloud image, configured on first boot |
@@ -25,13 +30,17 @@ Grouped by `category`, which is how the HexOS UI groups them too.
 |-----------|-------------|
 | [Bazzite](bazzite.json) | Gaming-focused atomic KDE desktop from Universal Blue; offers GPU passthrough |
 | [CachyOS](cachyos.json) | Performance-tuned Arch with KDE Plasma, installed hands-free by its own headless installer |
+| [Fedora KDE Plasma Desktop 44](fedora-kde-44.json) | KDE Plasma, from the same Fedora network installer as Workstation |
 | [Fedora Workstation 44](fedora-workstation-44.json) | GNOME desktop, installed hands-free by Fedora's network installer |
+| [Kubuntu 26.04 LTS](kubuntu-26.04.json) | Ubuntu with the KDE Plasma desktop, installed hands-free from the official ISO |
 | [Linux Mint 22.3 Cinnamon](mint-22.3.json) | Cinnamon desktop, installed hands-free from the official ISO |
+| [openSUSE Leap 16.0](opensuse-leap-16.json) | Fixed-release SLE-based desktop, installed hands-free by Agama |
 | [Omarchy 3.8](omarchy.json) | DHH's Arch + Hyprland desktop, installed hands-free via the ISO's own autoinstall — `internal: true`, so it does not appear in the user-facing catalog yet |
 | [Pop!_OS 24.04 LTS](pop-os-24.04.json) | System76's COSMIC desktop, installed hands-free from the official ISO |
 | [Ubuntu Desktop 26.04 LTS](ubuntu-desktop-26.04.json) | The Ubuntu desktop, installed hands-free from Canonical's official installer |
 | [Windows 10 Pro](windows-10.json) | Unattended install from a user-supplied installer ISO |
 | [Windows 11 Pro](windows-11.json) | Unattended install from a user-supplied installer ISO |
+| [Xubuntu 26.04 LTS](xubuntu-26.04.json) | Ubuntu with the Xfce desktop, light on resources |
 | [Zorin OS 18.1 Core](zorin-os-18.json) | Windows-familiar desktop, installed hands-free from the official ISO |
 
 ### Appliance
@@ -39,6 +48,7 @@ Grouped by `category`, which is how the HexOS UI groups them too.
 | Blueprint | Description |
 |-----------|-------------|
 | [Home Assistant OS](home-assistant-os.json) | Official Home Assistant appliance OS |
+| [OpenWrt 25.12](openwrt.json) | Official OpenWrt x86-64 router/firewall image, managed from LuCI |
 
 Drafts that aren't ready to ship live in a gitignored `_pending/` directory on
 the maintainer's machine — a draft carries `TODO` digests and URLs nobody has

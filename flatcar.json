@@ -1,0 +1,42 @@
+{
+    "id": "flatcar",
+    "name": "Flatcar Container Linux",
+    "description": "Flatcar Container Linux from the official stable channel — an immutable, automatically-updating container host in the CoreOS lineage. Configured at first boot from an Ignition document.",
+    "icon": "vms/flatcar",
+    "category": "server",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "machine-config",
+        "source": {
+            "url": "https://stable.release.flatcar-linux.net/amd64-usr/{version}/flatcar_production_openstack_image.img",
+            "version": "4593.2.4",
+            "format": "qcow2",
+            "compression": "none",
+            "sha512": "39abdd660255eb6f29611cce8d66229e5368ac21b8841c50a6b611ae9e6ae2dafe9db1354d185145819386bf7b6c771e28153e522c61deb95aaee7694b12f153",
+            "releasesUrl": "https://stable.release.flatcar-linux.net/amd64-usr/"
+        },
+        "machineConfig": {
+            "template": "flatcar-ignition",
+            "delivery": "config-drive"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 2048,
+        "recMemoryMb": 4096,
+        "minVcpus": 2,
+        "recVcpus": 2,
+        "diskGb": 32
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": true,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

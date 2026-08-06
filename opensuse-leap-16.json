@@ -1,0 +1,40 @@
+{
+    "id": "opensuse-leap-16",
+    "name": "openSUSE Leap 16.0",
+    "description": "openSUSE Leap 16.0, installed hands-free from the official offline installer — a fixed-release desktop and workstation distribution built from the same sources as SUSE Linux Enterprise, with 24 months of updates per release.",
+    "icon": "vms/opensuse",
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "cpuFeatures": ["cx16", "lahf_lm", "popcnt", "sse4_1", "sse4_2", "ssse3"],
+    "provisioning": {
+        "strategy": "installer-iso",
+        "source": {
+            "url": "https://download.opensuse.org/distribution/leap/16.0/offline/Leap-16.0-offline-installer-x86_64-Build178.27.install.iso",
+            "version": "16.0-Build178.27",
+            "sha512": "94411793a1878b3558211c8bbe4f3823c3c5212cc2dd9f9e4532a18be7eddd3be14db5a3bb47a2f36dd957e190ea706cd45af16bce218dfc00f71e64a8469971",
+            "releasesUrl": "https://download.opensuse.org/distribution/leap/16.0/offline/"
+        },
+        "seed": {
+            "template": "opensuse-agama-profile"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "diskGb": 64
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

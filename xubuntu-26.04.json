@@ -1,0 +1,39 @@
+{
+    "id": "xubuntu-26.04",
+    "name": "Xubuntu 26.04 LTS",
+    "description": "Ubuntu 26.04 LTS with the Xfce desktop, installed hands-free from Canonical's official installer — the same Ubuntu base and update schedule with a lightweight, conventional desktop that runs well on modest resources.",
+    "icon": "vms/xubuntu",
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "installer-iso",
+        "source": {
+            "url": "https://cdimage.ubuntu.com/xubuntu/releases/{version}/release/xubuntu-{version}-desktop-amd64.iso",
+            "version": "26.04",
+            "sha256": "ae030dbd99426a4c7b2d1c96731e0f435ec9d18f6a28c9e76f077dd5f46364bc",
+            "releasesUrl": "https://cdimage.ubuntu.com/xubuntu/releases/"
+        },
+        "seed": {
+            "template": "ubuntu-desktop-autoinstall"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 2048,
+        "recMemoryMb": 4096,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "diskGb": 64
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}
