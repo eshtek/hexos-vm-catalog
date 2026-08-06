@@ -4,9 +4,10 @@
 // Verbatim copy of the blueprint schema from the hexOS platform monorepo:
 //   packages/shared/eshtek/vm-blueprints.ts
 //
-// That file is the single source of truth. This repo keeps a copy so blueprints
-// can be validated locally and in CI without depending on the private platform
-// package (see Q1 in the Zero-Touch VM Provisioning plan — "copy, don't share").
+// That file is the single source of truth. This repo keeps a copy rather than
+// importing it because hexos-platform is private and this repo is public: CI
+// here runs on fork pull requests, so it cannot depend on a package it has no
+// credentials to install.
 //
 // Re-vendor after any upstream schema change:
 //   bun run sync-schema        # wraps _lib/sync-schema.sh
@@ -31,45 +32,106 @@ const blueprintIdSchema = z
     .max(64)
     .regex(/^[a-z0-9][a-z0-9.-]*$/, 'lowercase alphanumerics, "." and "-" only');
 
+// ── Checksums ────────────────────────────────────────────────────────────────
+// Sources carry one or both of sha256/sha512. Two algorithms because not every
+// publisher offers a choice: Canonical, Fedora and OpenWrt publish SHA-256,
+// while Debian's cloud images and openSUSE publish only SHA-512. At least one
+// digest is always required — an unverified image is never booted — and the
+// install pipeline verifies EVERY digest present, so listing both is a strictly
+// stronger claim, not a fallback chain.
+
+export const SHA256_HEX = /^[a-f0-9]{64}$/;
+export const SHA512_HEX = /^[a-f0-9]{128}$/;
+
+export type ChecksumAlgorithm = 'sha256' | 'sha512';
+
+export interface SourceDigest {
+    algorithm: ChecksumAlgorithm;
+    value: string;
+}
+
+const checksumFieldsSchema = {
+    /** sha256 of the file as downloaded (i.e. before decompression). Lowercase hex. */
+    sha256: z.string().regex(SHA256_HEX).optional(),
+    /** sha512 of the file as downloaded (i.e. before decompression). Lowercase hex. */
+    sha512: z.string().regex(SHA512_HEX).optional(),
+};
+
+const requireOneDigest = <T extends { sha256?: string; sha512?: string }>(source: T) =>
+    Boolean(source.sha256 || source.sha512);
+
+const ONE_DIGEST_MESSAGE = 'at least one of sha256 or sha512 is required — never boot an unverified image';
+
+/**
+ * Every digest a source claims, strongest first. The install pipeline must
+ * verify ALL of them; a mismatch on any one fails the install. Returns at
+ * least one entry for any source that passed schema validation.
+ */
+export function sourceDigests(source: { sha256?: string; sha512?: string }): SourceDigest[] {
+    const digests: SourceDigest[] = [];
+    if (source.sha512) digests.push({ algorithm: 'sha512', value: source.sha512 });
+    if (source.sha256) digests.push({ algorithm: 'sha256', value: source.sha256 });
+    return digests;
+}
+
+// Where the next version comes from. `url` pins one artifact and says nothing
+// about what supersedes it, so a source may also name the vendor listing a
+// maintainer reads to bump it. Editorial metadata: nothing here fetches it and
+// no client renders it (that is isoHelpUrl's job, below).
+const releasesUrlField = {
+    /** Vendor page listing available releases and their published digests. */
+    releasesUrl: z.string().url().startsWith('https://').max(512).optional(),
+};
+
 // Downloadable disk image. `url` may contain "{version}" placeholders that are
 // substituted with `version` at install time, so version bumps are a
-// two-field catalog change (version + sha256).
-export const vmImageSourceSchema = z.object({
-    url: z.string().url().startsWith('https://'),
-    version: z.string().min(1).max(64),
-    format: z.enum(['raw', 'qcow2']),
-    compression: z.enum(['none', 'xz', 'gz', 'zstd']).default('none'),
-    /** sha256 of the file as downloaded (i.e. before decompression). Never boot an unverified image. */
-    sha256: z.string().regex(/^[a-f0-9]{64}$/),
-});
+// two-field catalog change (version + digest).
+export const vmImageSourceSchema = z
+    .object({
+        url: z.string().url().startsWith('https://'),
+        version: z.string().min(1).max(64),
+        format: z.enum(['raw', 'qcow2']),
+        // bz2 is here for FreeBSD-derived appliance images (OPNsense ships
+        // .img.bz2). 7z is deliberately absent — it would need a bundled extractor
+        // and a "which member of the archive" field, since it is a container rather
+        // than a stream filter like the rest.
+        compression: z.enum(['none', 'xz', 'gz', 'zstd', 'bz2']).default('none'),
+        ...checksumFieldsSchema,
+        ...releasesUrlField,
+    })
+    .refine(requireOneDigest, { message: ONE_DIGEST_MESSAGE, path: ['sha256'] });
 
 // Downloadable installer ISO (freely redistributable media, unlike user-iso).
 // `url` may contain "{version}" placeholders like vmImageSourceSchema.
-export const vmInstallerIsoSourceSchema = z.object({
-    url: z.string().url().startsWith('https://'),
-    version: z.string().min(1).max(64),
-    /** sha256 of the ISO as downloaded. Never boot an unverified installer. */
-    sha256: z.string().regex(/^[a-f0-9]{64}$/),
-});
+export const vmInstallerIsoSourceSchema = z
+    .object({
+        url: z.string().url().startsWith('https://'),
+        version: z.string().min(1).max(64),
+        ...checksumFieldsSchema,
+        ...releasesUrlField,
+    })
+    .refine(requireOneDigest, { message: ONE_DIGEST_MESSAGE, path: ['sha256'] });
 
 // The user supplies the installer ISO (e.g. Windows — not redistributable).
 export const vmUserIsoSourceSchema = z.object({
     type: z.literal('user-iso'),
     /**
      * The vendor's official download page, offered as a link in the install
-     * dialog (a link only — scripted retrieval stays off the table).
+     * dialog (a link only — scripted retrieval stays off the table). Distinct
+     * from releasesUrl, which no client renders, even where the two point at
+     * the same page: this one is product copy.
      */
     isoHelpUrl: z.string().url().startsWith('https://').optional(),
+    ...releasesUrlField,
 });
 
 export const vmExtraMediaSchema = z.object({
     /** Slug charset — the id becomes part of a host-side cache filename. */
     id: blueprintIdSchema,
     url: z.string().url().startsWith('https://'),
-    sha256: z
-        .string()
-        .regex(/^[a-f0-9]{64}$/)
-        .optional(),
+    // Unlike the primary source, extra media may carry no digest at all
+    // (historically permitted); catalog CI warns rather than rejecting.
+    ...checksumFieldsSchema,
 });
 
 const provisioningImageSchema = z.object({
@@ -109,11 +171,37 @@ const provisioningInstallerIsoSchema = z.object({
     }),
 });
 
+// Container hosts configured by a machine config rather than cloud-init: Fedora
+// CoreOS and Flatcar (Ignition), Talos (its own machine config). Distinct from
+// 'cloud-init' because these guests ship no cloud-init at all, and distinct from
+// 'image' because without the config they boot unconfigured and unreachable.
+const provisioningMachineConfigSchema = z.object({
+    strategy: z.literal('machine-config'),
+    source: vmImageSourceSchema,
+    machineConfig: z.object({
+        /** Named config template shipped in the backend (not arbitrary catalog-supplied config). */
+        template: z.string().min(1).max(64),
+        /**
+         * How the host hands the rendered document to the guest.
+         * 'config-drive' — extra volume with a well-known label, read at first boot
+         *                  (openstack 'config-2' for Ignition guests, Talos nocloud).
+         *                  What everything ships with: the volume can be ejected and
+         *                  scrubbed once the install is confirmed.
+         * 'fw-cfg'       — QEMU fw_cfg blob at opt/com.coreos/config. Works on every
+         *                  supported train, but rides in the domain's command line,
+         *                  where it is visible in `ps` and cannot be scrubbed after
+         *                  install. No template uses it today.
+         */
+        delivery: z.enum(['fw-cfg', 'config-drive']),
+    }),
+});
+
 export const vmProvisioningSchema = z.discriminatedUnion('strategy', [
     provisioningImageSchema,
     provisioningCloudInitSchema,
     provisioningAnswerFileSchema,
     provisioningInstallerIsoSchema,
+    provisioningMachineConfigSchema,
 ]);
 
 export const vmBlueprintResourcesSchema = z

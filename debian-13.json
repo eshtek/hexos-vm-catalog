@@ -12,7 +12,8 @@
             "version": "20260712-2537",
             "format": "qcow2",
             "compression": "none",
-            "sha256": "2cab162ddebb1ef083cca8f8261f77c93ae70f98252aabfeb1d8a28c30b191b1"
+            "sha512": "7ae53e9dbee282bfc16f289dec483dde3a8598769c38a267948310f7a2a52c662620198603bc52c142627efba379863d16079698a10b34102d55bcedd40e8d32",
+            "releasesUrl": "https://cloud.debian.org/images/cloud/trixie/"
         },
         "cloudInit": {
             "userDataTemplate": "linux-default"

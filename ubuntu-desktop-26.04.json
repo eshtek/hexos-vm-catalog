@@ -10,7 +10,8 @@
         "source": {
             "url": "https://releases.ubuntu.com/{version}/ubuntu-{version}-desktop-amd64.iso",
             "version": "26.04",
-            "sha256": "487f87faaf547ea30e0aba4d5b53346292571256b25333a978db1692bcee9dd2"
+            "sha256": "487f87faaf547ea30e0aba4d5b53346292571256b25333a978db1692bcee9dd2",
+            "releasesUrl": "https://releases.ubuntu.com/26.04/"
         },
         "seed": {
             "template": "ubuntu-desktop-autoinstall"

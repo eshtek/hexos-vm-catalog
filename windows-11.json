@@ -9,7 +9,8 @@
         "strategy": "answer-file",
         "source": {
             "type": "user-iso",
-            "isoHelpUrl": "https://www.microsoft.com/software-download/windows11"
+            "isoHelpUrl": "https://www.microsoft.com/software-download/windows11",
+            "releasesUrl": "https://www.microsoft.com/software-download/windows11"
         },
         "answerFile": {
             "template": "win11-pro"

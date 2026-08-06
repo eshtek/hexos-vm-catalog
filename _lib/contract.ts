@@ -10,13 +10,48 @@
 //   - answer-file:   hexos-platform  packages/backend/src/lib/autounattend.ts    (ANSWER_FILE_TEMPLATES)
 //   - installer-iso: hexos-platform  packages/backend/src/lib/installerSeed.ts   (INSTALLER_SEED_TEMPLATES)
 
-import type { VMBlueprint } from "./vm-blueprint.schema";
+import { sourceDigests, type VMBlueprint } from "./vm-blueprint.schema";
+
+// A backend that requires sha256 on every source rejects a sha512-only
+// document at sync time, which sets validationError and silently disables the
+// row. Gating such blueprints behind ">=" this version would keep them hidden
+// on those servers instead of broken on them.
+//
+// Deliberately empty, and not a TODO: digest-algorithm support landed in the
+// same unreleased change as VM provisioning itself, so no deployed backend can
+// sync this catalog without understanding sha512 — there is no window to gate.
+// Set it only if the two ever diverge (a backend shipping blueprint sync but
+// not sha512), which would be a regression, not a rollout.
+export const MIN_SHA512_TRUENAS_VERSION = "";
 
 export const KNOWN_CLOUD_INIT_TEMPLATES = new Set(["linux-default"]);
+
+// Machine-config templates, and the delivery mechanism each one requires. A
+// mismatch is silent at runtime: the guest simply never sees the document and
+// boots unconfigured, so it is checked here rather than left to an install test.
+export const KNOWN_MACHINE_CONFIG_TEMPLATES = new Map<string, "fw-cfg" | "config-drive">([
+  // Every template delivers by config-drive, including the two Ignition guests.
+  // fw-cfg works on every train (verified — see machine-config-strategy.md) but
+  // the document would ride in the QEMU command line, where a phone-home token
+  // is visible in `ps` and cannot be scrubbed after install: command_line_args
+  // is persisted and re-rendered into the domain XML on every boot. Ignition
+  // reads a config drive only on the 'openstack' platform, so both blueprints
+  // pin the openstack image variant rather than the qemu one.
+  //
+  // talos-nocloud is NOT here yet: a Talos node rejects a partial machine
+  // config, and a complete one carries the cluster's PKI (Talos API / etcd /
+  // Kubernetes CAs plus the bootstrap token). Who generates and holds that key
+  // is an open decision, so no template exists in hexos-platform and this
+  // allowlist must not pretend otherwise — talos.json stays in _pending/.
+  ["fcos-ignition", "config-drive"],
+  ["flatcar-ignition", "config-drive"],
+]);
 export const KNOWN_ANSWER_FILE_TEMPLATES = new Set(["win11-pro", "win10-pro"]);
 export const KNOWN_INSTALLER_SEED_TEMPLATES = new Set([
   "ubuntu-desktop-autoinstall",
   "fedora-workstation-kickstart",
+  "fedora-kde-kickstart",
+  "opensuse-agama-profile",
   "bazzite-kickstart",
   "mint-preseed",
   "zorin-preseed",
@@ -50,6 +85,26 @@ const KNOWN_CPU_FLAGS = new Set([
 // Icon keys resolve like VMIcons ("vms/<slug>"); anything else falls back to
 // the OS-derived icon in the UI — a lint, not a hard failure.
 const ICON_KEY = /^vms\/[a-z0-9][a-z0-9-]*$/;
+// A releasesUrl ending in an image/ISO/manifest filename is almost always the
+// pinned artifact pasted twice, which defeats the point of the field.
+const RELEASE_ARTIFACT = /\.(iso|img|qcow2|raw|vhd|vhdx|vmdk|xz|gz|bz2|zst|sha\d+|asc|sig)$/i;
+
+/** Numeric-dot compare, e.g. "25.04.2.6" vs "25.10". Missing components read as 0. */
+function compareVersions(a: string, b: string): number {
+  const pa = a.split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => Number.parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff < 0 ? -1 : 1;
+  }
+  return 0;
+}
+
+/** The version in the range's lower bound (">=25.04.2.6" -> "25.04.2.6"), or null. */
+function lowerBound(range: string | undefined): string | null {
+  const match = range?.match(/>=\s*([\d.]+)/);
+  return match ? match[1] : null;
+}
 
 export interface ContractResult {
   errors: string[];
@@ -81,14 +136,62 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
       );
     }
     for (const m of p.extraMedia) {
-      if (!m.sha256) {
-        warnings.push(`extraMedia "${m.id}" has no sha256 — the ISO will be attached without integrity verification`);
+      if (!m.sha256 && !m.sha512) {
+        warnings.push(`extraMedia "${m.id}" has no sha256 or sha512 — the ISO will be attached without integrity verification`);
       }
     }
   }
+  if (p.strategy === "machine-config") {
+    const expected = KNOWN_MACHINE_CONFIG_TEMPLATES.get(p.machineConfig.template);
+    if (!expected) {
+      errors.push(
+        `unknown machineConfig.template "${p.machineConfig.template}" — the backend only renders: ${[...KNOWN_MACHINE_CONFIG_TEMPLATES.keys()].sort().join(", ")}`,
+      );
+    } else if (expected !== p.machineConfig.delivery) {
+      errors.push(
+        `machineConfig.template "${p.machineConfig.template}" requires delivery "${expected}", not "${p.machineConfig.delivery}" — the wrong mechanism fails silently and the guest boots unconfigured`,
+      );
+    }
+  }
+
   if (p.strategy === "installer-iso" && !KNOWN_INSTALLER_SEED_TEMPLATES.has(p.seed.template)) {
     errors.push(
       `unknown installer-seed template "${p.seed.template}" — the backend ships only: ${[...KNOWN_INSTALLER_SEED_TEMPLATES].join(", ")}`,
+    );
+  }
+
+  // Digest gate. The schema already guarantees at least one digest is present
+  // and well-formed; what it cannot express is that sha512-only documents need
+  // a backend new enough to understand them.
+  if (p.strategy !== "answer-file" && MIN_SHA512_TRUENAS_VERSION) {
+    const digests = sourceDigests(p.source);
+    const sha512Only = digests.length === 1 && digests[0].algorithm === "sha512";
+    if (sha512Only) {
+      const gate = lowerBound(bp.truenasVersion);
+      if (!gate) {
+        errors.push(
+          `source carries only a sha512 but truenasVersion has no ">=" lower bound — older backends reject the document at sync time and auto-disable it; gate it with ">=${MIN_SHA512_TRUENAS_VERSION}"`,
+        );
+      } else if (compareVersions(gate, MIN_SHA512_TRUENAS_VERSION) < 0) {
+        errors.push(
+          `source carries only a sha512 but truenasVersion allows ${gate}, older than ${MIN_SHA512_TRUENAS_VERSION} (first release with digest-algorithm support) — raise the lower bound`,
+        );
+      }
+    }
+  }
+
+  // Every blueprint says where its next version comes from. The schema leaves
+  // releasesUrl optional (admin-authored rows and older documents predate it);
+  // the catalog requires it, because the alternative is the next person bumping
+  // this file guessing at a URL — the exact path that produces `-latest` links
+  // and invented digests.
+  if (!p.source.releasesUrl) {
+    errors.push(
+      `source.releasesUrl is missing — name the page that lists this project's releases and their published digests (a directory index if there is one, otherwise the releases page)`,
+    );
+  } else if (RELEASE_ARTIFACT.test(p.source.releasesUrl)) {
+    warnings.push(
+      `source.releasesUrl "${p.source.releasesUrl}" points at a file rather than a page — it should be the listing you read to discover a NEWER version, not the artifact this blueprint already pins`,
     );
   }
 

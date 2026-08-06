@@ -6,21 +6,45 @@ A blueprint is a JSON document describing a ready-to-run VM: where to get its di
 
 ## Available Blueprints
 
+Grouped by `category`, which is how the HexOS UI groups them too.
+
+### Server
+
 | Blueprint | Description |
 |-----------|-------------|
-| [CachyOS](cachyos.json) | Performance-tuned Arch with KDE Plasma, installed hands-free by its own headless installer |
 | [Debian 13 (Trixie)](debian-13.json) | Official Debian cloud image, configured on first boot |
 | [Fedora 44](fedora-44.json) | Official Fedora Cloud Base image, configured on first boot |
-| [Fedora Workstation 44](fedora-workstation-44.json) | GNOME desktop, installed hands-free by Fedora's network installer |
-| [Home Assistant OS](home-assistant-os.json) | Official Home Assistant appliance OS |
-| [Omarchy 3.8](omarchy.json) | DHH's Arch + Hyprland desktop, installed hands-free via the ISO's own autoinstall |
 | [Rocky Linux 9](rocky-9.json) | Official Rocky GenericCloud image, RHEL-compatible |
 | [Rocky Linux 10](rocky-10.json) | Official Rocky GenericCloud image; needs an x86-64-v3 CPU |
-| [Ubuntu Desktop 26.04 LTS](ubuntu-desktop-26.04.json) | The Ubuntu desktop, installed hands-free from Canonical's official installer |
 | [Ubuntu Server 24.04 LTS](ubuntu-24.04.json) | Canonical's official cloud image, configured on first boot |
 | [Ubuntu Server 26.04 LTS](ubuntu-26.04.json) | Canonical's official cloud image, configured on first boot |
+
+### Desktop
+
+| Blueprint | Description |
+|-----------|-------------|
+| [Bazzite](bazzite.json) | Gaming-focused atomic KDE desktop from Universal Blue; offers GPU passthrough |
+| [CachyOS](cachyos.json) | Performance-tuned Arch with KDE Plasma, installed hands-free by its own headless installer |
+| [Fedora Workstation 44](fedora-workstation-44.json) | GNOME desktop, installed hands-free by Fedora's network installer |
+| [Linux Mint 22.3 Cinnamon](mint-22.3.json) | Cinnamon desktop, installed hands-free from the official ISO |
+| [Omarchy 3.8](omarchy.json) | DHH's Arch + Hyprland desktop, installed hands-free via the ISO's own autoinstall — `internal: true`, so it does not appear in the user-facing catalog yet |
+| [Pop!_OS 24.04 LTS](pop-os-24.04.json) | System76's COSMIC desktop, installed hands-free from the official ISO |
+| [Ubuntu Desktop 26.04 LTS](ubuntu-desktop-26.04.json) | The Ubuntu desktop, installed hands-free from Canonical's official installer |
 | [Windows 10 Pro](windows-10.json) | Unattended install from a user-supplied installer ISO |
 | [Windows 11 Pro](windows-11.json) | Unattended install from a user-supplied installer ISO |
+| [Zorin OS 18.1 Core](zorin-os-18.json) | Windows-familiar desktop, installed hands-free from the official ISO |
+
+### Appliance
+
+| Blueprint | Description |
+|-----------|-------------|
+| [Home Assistant OS](home-assistant-os.json) | Official Home Assistant appliance OS |
+
+Drafts that aren't ready to ship live in a gitignored `_pending/` directory on
+the maintainer's machine — a draft carries `TODO` digests and URLs nobody has
+confirmed yet, and neither the sync nor the validator looks at underscore-
+prefixed paths. Nothing is published from this repo until it reaches the root
+with a real digest.
 
 ## Blueprint format
 
@@ -41,12 +65,17 @@ A blueprint is a JSON document describing a ready-to-run VM: where to get its di
     "internal": false,                     // true = never served from the prod branch
     "provisioning": {
         "strategy": "image",               // "image" | "cloud-init" | "answer-file" | "installer-iso"
+                                           //   | "machine-config"
         "source": {
             "url": "https://…/{version}/disk-{version}.qcow2.xz",  // {version} is substituted
             "version": "18.1",
             "format": "qcow2",             // "raw" | "qcow2"
             "compression": "xz",           // "none" | "xz" | "gz" | "zstd"
-            "sha256": "…"                  // of the file as downloaded; required
+            "sha256": "…",                 // of the file as downloaded, as published by the vendor
+                                           // (use "sha512" instead where that is all they publish —
+                                           // Debian's cloud images, for one; at least one is required)
+            "releasesUrl": "https://…/"    // page listing this project's releases and their digests;
+                                           // required, and what you open to bump the two fields above
         }
     },
     "resources": {
@@ -69,10 +98,11 @@ Strategy notes:
 
 - **image** — a bootable appliance image streamed directly onto the VM disk (HAOS-style).
 - **cloud-init** — a distro cloud image plus a `cloudInit.userDataTemplate` naming a first-boot template shipped in the HexOS backend. Readiness is usually `{ "type": "phone-home" }`.
-- **answer-file** — installer automation (Windows). `source` is `{ "type": "user-iso" }` (the user supplies the installer ISO), `answerFile.template` names a backend template, and `extraMedia` lists additional ISOs (e.g. VirtIO drivers) attached as CD-ROMs.
+- **answer-file** — installer automation (Windows). `source` is `{ "type": "user-iso" }` (the user supplies the installer ISO), `answerFile.template` names a backend template, and `extraMedia` lists additional ISOs (e.g. VirtIO drivers) attached as CD-ROMs. `isoHelpUrl` is the vendor link the install dialog shows the user; it is separate from `releasesUrl` (which nothing renders) even when both point at the same page.
+- **machine-config** — container hosts that ship no cloud-init at all (Fedora CoreOS and Flatcar use Ignition). `source` is a prebuilt image, and `machineConfig.template` names a backend template whose rendered document reaches the guest via `machineConfig.delivery`. Always `config-drive`: `fw-cfg` works, but the document rides in the domain's command line where it can't be scrubbed after install. These images ship a fixed built-in account (`core`), so the install dialog asks for no username.
 - **installer-iso** — installer automation for freely redistributable media (desktop Linux). `source` is a downloadable ISO (`url`/`version`/`sha256`, no `format`/`compression`), and `seed.template` names a backend template that generates the answer-seed ISO attached alongside it (Ubuntu autoinstall on a NoCloud `cidata` volume, Fedora kickstart on `OEMDRV`). The VM disk starts blank; the installer fills it. Readiness is usually `{ "type": "phone-home" }`.
 
-Version bumps are a two-field change: `source.version` and `source.sha256`.
+Version bumps are a two-field change: `source.version` and its digest. `source.releasesUrl` is where you go to make it — the vendor page listing available releases and their published checksums, recorded once per blueprint so nobody has to rediscover it. See [Checking for new versions](#checking-for-new-versions).
 
 > [!NOTE]
 > **`sha256` pins the media, not always the outcome.** For a *net* installer the
@@ -102,9 +132,10 @@ bun run validate
 
 The validator checks each root `*.json` against the vendored schema, then applies a few contract checks the schema can't express ([`_lib/contract.ts`](_lib/contract.ts)):
 
-- `cloudInit.userDataTemplate` / `answerFile.template` / `seed.template` must name a template the backend actually ships (`linux-default`, `win11-pro`, `win10-pro`, `ubuntu-desktop-autoinstall`, `fedora-workstation-kickstart`, `bazzite-kickstart`, `mint-preseed`, `zorin-preseed`, `pop-live-exec`, `omarchy-autoinstall`, `cachyos-headless` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
+- `cloudInit.userDataTemplate` / `answerFile.template` / `seed.template` must name a template the backend actually ships (`linux-default`, `win11-pro`, `win10-pro`, `ubuntu-desktop-autoinstall`, `fedora-workstation-kickstart`, `fedora-kde-kickstart`, `opensuse-agama-profile`, `bazzite-kickstart`, `mint-preseed`, `zorin-preseed`, `pop-live-exec`, `omarchy-autoinstall`, `cachyos-headless`, plus the machine-config pair `fcos-ignition` / `flatcar-ignition` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
 - a duplicate `id` across two files is an error (the sync skips the duplicate)
-- warnings for an `id` that differs from its filename stem, an off-convention `icon`, a `truenasVersion` with no comparison operator (a no-op gate), an unrecognized `cpuFeatures` flag name (a typo would hide the blueprint on every host), or `extraMedia` with no `sha256`
+- `source.releasesUrl` must be present — the schema leaves it optional for admin-authored rows, but a catalog blueprint that doesn't say where its next version comes from is how `-latest` URLs and guessed digests get in
+- warnings for an `id` that differs from its filename stem, an off-convention `icon`, a `truenasVersion` with no comparison operator (a no-op gate), an unrecognized `cpuFeatures` flag name (a typo would hide the blueprint on every host), `extraMedia` with no `sha256`, or a `releasesUrl` pointing at a file rather than a listing
 
 Errors fail the run; warnings don't.
 
@@ -118,6 +149,20 @@ bun run sync-schema
 ```
 
 When the backend adds a new provisioning template, also update the allowlists in [`_lib/contract.ts`](_lib/contract.ts).
+
+## Checking for new versions
+
+`releases.ts` prints every blueprint's pinned version alongside the page that would announce a newer one — the starting point for a bump pass:
+
+```bash
+cd _lib
+bun run releases              # id, pinned version, digest algorithm, releases page
+bun run releases -- --pending # include the _pending/ drafts
+bun run releases -- --check   # confirm each page still resolves
+bun run releases -- --json    # machine-readable
+```
+
+Nothing fetches `releasesUrl` at sync or install time and no client renders it, so `--check` reports and always exits 0 — unlike `bun run check-sources`, which HEADs the pinned artifacts nightly and fails when one 404s.
 
 ## Contributing
 

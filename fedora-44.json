@@ -12,7 +12,8 @@
             "version": "44-1.7",
             "format": "qcow2",
             "compression": "none",
-            "sha256": "28680fe5b371a5a82ebf43a31926e086a168e59949d03969c5093e7071f90b7f"
+            "sha256": "28680fe5b371a5a82ebf43a31926e086a168e59949d03969c5093e7071f90b7f",
+            "releasesUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/"
         },
         "cloudInit": {
             "userDataTemplate": "linux-default"

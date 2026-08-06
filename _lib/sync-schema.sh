@@ -29,9 +29,10 @@ fi
 // Verbatim copy of the blueprint schema from the hexOS platform monorepo:
 //   packages/shared/eshtek/vm-blueprints.ts
 //
-// That file is the single source of truth. This repo keeps a copy so blueprints
-// can be validated locally and in CI without depending on the private platform
-// package (see Q1 in the Zero-Touch VM Provisioning plan — "copy, don't share").
+// That file is the single source of truth. This repo keeps a copy rather than
+// importing it because hexos-platform is private and this repo is public: CI
+// here runs on fork pull requests, so it cannot depend on a package it has no
+// credentials to install.
 //
 // Re-vendor after any upstream schema change:
 //   bun run sync-schema        # wraps _lib/sync-schema.sh

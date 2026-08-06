@@ -11,7 +11,8 @@
         "source": {
             "url": "https://iso.omarchy.org/omarchy-{version}.iso",
             "version": "3.8.4",
-            "sha256": "7bc1dc7d98f3d088e57dc06581a494ea441fb15f3edd191360fd1696931bd895"
+            "sha256": "7bc1dc7d98f3d088e57dc06581a494ea441fb15f3edd191360fd1696931bd895",
+            "releasesUrl": "https://github.com/basecamp/omarchy/releases"
         },
         "seed": {
             "template": "omarchy-autoinstall"

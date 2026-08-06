@@ -10,7 +10,8 @@
         "source": {
             "url": "https://mirrors.edge.kernel.org/linuxmint/stable/{version}/linuxmint-{version}-cinnamon-64bit.iso",
             "version": "22.3",
-            "sha256": "a081ab202cfda17f6924128dbd2de8b63518ac0531bcfe3f1a1b88097c459bd4"
+            "sha256": "a081ab202cfda17f6924128dbd2de8b63518ac0531bcfe3f1a1b88097c459bd4",
+            "releasesUrl": "https://mirrors.edge.kernel.org/linuxmint/stable/"
         },
         "seed": {
             "template": "mint-preseed"

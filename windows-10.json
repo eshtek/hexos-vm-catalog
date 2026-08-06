@@ -9,7 +9,8 @@
         "strategy": "answer-file",
         "source": {
             "type": "user-iso",
-            "isoHelpUrl": "https://www.microsoft.com/software-download/windows10ISO"
+            "isoHelpUrl": "https://www.microsoft.com/software-download/windows10ISO",
+            "releasesUrl": "https://www.microsoft.com/software-download/windows10ISO"
         },
         "answerFile": {
             "template": "win10-pro"

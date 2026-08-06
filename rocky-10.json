@@ -13,7 +13,8 @@
             "version": "10.2-20260525.0",
             "format": "qcow2",
             "compression": "none",
-            "sha256": "9fc9e9ff16888bb68ac39b0392e25c9c92684d50c85f1cce6ab549363bbc4b48"
+            "sha256": "9fc9e9ff16888bb68ac39b0392e25c9c92684d50c85f1cce6ab549363bbc4b48",
+            "releasesUrl": "https://dl.rockylinux.org/pub/rocky/10/images/x86_64/"
         },
         "cloudInit": {
             "userDataTemplate": "linux-default"

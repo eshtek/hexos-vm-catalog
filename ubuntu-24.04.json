@@ -12,7 +12,8 @@
             "version": "release-20260615",
             "format": "qcow2",
             "compression": "none",
-            "sha256": "5fa5b05e5ec239858c4531485d6023b0896448c2df7c63b34f8dae6ea6051a44"
+            "sha256": "5fa5b05e5ec239858c4531485d6023b0896448c2df7c63b34f8dae6ea6051a44",
+            "releasesUrl": "https://cloud-images.ubuntu.com/releases/noble/"
         },
         "cloudInit": {
             "userDataTemplate": "linux-default"

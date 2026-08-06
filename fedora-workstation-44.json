@@ -10,7 +10,8 @@
         "source": {
             "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-{version}.iso",
             "version": "44-1.7",
-            "sha256": "bd285201494dd0ba09b54d05ac707de1401668b8512a573edb5922dcf9d7067e"
+            "sha256": "bd285201494dd0ba09b54d05ac707de1401668b8512a573edb5922dcf9d7067e",
+            "releasesUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/iso/"
         },
         "seed": {
             "template": "fedora-workstation-kickstart"

@@ -10,7 +10,8 @@
         "source": {
             "url": "https://iso.pop-os.org/24.04/amd64/intel/20/pop-os_24.04_amd64_intel_20.iso",
             "version": "24.04-build20",
-            "sha256": "a0ef3842ab710db4f4407cf3499560b59dddbbcd59bee17beab7b0e99dc22b4c"
+            "sha256": "a0ef3842ab710db4f4407cf3499560b59dddbbcd59bee17beab7b0e99dc22b4c",
+            "releasesUrl": "https://api.pop-os.org/builds/24.04/intel"
         },
         "seed": {
             "template": "pop-live-exec"

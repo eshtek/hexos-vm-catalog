@@ -10,7 +10,8 @@
         "source": {
             "url": "https://download.bazzite.gg/bazzite-stable-amd64.iso",
             "version": "41-20251018",
-            "sha256": "9c8d06cd8e57f2274678edeb14b4b13a79b8117c70571a65199919a66305b5c7"
+            "sha256": "9c8d06cd8e57f2274678edeb14b4b13a79b8117c70571a65199919a66305b5c7",
+            "releasesUrl": "https://github.com/ublue-os/bazzite/releases"
         },
         "seed": {
             "template": "bazzite-kickstart"

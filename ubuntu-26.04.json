@@ -12,7 +12,8 @@
             "version": "release-20260717",
             "format": "qcow2",
             "compression": "none",
-            "sha256": "b7daa0ffcb06acf44547a2f7682088d13acf0609937507faa8d7ef0302640ddd"
+            "sha256": "b7daa0ffcb06acf44547a2f7682088d13acf0609937507faa8d7ef0302640ddd",
+            "releasesUrl": "https://cloud-images.ubuntu.com/releases/26.04/"
         },
         "cloudInit": {
             "userDataTemplate": "linux-default"
