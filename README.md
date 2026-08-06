@@ -74,6 +74,20 @@ Strategy notes:
 
 Version bumps are a two-field change: `source.version` and `source.sha256`.
 
+> [!NOTE]
+> **`sha256` pins the media, not always the outcome.** For a *net* installer the
+> package payload is fetched from the vendor's CDN at install time, so the hash
+> never covered what actually lands on disk. One blueprint goes a step further:
+> **CachyOS** installs by upgrading `cachyos-cli-installer-new` from CachyOS's
+> repo in the live session, because the installer bundled in the ISO is months
+> stale and cannot install headlessly at all (it has no `--config` flag and
+> never formats the root partition). That is a deliberate, accepted trade-off —
+> its install behavior tracks a repo package rather than the pinned ISO. If a
+> net-installer blueprint breaks after an upstream release with its hash
+> unchanged, suspect the vendor's tooling, and verify against the **shipped**
+> artifact rather than the vendor's docs — repeatedly this year, published media
+> has lagged the documented automation it is supposed to provide.
+
 The authoritative schema is `vmBlueprintSchema` in `hexos-platform/packages/shared/eshtek/vm-blueprints.ts` — documents failing it are rejected at sync time. A verbatim copy is vendored here at [`_lib/vm-blueprint.schema.ts`](_lib/vm-blueprint.schema.ts) so blueprints can be validated locally and in CI without the private platform package; the server remains the real gate.
 
 ## Validating locally
