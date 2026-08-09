@@ -3,6 +3,13 @@
     "name": "CachyOS",
     "description": "The performance-tuned Arch Linux with the KDE Plasma desktop, installed hands-free by CachyOS's own headless installer — optimized kernels and CPU-tuned packages, rolling updates. Attach a GPU for gaming workloads.",
     "icon": "vms/cachyos",
+    "website": "https://cachyos.org/",
+    "screenshots": [
+        "cachyos/screenshots/desktop.jpg",
+        "cachyos/screenshots/desktop-kde.jpg",
+        "cachyos/screenshots/theme-nord.jpg",
+        "cachyos/screenshots/desktop-xfce.jpg"
+    ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {

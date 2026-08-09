@@ -3,6 +3,13 @@
     "name": "Ubuntu Desktop 26.04 LTS",
     "description": "The Ubuntu 26.04 LTS desktop, installed hands-free from Canonical's official installer — the most widely used Linux desktop and a popular alternative to Windows.",
     "icon": "vms/ubuntu",
+    "website": "https://ubuntu.com/desktop",
+    "screenshots": [
+        "ubuntu-desktop-26.04/screenshots/desktop.jpg",
+        "ubuntu-desktop-26.04/screenshots/desktop-dark.jpg",
+        "ubuntu-desktop-26.04/screenshots/applications-menu.jpg",
+        "ubuntu-desktop-26.04/screenshots/quick-menu.jpg"
+    ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {

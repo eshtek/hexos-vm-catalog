@@ -3,6 +3,7 @@
     "name": "Ubuntu Server 24.04 LTS",
     "description": "Ubuntu Server 24.04 LTS (Noble Numbat) from Canonical's official cloud image, configured on first boot with your user account and SSH access.",
     "icon": "vms/ubuntu",
+    "website": "https://ubuntu.com/server",
     "category": "server",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {

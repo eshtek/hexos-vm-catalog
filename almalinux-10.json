@@ -3,6 +3,7 @@
     "name": "AlmaLinux 10",
     "description": "AlmaLinux 10 from the official GenericCloud image — the newest community-governed enterprise release, binary-compatible with Red Hat Enterprise Linux. Requires a CPU supporting x86-64-v3 (roughly Intel Haswell / AMD Excavator or newer).",
     "icon": "vms/almalinux",
+    "website": "https://almalinux.org/",
     "category": "server",
     "truenasVersion": ">=25.04.2.6",
     "cpuFeatures": [

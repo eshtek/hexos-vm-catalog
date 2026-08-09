@@ -3,6 +3,13 @@
     "name": "Linux Mint 22.3 Cinnamon",
     "description": "Linux Mint 22.3 with the Cinnamon desktop, installed hands-free from the official ISO — the classic, familiar Linux desktop that many consider the easiest switch from Windows.",
     "icon": "vms/mint",
+    "website": "https://linuxmint.com/",
+    "screenshots": [
+        "mint-22.3/screenshots/desktop.jpg",
+        "mint-22.3/screenshots/cinnamon.jpg",
+        "mint-22.3/screenshots/software-manager.jpg",
+        "mint-22.3/screenshots/update-manager.jpg"
+    ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {

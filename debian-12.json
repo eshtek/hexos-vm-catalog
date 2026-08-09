@@ -3,6 +3,7 @@
     "name": "Debian 12 (Bookworm)",
     "description": "Debian 12 from the official cloud image, configured on first boot — the previous stable release, for workloads pinned to it while Trixie settles.",
     "icon": "vms/debian",
+    "website": "https://www.debian.org/",
     "category": "server",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {

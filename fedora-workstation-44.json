@@ -3,6 +3,10 @@
     "name": "Fedora Workstation 44",
     "description": "Fedora Workstation 44 with the GNOME desktop, installed hands-free by Fedora's network installer — a fast-moving, polished Linux desktop favored by many switching away from Windows.",
     "icon": "vms/fedora",
+    "website": "https://fedoraproject.org/workstation/",
+    "screenshots": [
+        "fedora-workstation-44/screenshots/desktop.jpg"
+    ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {

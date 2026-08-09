@@ -3,6 +3,7 @@
     "name": "Flatcar Container Linux",
     "description": "Flatcar Container Linux from the official stable channel — an immutable, automatically-updating container host in the CoreOS lineage. Configured at first boot from an Ignition document.",
     "icon": "vms/flatcar",
+    "website": "https://www.flatcar.org/",
     "category": "server",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {

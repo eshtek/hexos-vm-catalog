@@ -3,6 +3,12 @@
     "name": "Bazzite",
     "description": "The gaming-focused Linux desktop from Universal Blue, installed hands-free from the official installer with the KDE desktop — Steam and game-streaming tools preinstalled, updated as one atomic image. Attach a GPU for Steam Game Mode.",
     "icon": "vms/bazzite",
+    "website": "https://bazzite.gg/",
+    "screenshots": [
+        "bazzite/screenshots/desktop-gnome.jpg",
+        "bazzite/screenshots/menu-kde.jpg",
+        "bazzite/screenshots/files.jpg"
+    ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {

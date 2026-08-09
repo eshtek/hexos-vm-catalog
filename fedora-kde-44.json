@@ -3,6 +3,10 @@
     "name": "Fedora KDE Plasma Desktop 44",
     "description": "Fedora 44 with the KDE Plasma desktop, installed hands-free by Fedora's network installer — a fast-moving Linux desktop with a highly configurable, Windows-familiar interface.",
     "icon": "vms/fedora",
+    "website": "https://fedoraproject.org/kde/",
+    "screenshots": [
+        "fedora-kde-44/screenshots/desktop.jpg"
+    ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {
