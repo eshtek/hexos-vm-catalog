@@ -65,6 +65,11 @@ export const KNOWN_INSTALLER_SEED_TEMPLATES = new Set([
 // the platform deploys. The UI groups these; unknown slugs land in "Other".
 export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
 
+// How many screenshots the detail-sheet gallery actually renders (the UI's
+// ScreenshotViewer is handed a 5-item slice). Extra images cost repo size and
+// are never seen.
+export const SCREENSHOTS_SHOWN = 5;
+
 // parseRange (shared/eshtek/versions.ts) only reads tokens that start with a
 // comparison operator; a range with none is silently "always in range".
 const VERSION_RANGE_OP = /(?:^|\s)(?:>=|<=|>|<)\s*\d/;
@@ -217,6 +222,32 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
     warnings.push(
       `truenasVersion "${bp.truenasVersion}" has no comparison operator (>=, >, <=, <) — it will be treated as no version gate at all`,
     );
+  }
+
+  // Screenshots ship IN this repo and the sync resolves them against the
+  // branch's raw-GitHub base, so a path that leaves the repo resolves to
+  // something outside the catalog — reject it here rather than serving it.
+  // Absolute URLs stay legal (the schema accepts the resolved form), but a
+  // catalog file authoring one means the image is not mirrored after all.
+  for (const shot of bp.screenshots) {
+    if (/^https?:\/\//.test(shot)) {
+      warnings.push(
+        `screenshot "${shot}" is an absolute URL — catalog files carry repo-relative paths so the image is mirrored here and cannot rot upstream`,
+      );
+    } else if (shot.startsWith("/") || shot.split("/").includes("..")) {
+      errors.push(`screenshot "${shot}" must be a path relative to the repo root, with no "/" prefix and no ".." segments`);
+    }
+  }
+  if (bp.screenshots.length === 0) {
+    warnings.push(`no screenshots — the detail sheet renders without a gallery`);
+  } else if (bp.screenshots.length > SCREENSHOTS_SHOWN) {
+    warnings.push(
+      `${bp.screenshots.length} screenshots, but the detail sheet gallery shows the first ${SCREENSHOTS_SHOWN} — the rest are dead weight in the repo`,
+    );
+  }
+
+  if (!bp.website) {
+    warnings.push(`no website — the detail sheet renders without its "Website" button`);
   }
 
   return { errors, warnings };

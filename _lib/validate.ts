@@ -5,7 +5,7 @@
 // This is a contributor convenience — the catalog sync in hexos-platform is the
 // authoritative gate and re-validates with the same schema at read time.
 
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkContract } from "./contract";
@@ -59,6 +59,18 @@ for (const file of files) {
       const contract = checkContract(bp, file);
       errors.push(...contract.errors);
       warnings.push(...contract.warnings);
+
+      // Mirrored screenshots live in THIS repo, so a path typo is checkable
+      // here and nowhere else: the sync only rewrites the path against the
+      // branch base, and a missing file surfaces as a broken image in the
+      // detail sheet long after the fact. (checkContract can't do this — it is
+      // a pure function shared with the platform, with no filesystem access.)
+      for (const shot of bp.screenshots) {
+        if (/^https?:\/\//.test(shot)) continue;
+        if (!existsSync(join(ROOT, shot))) {
+          errors.push(`screenshot "${shot}" does not exist in the repo — mirrored images must be committed alongside the blueprint`);
+        }
+      }
     }
   }
 

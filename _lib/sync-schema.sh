@@ -46,6 +46,22 @@ BANNER
   cat "$src"
 } >"$dest"
 
+# The vendored copy has to stand alone: this repo is public and has none of the
+# platform's other modules, so any import beyond zod resolves to nothing and
+# breaks `bun run validate` (and CI) the moment it lands. Caught here rather
+# than in a confused PR — upstream helpers needing other types belong in a
+# sibling file (see eshtek/vm-blueprint-guest.ts), not in the schema.
+stray_imports="$(grep -nE "^import .*from '(\.|\.\.)/" "$dest" || true)"
+if [[ -n "$stray_imports" ]]; then
+  echo "" >&2
+  echo "error: the vendored schema imports platform-local modules that do not exist here:" >&2
+  echo "$stray_imports" >&2
+  echo "" >&2
+  echo "Move the offending code out of packages/shared/eshtek/vm-blueprints.ts (zod only)," >&2
+  echo "then re-run this script." >&2
+  exit 1
+fi
+
 echo "vendored: $src"
 echo "      ->  $dest"
 echo "review the diff, then re-run: bun run validate"

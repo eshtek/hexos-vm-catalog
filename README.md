@@ -67,6 +67,12 @@ with a real digest.
     "name": "Home Assistant OS",
     "description": "…",
     "icon": "vms/haos",
+    "website": "https://www.home-assistant.io/",  // product page; the detail sheet's "Website" button.
+                                           // Distinct from source.releasesUrl (which nothing renders)
+    "screenshots": [                       // mirrored IN THIS REPO, repo-relative; the detail sheet
+        "haos/screenshots/dashboard.jpg",  // gallery shows the first 5. See "Screenshots" below
+        "haos/screenshots/settings.jpg"
+    ],
     "category": "appliance",               // "server" | "desktop" | "appliance" (CI-enforced; the UI groups by this)
     "truenasVersion": ">=25.04.2.6",       // hidden on servers outside this range
     "cpuFeatures": ["avx2", "fma"],        // optional: /proc/cpuinfo flags the host CPU must have
@@ -127,6 +133,35 @@ Version bumps are a two-field change: `source.version` and its digest. `source.r
 > unchanged, suspect the vendor's tooling, and verify against the **shipped**
 > artifact rather than the vendor's docs — repeatedly this year, published media
 > has lagged the documented automation it is supposed to provide.
+
+### Screenshots
+
+The detail sheet renders a gallery of up to **5** screenshots of the desktop (or web UI) the
+blueprint actually installs, mirroring how the app catalog presents an app.
+
+Images are **mirrored into this repo** and referenced with repo-relative paths. The platform's
+catalog sync rewrites those paths at sync time — to
+`https://raw.githubusercontent.com/eshtek/hexos-vm-catalog/<branch>/<path>` normally, and to
+`/vm-catalog-assets/<path>` when a developer points `VM_CATALOG_PATH` at a local checkout. Absolute
+`https://` URLs are accepted by the schema (that is the resolved form) but should not appear in a
+catalog file: hotlinking a vendor's CDN means the gallery breaks the day they reorganize it.
+
+Conventions:
+
+- One directory per blueprint: `<blueprint-id>/screenshots/<name>.jpg`.
+- Downscale to **1280px wide** and save as JPEG (~quality 82). Source PNGs run 1–2 MB each; the
+  gallery renders them at thumbnail size and this repo is cloned by CI.
+  `sips -Z 1280 -s format jpeg -s formatOptions 82 in.png --out out.jpg` does it with no extra tools.
+- Record provenance for every image in [`ATTRIBUTION.md`](ATTRIBUTION.md) — source, author and
+  licence. Screenshots of GPL software are typically GPL and require attribution.
+- **Only mirror images we have the right to redistribute.** Screenshots we captured ourselves from
+  the guest we ship are the cleanest source: no third-party licence, and they show exactly the
+  version this blueprint installs. Vendor marketing images generally are not redistributable —
+  Windows especially.
+
+`bun run validate` fails on a screenshot path that does not exist in the repo, which is the only
+place a typo is catchable: the sync just rewrites the path, and a bad one surfaces as a broken image
+in the UI long after the fact.
 
 The authoritative schema is `vmBlueprintSchema` in `hexos-platform/packages/shared/eshtek/vm-blueprints.ts` — documents failing it are rejected at sync time. A verbatim copy is vendored here at [`_lib/vm-blueprint.schema.ts`](_lib/vm-blueprint.schema.ts) so blueprints can be validated locally and in CI without the private platform package; the server remains the real gate.
 

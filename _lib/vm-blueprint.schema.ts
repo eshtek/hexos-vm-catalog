@@ -259,6 +259,26 @@ export const vmBlueprintSchema = z.object({
     /** Icon key, resolved like VMIcons (e.g. "vms/haos"). */
     icon: z.string().max(128).optional(),
     /**
+     * The distro's own product page, offered as the "Website" button in the
+     * catalog detail sheet. Distinct from `provisioning.source.releasesUrl`
+     * (maintainer-facing, never rendered) even when the two agree: this one is
+     * product copy, the same role `homepage` plays for apps.
+     */
+    website: z.string().url().startsWith('https://').max(512).optional(),
+    /**
+     * Desktop screenshots of the version this blueprint installs, rendered as
+     * the detail sheet's gallery (up to 5 shown).
+     *
+     * Two accepted forms, and BOTH must stay valid: a path relative to the
+     * catalog repo (e.g. "zorin-os-18/screenshots/desktop.png"), which is what
+     * a catalog file carries, and an absolute https URL, which is what the same
+     * document holds AFTER syncVMBlueprintCatalog resolves those paths against
+     * the branch's raw-GitHub base (dev: /vm-catalog-assets/...). The stored
+     * document is re-validated on every sync, so rejecting the resolved form
+     * would disable every blueprint carrying a screenshot.
+     */
+    screenshots: z.array(z.string().min(1).max(512)).max(8).default([]),
+    /**
      * Category slug used to group the user-facing catalog. Deliberately not a
      * hard enum — sync re-validates every stored document, and an enum would
      * validationError-hide blueprints whenever the catalog adds a category
@@ -336,6 +356,16 @@ export interface VMBlueprintAdminRecord {
     removedFromCatalog: boolean;
     lastCatalogSync: Date | null;
     updatedAt: Date;
+}
+
+/**
+ * Completed installs per blueprint over a window — what orders the "Most
+ * popular this month" grid. Blueprints nobody has installed are absent rather
+ * than present with 0, so callers must treat a missing entry as no installs.
+ */
+export interface VMBlueprintPopularity {
+    blueprintId: string;
+    installs: number;
 }
 
 export interface VMBlueprintCatalogStatus {
