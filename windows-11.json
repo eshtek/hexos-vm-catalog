@@ -3,6 +3,11 @@
     "name": "Windows 11 Pro",
     "description": "Windows 11 Pro installed hands-free from your own installer ISO — bring the ISO (Microsoft doesn't allow us to ship it), and HexOS handles partitioning, setup answers, and your first account.",
     "icon": "vms/windows",
+    "website": "https://www.microsoft.com/windows/windows-11",
+    "screenshots": [
+        "windows-11/screenshots/desktop.jpg",
+        "windows-11/screenshots/start-menu.jpg"
+    ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
     "provisioning": {
