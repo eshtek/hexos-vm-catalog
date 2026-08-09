@@ -3,8 +3,17 @@
     "name": "Kubuntu 26.04 LTS",
     "description": "Ubuntu 26.04 LTS with the KDE Plasma desktop, installed hands-free from Canonical's official installer — the same Ubuntu base and update schedule with a far more customizable interface.",
     "icon": "vms/kubuntu",
+    "website": "https://kubuntu.org/",
+    "screenshots": [
+        "kubuntu-26.04/screenshots/desktop.jpg",
+        "kubuntu-26.04/screenshots/wallpaper.jpg",
+        "kubuntu-26.04/screenshots/quick-settings.jpg",
+        "kubuntu-26.04/screenshots/colors.jpg",
+        "kubuntu-26.04/screenshots/desktop-effects.jpg"
+    ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
+    "internal": true,
     "provisioning": {
         "strategy": "installer-iso",
         "source": {
