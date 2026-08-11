@@ -12,7 +12,14 @@
     ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
-    "cpuFeatures": ["cx16", "lahf_lm", "popcnt", "sse4_1", "sse4_2", "ssse3"],
+    "cpuFeatures": [
+        "cx16",
+        "lahf_lm",
+        "popcnt",
+        "sse4_1",
+        "sse4_2",
+        "ssse3"
+    ],
     "provisioning": {
         "strategy": "installer-iso",
         "source": {
@@ -30,6 +37,7 @@
         "recMemoryMb": 8192,
         "minVcpus": 2,
         "recVcpus": 4,
+        "maxUsefulVcpus": 6,
         "diskGb": 64
     },
     "guest": {

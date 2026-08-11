@@ -39,6 +39,7 @@
             "hostname": "homeassistant.local",
             "port": 8123
         },
-        "postInstallUrl": "http://{ip}:8123"
+        "postInstallUrl": "http://{ip}:8123",
+        "usbPassthrough": true
     }
 }

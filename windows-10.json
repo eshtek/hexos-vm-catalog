@@ -33,6 +33,7 @@
         "recMemoryMb": 8192,
         "minVcpus": 2,
         "recVcpus": 4,
+        "maxUsefulVcpus": 8,
         "diskGb": 64
     },
     "guest": {

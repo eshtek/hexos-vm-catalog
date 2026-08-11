@@ -210,6 +210,14 @@ export const vmBlueprintResourcesSchema = z
         recMemoryMb: z.number().int().min(256),
         minVcpus: z.number().int().min(1).max(64),
         recVcpus: z.number().int().min(1).max(64),
+        /**
+         * Where extra vCPUs stop helping THIS guest, however large the host —
+         * desktop responsiveness is single-thread bound past ~4-6, OpenWrt's
+         * routing is effectively single-threaded. Guides the wizard's slider
+         * captions only; it is never a hard clamp, and servers omit it (what
+         * they can use depends entirely on what the owner runs).
+         */
+        maxUsefulVcpus: z.number().int().min(1).max(64).optional(),
         diskGb: z.number().int().min(1).max(4096),
     })
     .refine((r) => r.recMemoryMb >= r.minMemoryMb, { message: 'recMemoryMb must be >= minMemoryMb' })
@@ -245,6 +253,15 @@ export const vmBlueprintGuestSchema = z.object({
     autostart: z.boolean().default(true),
     /** Offer attaching a host GPU (PCI passthrough) in the install dialog. */
     gpuPassthrough: z.boolean().default(false),
+    /**
+     * Offer attaching host USB devices in the one-click install dialog even
+     * without a GPU pick. For blueprints where a USB stick is the point of the
+     * VM (Home Assistant's Zigbee/Z-Wave dongles). This flag only decides what
+     * the dialog PROMOTES — the install accepts USB devices for any blueprint
+     * (the wizard's Custom-install handoff always could), so a wrong value here
+     * costs a click, never a capability.
+     */
+    usbPassthrough: z.boolean().default(false),
     /** Take a "fresh install" zvol snapshot once the install is confirmed online. */
     installSnapshot: z.boolean().default(true),
     readiness: vmReadinessSchema,
@@ -322,12 +339,13 @@ export enum VMBlueprintSource {
     Admin = 'admin',
 }
 
-// What the main server serves to clients / the admin UI (the row's effective,
-// validated document plus provenance).
-export interface VMBlueprintRecord {
+// Common shape of a served blueprint row (provenance + curation flags). The
+// user-facing and admin records extend it, differing only in document
+// nullability and the admin-only sync timestamp — a field added here reaches
+// both.
+interface VMBlueprintRecordBase {
     blueprintId: string;
     source: VMBlueprintSource;
-    document: VMBlueprint;
     /** True when an admin override is layered over the synced document. */
     overridden: boolean;
     enabled: boolean;
@@ -341,22 +359,61 @@ export interface VMBlueprintRecord {
     updatedAt: Date;
 }
 
+// What the main server serves to clients (the row's effective, validated
+// document plus provenance).
+export interface VMBlueprintRecord extends VMBlueprintRecordBase {
+    document: VMBlueprint;
+}
+
 // Admin management view: every row regardless of visibility, with provenance.
 // `document` is the effective (document + override) blueprint, or null when
 // the merge no longer validates.
-export interface VMBlueprintAdminRecord {
-    blueprintId: string;
-    source: VMBlueprintSource;
+export interface VMBlueprintAdminRecord extends VMBlueprintRecordBase {
     document: VMBlueprint | null;
-    overridden: boolean;
-    enabled: boolean;
-    hidden: boolean;
-    recommended: boolean;
-    validationError: string | null;
-    removedFromCatalog: boolean;
     lastCatalogSync: Date | null;
-    updatedAt: Date;
 }
+
+// ── Provisioning-strategy predicates ─────────────────────────────────────────
+// One home for "which strategies need what", shared by the install dialog,
+// the detail sheets and the admin table.
+
+type VMProvisioningDoc = VMBlueprint['provisioning'];
+
+/**
+ * Cloud-init and installer-iso blueprints create a first-user account from
+ * the form; machine-config images (Fedora CoreOS, Flatcar) configure their
+ * fixed built-in account with the same credentials.
+ */
+export const blueprintNeedsAccount = (provisioning: VMProvisioningDoc): boolean =>
+    provisioning.strategy === 'cloud-init' ||
+    provisioning.strategy === 'installer-iso' ||
+    provisioning.strategy === 'machine-config';
+
+/**
+ * Machine-config images ship a fixed built-in account and have no installer
+ * to create another, so there is no username to pick.
+ */
+export const blueprintNeedsUsername = (provisioning: VMProvisioningDoc): boolean =>
+    provisioning.strategy !== 'machine-config';
+
+/** Desktop (installer-iso) installs require a password — a desktop login can't run on an SSH key alone. */
+export const blueprintRequiresPassword = (provisioning: VMProvisioningDoc): boolean =>
+    provisioning.strategy === 'installer-iso';
+
+/** Answer-file (Windows) blueprints additionally need the user-supplied installer ISO. */
+export const blueprintNeedsWindowsSetup = (provisioning: VMProvisioningDoc): boolean =>
+    provisioning.strategy === 'answer-file';
+
+/** Strategies that read/stage installer media in the Install Media location. */
+export const blueprintUsesInstallMedia = (provisioning: VMProvisioningDoc): boolean =>
+    provisioning.strategy === 'answer-file' || provisioning.strategy === 'installer-iso';
+
+/**
+ * The version a provisioning source pins, whether that source is a disk
+ * image or an installer ISO; undefined for user-supplied media (Windows).
+ */
+export const blueprintSourceVersion = (provisioning: VMProvisioningDoc): string | undefined =>
+    'source' in provisioning && 'version' in provisioning.source ? provisioning.source.version : undefined;
 
 /**
  * Completed installs per blueprint over a window — what orders the "Most
@@ -519,3 +576,21 @@ export const RESERVED_WINDOWS_USERNAMES = new Set([
     'defaultaccount',
     'wdagutilityaccount',
 ]);
+
+/**
+ * Charset rules for user-supplied install values, shared by the install
+ * route's schema, the seed renderers' defense-in-depth asserts, and the
+ * frontend form — one definition so the form can never accept a value the
+ * backend rejects. These values are rendered into NoCloud seeds,
+ * autounattend.xml, and shell here-docs, so the charsets are deliberately
+ * strict.
+ */
+export const VM_HOSTNAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
+export const VM_UNIX_USERNAME_PATTERN = /^[a-z_][a-z0-9_-]{0,31}$/;
+export const VM_WINDOWS_USERNAME_PATTERN = /^[a-z_][a-z0-9_-]{0,19}$/;
+/** crypt(3) SHA-512 hash — plaintext never travels past the request scope. */
+export const VM_SHA512_CRYPT_HASH_PATTERN = /^\$6\$[$./0-9A-Za-z=,]+$/;
+export const VM_SSH_PUBLIC_KEY_PATTERN =
+    /^(ssh-(rsa|ed25519)|ecdsa-sha2-nistp(256|384|521)|sk-(ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com) [A-Za-z0-9+/=]+( [\x20-\x7e]{1,128})?$/;
+/** Tokened relay endpoints on main (phone-home / update-status). */
+export const VM_HTTPS_RELAY_URL_PATTERN = /^https:\/\/[A-Za-z0-9.:_/-]+$/;
