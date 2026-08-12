@@ -8,7 +8,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkContract } from "./contract";
+import { checkContract, MIRRORED_ICON_FILE } from "./contract";
 import { type VMBlueprint, vmBlueprintSchema } from "./vm-blueprint.schema";
 
 // This file lives in _lib/; blueprints live one level up in the repo root.
@@ -70,6 +70,13 @@ for (const file of files) {
         if (!existsSync(join(ROOT, shot))) {
           errors.push(`screenshot "${shot}" does not exist in the repo — mirrored images must be committed alongside the blueprint`);
         }
+      }
+
+      // Same for a mirrored icon; legacy frontend keys and absolute URLs name
+      // nothing in this repo, so only extension-bearing relative paths are
+      // checkable here.
+      if (bp.icon && !/^https?:\/\//.test(bp.icon) && MIRRORED_ICON_FILE.test(bp.icon) && !existsSync(join(ROOT, bp.icon))) {
+        errors.push(`icon "${bp.icon}" does not exist in the repo — mirrored icons must be committed (see _icons/)`);
       }
     }
   }

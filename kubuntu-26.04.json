@@ -2,7 +2,7 @@
     "id": "kubuntu-26.04",
     "name": "Kubuntu 26.04 LTS",
     "description": "Ubuntu 26.04 LTS with the KDE Plasma desktop, installed hands-free from Canonical's official installer — the same Ubuntu base and update schedule with a far more customizable interface.",
-    "icon": "vms/kubuntu",
+    "icon": "_icons/kubuntu.svg",
     "website": "https://kubuntu.org/",
     "screenshots": [
         "kubuntu-26.04/screenshots/desktop.jpg",

@@ -2,7 +2,7 @@
     "id": "fedora-coreos",
     "name": "Fedora CoreOS",
     "description": "Fedora CoreOS from the official stable stream — a minimal, automatically-updating host built to run containers and nothing else. Configured at first boot from an Ignition document; there is no package manager and no interactive install.",
-    "icon": "vms/fedora",
+    "icon": "_icons/fedora.svg",
     "website": "https://fedoraproject.org/coreos/",
     "category": "server",
     "truenasVersion": ">=25.04.2.6",

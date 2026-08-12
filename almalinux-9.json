@@ -2,7 +2,7 @@
     "id": "almalinux-9",
     "name": "AlmaLinux 9",
     "description": "AlmaLinux 9 from the official GenericCloud image — a community-governed enterprise Linux, binary-compatible with Red Hat Enterprise Linux.",
-    "icon": "vms/almalinux",
+    "icon": "_icons/almalinux.svg",
     "website": "https://almalinux.org/",
     "category": "server",
     "truenasVersion": ">=25.04.2.6",

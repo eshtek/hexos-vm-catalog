@@ -2,7 +2,7 @@
     "id": "mint-22.3",
     "name": "Linux Mint 22.3 Cinnamon",
     "description": "Linux Mint 22.3 with the Cinnamon desktop, installed hands-free from the official ISO — the classic, familiar Linux desktop that many consider the easiest switch from Windows.",
-    "icon": "vms/mint",
+    "icon": "_icons/mint.svg",
     "website": "https://linuxmint.com/",
     "screenshots": [
         "mint-22.3/screenshots/desktop.jpg",

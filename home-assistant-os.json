@@ -2,7 +2,7 @@
     "id": "haos",
     "name": "Home Assistant OS",
     "description": "The official Home Assistant appliance OS — full home automation platform with add-on support, managed updates, and backups.",
-    "icon": "vms/haos",
+    "icon": "_icons/haos.svg",
     "website": "https://www.home-assistant.io/",
     "screenshots": [
         "home-assistant-os/screenshots/dashboard.jpg"

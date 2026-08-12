@@ -2,7 +2,7 @@
     "id": "omarchy",
     "name": "Omarchy 3.8",
     "description": "DHH's opinionated Arch Linux desktop with the Hyprland tiling compositor, installed hands-free from the official ISO — a keyboard-driven, developer-focused desktop that updates continuously. Attach a GPU for a smooth Wayland session.",
-    "icon": "vms/penguin",
+    "icon": "_icons/penguin.svg",
     "website": "https://omarchy.org/",
     "screenshots": [
         "omarchy/screenshots/theme-gruvbox.jpg",

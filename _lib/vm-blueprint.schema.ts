@@ -273,8 +273,18 @@ export const vmBlueprintSchema = z.object({
     id: blueprintIdSchema,
     name: z.string().min(1).max(128),
     description: z.string().max(1024).default(''),
-    /** Icon key, resolved like VMIcons (e.g. "vms/haos"). */
-    icon: z.string().max(128).optional(),
+    /**
+     * Blueprint icon. Three accepted forms, and ALL must stay valid: a path
+     * relative to the catalog repo (e.g. "_icons/haos.svg"), which is what a
+     * catalog file carries; an absolute https URL (dev: /vm-catalog-assets/...),
+     * which is what the same document holds AFTER syncVMBlueprintCatalog
+     * resolves that path — the stored document re-validates on every sync, so
+     * rejecting the resolved form would disable every blueprint; and a legacy
+     * VMIcons-style key (e.g. "vms/haos"), resolved against the frontend's
+     * bundled artwork — VMs installed before the catalog carried its own icons
+     * persisted that key forever.
+     */
+    icon: z.string().max(512).optional(),
     /**
      * The distro's own product page, offered as the "Website" button in the
      * catalog detail sheet. Distinct from `provisioning.source.releasesUrl`

@@ -97,3 +97,14 @@ permit limited use in some contexts; that judgement has NOT been made here.
 | `windows-11/screenshots/start-menu.jpg` | Own capture, HexOS lab VM (AMDHW-Dev) 2026-08-07 | Eshtek | **None — Microsoft product UI** | Windows 11 Pro 25H2 |
 | `windows-10/screenshots/desktop.jpg` | Own capture, HexOS lab VM (AMDHW-Dev) 2026-08-07 | Eshtek | **None — Microsoft product UI** | Windows 10 Pro 22H2 |
 | `windows-10/screenshots/start-menu.jpg` | Own capture, HexOS lab VM (AMDHW-Dev) 2026-08-07 | Eshtek | **None — Microsoft product UI** | Windows 10 Pro 22H2 |
+
+# Icon attribution
+
+Brand icons under `_icons/` are mirrored verbatim from the HexOS frontend's bundled artwork
+(`eshtek/hexos-platform`, `packages/frontend/public/icons/vms/`), so a blueprint's icon ships with
+the blueprint instead of requiring a platform release. Each file is the upstream project's logo
+mark: these are trademarks of their respective projects (Canonical, the Fedora Project, AlmaLinux
+OS Foundation, the Debian Project, RESF, SUSE, the OpenWrt Project, System76, the Linux Mint team,
+Zorin Group, the Home Assistant project, the Flatcar/Bazzite/CachyOS teams, Microsoft, and the
+Linux/Tux mark), used here nominatively to identify the software the blueprint installs. If an
+upstream project objects or rebrands, replace or remove the file here — nothing else references it.

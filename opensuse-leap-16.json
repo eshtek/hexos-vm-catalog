@@ -2,7 +2,7 @@
     "id": "opensuse-leap-16",
     "name": "openSUSE Leap 16.0",
     "description": "openSUSE Leap 16.0, installed hands-free from the official offline installer — a fixed-release desktop and workstation distribution built from the same sources as SUSE Linux Enterprise, with 24 months of updates per release.",
-    "icon": "vms/opensuse",
+    "icon": "_icons/opensuse.svg",
     "website": "https://get.opensuse.org/leap/",
     "screenshots": [
         "opensuse-leap-16/screenshots/desktop.jpg",

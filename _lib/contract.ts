@@ -70,6 +70,11 @@ export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
 // are never seen.
 export const SCREENSHOTS_SHOWN = 5;
 
+// Mirrored icons live under _icons/ and are told apart from legacy
+// frontend-bundled icon KEYS ("vms/ubuntu") by carrying an image extension —
+// the exact gate the platform sync uses to decide what to resolve into a URL.
+export const MIRRORED_ICON_FILE = /\.(svg|png|webp)$/i;
+
 // parseRange (shared/eshtek/versions.ts) only reads tokens that start with a
 // comparison operator; a range with none is silently "always in range".
 const VERSION_RANGE_OP = /(?:^|\s)(?:>=|<=|>|<)\s*\d/;
@@ -87,9 +92,9 @@ const KNOWN_CPU_FLAGS = new Set([
   // frequent extras
   "adx", "aes", "pclmulqdq", "pdpe1gb", "rdrand", "rdseed", "sha_ni", "sse2", "sse3", "svm", "vmx",
 ]);
-// Icon keys resolve like VMIcons ("vms/<slug>"); anything else falls back to
-// the OS-derived icon in the UI — a lint, not a hard failure.
-const ICON_KEY = /^vms\/[a-z0-9][a-z0-9-]*$/;
+// Legacy icon keys resolve like VMIcons ("vms/<slug>") against artwork bundled
+// with the frontend; the mirrored form (MIRRORED_ICON_FILE) is preferred.
+const LEGACY_ICON_KEY = /^vms\/[a-z0-9][a-z0-9-]*$/;
 // A releasesUrl ending in an image/ISO/manifest filename is almost always the
 // pinned artifact pasted twice, which defeats the point of the field.
 const RELEASE_ARTIFACT = /\.(iso|img|qcow2|raw|vhd|vhdx|vmdk|xz|gz|bz2|zst|sha\d+|asc|sig)$/i;
@@ -206,10 +211,6 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
     );
   }
 
-  if (bp.icon && !ICON_KEY.test(bp.icon)) {
-    warnings.push(`icon "${bp.icon}" doesn't match the "vms/<slug>" convention; the UI will fall back to the OS-derived icon if it can't resolve`);
-  }
-
   for (const flag of bp.cpuFeatures ?? []) {
     if (!KNOWN_CPU_FLAGS.has(flag.toLowerCase())) {
       warnings.push(
@@ -244,6 +245,27 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
     warnings.push(
       `${bp.screenshots.length} screenshots, but the detail sheet gallery shows the first ${SCREENSHOTS_SHOWN} — the rest are dead weight in the repo`,
     );
+  }
+
+  // Icons ride in this repo too (under _icons/), resolved by the same sync. A
+  // legacy frontend icon key stays legal — VMs installed before icons moved
+  // here persisted those keys — but a NEW blueprint authored with one only
+  // renders once the platform bundles that artwork, which is the coupling the
+  // mirrored form exists to break.
+  if (!bp.icon) {
+    warnings.push(`no icon — catalog cards render the generic custom tile`);
+  } else if (/^https?:\/\//.test(bp.icon)) {
+    warnings.push(
+      `icon "${bp.icon}" is an absolute URL — catalog files carry repo-relative paths so the icon is mirrored here and cannot rot upstream`,
+    );
+  } else if (!MIRRORED_ICON_FILE.test(bp.icon)) {
+    warnings.push(
+      LEGACY_ICON_KEY.test(bp.icon)
+        ? `icon "${bp.icon}" is a legacy frontend icon key — it only renders if the platform already bundles that artwork; prefer mirroring an svg under _icons/`
+        : `icon "${bp.icon}" is neither a mirrored asset path (_icons/<name>.svg) nor a legacy "vms/<slug>" key — the UI will fall back to the custom tile`,
+    );
+  } else if (bp.icon.startsWith("/") || bp.icon.split("/").includes("..")) {
+    errors.push(`icon "${bp.icon}" must be a path relative to the repo root, with no "/" prefix and no ".." segments`);
   }
 
   if (!bp.website) {

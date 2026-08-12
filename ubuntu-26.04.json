@@ -2,7 +2,7 @@
     "id": "ubuntu-26.04",
     "name": "Ubuntu Server 26.04 LTS",
     "description": "Ubuntu Server 26.04 LTS (Resolute Raccoon) from Canonical's official cloud image, configured on first boot with your user account and SSH access.",
-    "icon": "vms/ubuntu",
+    "icon": "_icons/ubuntu.svg",
     "website": "https://ubuntu.com/server",
     "category": "server",
     "truenasVersion": ">=25.04.2.6",
