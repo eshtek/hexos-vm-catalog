@@ -66,7 +66,9 @@ with a real digest.
     "id": "haos",                          // unique, lowercase, stable forever
     "name": "Home Assistant OS",
     "description": "…",
-    "icon": "vms/haos",
+    "icon": "_icons/haos.svg",             // mirrored IN THIS REPO like screenshots; legacy
+                                           // "vms/<slug>" keys still resolve against artwork
+                                           // bundled with the frontend, but can't ship new art
     "website": "https://www.home-assistant.io/",  // product page; the detail sheet's "Website" button.
                                            // Distinct from source.releasesUrl (which nothing renders)
     "screenshots": [                       // mirrored IN THIS REPO, repo-relative; the detail sheet
@@ -110,13 +112,99 @@ with a real digest.
 }
 ```
 
-Strategy notes:
+### Provisioning strategies
 
-- **image** — a bootable appliance image streamed directly onto the VM disk (HAOS-style).
-- **cloud-init** — a distro cloud image plus a `cloudInit.userDataTemplate` naming a first-boot template shipped in the HexOS backend. Readiness is usually `{ "type": "phone-home" }`.
-- **answer-file** — installer automation (Windows). `source` is `{ "type": "user-iso" }` (the user supplies the installer ISO), `answerFile.template` names a backend template, and `extraMedia` lists additional ISOs (e.g. VirtIO drivers) attached as CD-ROMs. `isoHelpUrl` is the vendor link the install dialog shows the user; it is separate from `releasesUrl` (which nothing renders) even when both point at the same page.
-- **machine-config** — container hosts that ship no cloud-init at all (Fedora CoreOS and Flatcar use Ignition). `source` is a prebuilt image, and `machineConfig.template` names a backend template whose rendered document reaches the guest via `machineConfig.delivery`. Always `config-drive`: `fw-cfg` works, but the document rides in the domain's command line where it can't be scrubbed after install. These images ship a fixed built-in account (`core`), so the install dialog asks for no username.
-- **installer-iso** — installer automation for freely redistributable media (desktop Linux). `source` is a downloadable ISO (`url`/`version`/`sha256`, no `format`/`compression`), and `seed.template` names a backend template that generates the answer-seed ISO attached alongside it (Ubuntu autoinstall on a NoCloud `cidata` volume, Fedora kickstart on `OEMDRV`). The VM disk starts blank; the installer fills it. Readiness is usually `{ "type": "phone-home" }`.
+`provisioning.strategy` picks one of five install pipelines. Each is described
+here as what actually happens on the box, in the order the pipeline does it,
+followed by what the blueprint has to supply. The steps mirror the roadmap the
+install pipeline registers upfront, so this section is what needs re-checking
+whenever the pipeline gains or loses a step.
+
+#### `image` — boots the vendor image as shipped
+
+1. Allocate the zvol at the requested disk size.
+2. Download the vendor's disk image.
+3. Verify it against the digest in the blueprint.
+4. Decompress and write it to the zvol.
+5. Configure the domain (firmware, disk bus, NIC, CPU, memory) and boot.
+6. Wait for the guest to come online using the blueprint's readiness probe.
+
+Nothing is injected — no account is collected because the appliance ships with
+its own (HAOS-style). The blueprint supplies a bootable `source` image and a
+`readiness` probe that can see the appliance's own UI (e.g. mDNS + port).
+
+#### `cloud-init` — vendor image, configured on first boot
+
+1. Allocate the zvol, download, verify and write the image (as for `image`).
+2. Render the named user-data template with the first-user account (password
+   hash and/or SSH key) plus a phone-home URL.
+3. Attach the rendered document as a NoCloud seed volume.
+4. Boot; cloud-init reads the seed on first boot and creates the account.
+5. Wait for the guest to phone home. On success the seed stays attached — only
+   a failed install removes it.
+
+Needs a username and a password OR an SSH key — either login path is enough.
+`cloudInit.userDataTemplate` names a first-boot template shipped in the HexOS
+backend. Readiness is usually `{ "type": "phone-home" }`.
+
+#### `machine-config` — container host configured by an Ignition/machine config
+
+1. Allocate the zvol, download, verify and write the image (as for `image`).
+2. Render the named machine-config template with the credentials and a
+   phone-home URL.
+3. Attach it as a config-drive volume the guest reads at first boot.
+4. Boot; the guest applies the config to its built-in account.
+5. Wait for the phone home, then eject and scrub the config drive.
+
+Configures the image's built-in account (e.g. `core`) rather than creating one,
+so no username is asked for — these guests ship no cloud-init at all (Fedora
+CoreOS and Flatcar use Ignition). `source` is a prebuilt image, and
+`machineConfig.template` names a backend template whose rendered document
+reaches the guest via `machineConfig.delivery`. Always `config-drive`: `fw-cfg`
+works, but the document rides in the domain's command line where it can't be
+scrubbed after install.
+
+#### `installer-iso` — runs the distro installer unattended
+
+1. Allocate a BLANK zvol — the installer fills it, nothing is written up front.
+2. Download the installer ISO (skipped when it is already cached on the box).
+3. Render the seed (autoinstall / kickstart / preseed) with the account and the
+   disk layout, and build it into a seed ISO.
+4. Attach the installer ISO and the seed ISO as CD-ROMs, then boot.
+5. The installer runs unattended and installs onto the zvol.
+6. Wait for the INSTALLED system to phone home — that is what proves it
+   rebooted out of the installer.
+7. Eject and truncate the seed (it carries the password hash); eject the
+   installer but keep it as the shared cache for the next install.
+
+For freely redistributable media (desktop Linux). A password is mandatory here:
+a desktop login cannot run on an SSH key alone. `source` is a downloadable ISO
+(`url`/`version`/digest, no `format`/`compression`), and `seed.template` names
+a backend template that generates the answer-seed ISO (Ubuntu autoinstall on a
+NoCloud `cidata` volume, Fedora kickstart on `OEMDRV`). Readiness is usually
+`{ "type": "phone-home" }`.
+
+#### `answer-file` — Windows Setup, unattended
+
+1. Allocate a blank zvol.
+2. Take the user's own Windows ISO from Install Media, or download the URL they
+   pasted — HexOS cannot redistribute Windows media.
+3. Render `autounattend.xml` with the computer name and administrator account,
+   and attach it as a CD-ROM.
+4. Attach the VirtIO driver ISO alongside it when the guest uses a VirtIO disk
+   or NIC.
+5. Boot; Windows Setup runs unattended and installs onto the zvol.
+6. Install Windows updates, unless the install opted out of them.
+7. Wait for the first-logon command to phone home, then eject and scrub the
+   answer file — it holds a recoverable password. The user's own ISO is left
+   alone.
+
+The only strategy that requires the user to bring their own media: `source` is
+`{ "type": "user-iso" }`, `answerFile.template` names a backend template, and
+`extraMedia` lists additional ISOs (e.g. VirtIO drivers) attached as CD-ROMs.
+`isoHelpUrl` is the vendor link the install dialog shows the user; it is
+separate from `releasesUrl` (which nothing renders) even when both point at the
+same page.
 
 Version bumps are a two-field change: `source.version` and its digest. `source.releasesUrl` is where you go to make it — the vendor page listing available releases and their published checksums, recorded once per blueprint so nobody has to rediscover it. See [Checking for new versions](#checking-for-new-versions).
 
