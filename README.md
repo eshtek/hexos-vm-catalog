@@ -83,12 +83,12 @@ with a real digest.
     "internal": false,                     // true = never served from the prod branch
     "provisioning": {
         "strategy": "image",               // "image" | "cloud-init" | "answer-file" | "installer-iso"
-                                           //   | "machine-config"
+                                           //   | "installer-image" | "machine-config"
         "source": {
             "url": "https://…/{version}/disk-{version}.qcow2.xz",  // {version} is substituted
             "version": "18.1",
             "format": "qcow2",             // "raw" | "qcow2"
-            "compression": "xz",           // "none" | "xz" | "gz" | "zstd"
+            "compression": "xz",           // "none" | "xz" | "gz" | "zstd" | "bz2"
             "sha256": "…",                 // of the file as downloaded, as published by the vendor
                                            // (use "sha512" instead where that is all they publish —
                                            // Debian's cloud images, for one; at least one is required)
@@ -114,7 +114,7 @@ with a real digest.
 
 ### Provisioning strategies
 
-`provisioning.strategy` picks one of five install pipelines. Each is described
+`provisioning.strategy` picks one of six install pipelines. Each is described
 here as what actually happens on the box, in the order the pipeline does it,
 followed by what the blueprint has to supply. The steps mirror the roadmap the
 install pipeline registers upfront, so this section is what needs re-checking
@@ -182,6 +182,36 @@ a desktop login cannot run on an SSH key alone. `source` is a downloadable ISO
 (`url`/`version`/digest, no `format`/`compression`), and `seed.template` names
 a backend template that generates the answer-seed ISO (Ubuntu autoinstall on a
 NoCloud `cidata` volume, Fedora kickstart on `OEMDRV`). Readiness is usually
+`{ "type": "phone-home" }`.
+
+#### `installer-image` — recovery/installer media shipped as a raw disk image
+
+1. Allocate a BLANK zvol — the installer fills it, nothing is written up front.
+2. Download the vendor's raw installer image, verify it against the digest, and
+   decompress it onto a dedicated MEDIA zvol (sized from the decompression
+   estimate; sparse, so over-sizing costs nothing).
+3. Render the seed (the install script) with the account and build it into a
+   seed ISO.
+4. Attach the blank target as the first disk, the media zvol as the second
+   (firmware falls through the blank disk and boots the media), the seed as a
+   CD-ROM, then boot.
+5. After the live session settles, type the bootstrap into a text VT: it mounts
+   the seed by volume label and runs the install script, which drives the
+   image's own repair/install tooling against the target disk and powers off.
+6. On the power-off, detach the media disk and the seed CD, and start the VM
+   again — first boot runs media-less from the target.
+7. Wait for the INSTALLED system to phone home, then truncate the seed (it
+   carries the password hash) and destroy the media zvol — regenerable media,
+   destroyed only on a confirmed install; a timeout keeps it attached.
+
+For vendors that publish no installer ISO and no cloud image — only a raw
+recovery disk image that must boot from its own drive and image a second one
+(SteamOS's Steam Deck recovery image is the only case today). The guest's
+account is the image's fixed built-in user (`deck`), so no username is asked
+for; a password is mandatory because the image ships that account with an
+empty password. `source` is a downloadable raw image (`url`/`version`/
+`format`/`compression`/digest) and `seed.template` names the backend template
+that generates the install script and drives the flow. Readiness is
 `{ "type": "phone-home" }`.
 
 #### `answer-file` — Windows Setup, unattended

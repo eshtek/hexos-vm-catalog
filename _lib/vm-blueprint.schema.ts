@@ -171,6 +171,23 @@ const provisioningInstallerIsoSchema = z.object({
     }),
 });
 
+// Recovery/installer media shipped as a raw DISK IMAGE rather than a bootable
+// ISO (SteamOS's repair image is the only generic-PC install path Valve
+// publishes). The image boots from its own dedicated media zvol attached as a
+// second disk and installs onto the blank primary; the engine detaches the
+// media disk before first boot. Distinct from 'image' (which writes the
+// download onto the VM's only disk — recovery media would just boot itself
+// forever with nothing to install to) and from 'installer-iso' (a raw GPT
+// image is not El Torito media — OVMF cannot boot it from a CDROM device).
+const provisioningInstallerImageSchema = z.object({
+    strategy: z.literal('installer-image'),
+    source: vmImageSourceSchema,
+    seed: z.object({
+        /** Named installer-seed template shipped in the backend (not arbitrary catalog-supplied config). */
+        template: z.string().min(1).max(64),
+    }),
+});
+
 // Container hosts configured by a machine config rather than cloud-init: Fedora
 // CoreOS and Flatcar (Ignition), Talos (its own machine config). Distinct from
 // 'cloud-init' because these guests ship no cloud-init at all, and distinct from
@@ -201,6 +218,7 @@ export const vmProvisioningSchema = z.discriminatedUnion('strategy', [
     provisioningCloudInitSchema,
     provisioningAnswerFileSchema,
     provisioningInstallerIsoSchema,
+    provisioningInstallerImageSchema,
     provisioningMachineConfigSchema,
 ]);
 
@@ -391,24 +409,31 @@ type VMProvisioningDoc = VMBlueprint['provisioning'];
 
 /**
  * Cloud-init and installer-iso blueprints create a first-user account from
- * the form; machine-config images (Fedora CoreOS, Flatcar) configure their
- * fixed built-in account with the same credentials.
+ * the form; machine-config images (Fedora CoreOS, Flatcar) and installer-image
+ * guests (SteamOS's fixed `deck` user) configure their fixed built-in account
+ * with the same credentials.
  */
 export const blueprintNeedsAccount = (provisioning: VMProvisioningDoc): boolean =>
     provisioning.strategy === 'cloud-init' ||
     provisioning.strategy === 'installer-iso' ||
+    provisioning.strategy === 'installer-image' ||
     provisioning.strategy === 'machine-config';
 
 /**
- * Machine-config images ship a fixed built-in account and have no installer
- * to create another, so there is no username to pick.
+ * Machine-config and installer-image guests ship a fixed built-in account and
+ * have no installer to create another, so there is no username to pick.
  */
 export const blueprintNeedsUsername = (provisioning: VMProvisioningDoc): boolean =>
-    provisioning.strategy !== 'machine-config';
+    provisioning.strategy !== 'machine-config' && provisioning.strategy !== 'installer-image';
 
-/** Desktop (installer-iso) installs require a password — a desktop login can't run on an SSH key alone. */
+/**
+ * Desktop installs require a password — a desktop login can't run on an SSH
+ * key alone. installer-image guests additionally ship their built-in account
+ * with an EMPTY password (SteamOS's `deck` — verified live), so leaving it
+ * unset would leave the installed desktop passwordless.
+ */
 export const blueprintRequiresPassword = (provisioning: VMProvisioningDoc): boolean =>
-    provisioning.strategy === 'installer-iso';
+    provisioning.strategy === 'installer-iso' || provisioning.strategy === 'installer-image';
 
 /** Answer-file (Windows) blueprints additionally need the user-supplied installer ISO. */
 export const blueprintNeedsWindowsSetup = (provisioning: VMProvisioningDoc): boolean =>

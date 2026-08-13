@@ -58,7 +58,14 @@ export const KNOWN_INSTALLER_SEED_TEMPLATES = new Set([
   "pop-live-exec",
   "omarchy-autoinstall",
   "cachyos-headless",
+  "fygoos-initrd-exec",
+  "steamos-repair",
 ]);
+
+// Installer-image templates are installer-seed templates that additionally
+// name the guest's fixed built-in account and drive the powerOffForMediaEject
+// flow — only these may ride the installer-image strategy.
+export const KNOWN_INSTALLER_IMAGE_TEMPLATES = new Set(["steamos-repair"]);
 // The category vocabulary is enforced HERE (CI error) rather than as an enum in
 // the schema: sync re-validates stored documents against the schema, so a hard
 // enum would auto-hide blueprints whenever the catalog adds a category before
@@ -167,6 +174,11 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
   if (p.strategy === "installer-iso" && !KNOWN_INSTALLER_SEED_TEMPLATES.has(p.seed.template)) {
     errors.push(
       `unknown installer-seed template "${p.seed.template}" — the backend ships only: ${[...KNOWN_INSTALLER_SEED_TEMPLATES].join(", ")}`,
+    );
+  }
+  if (p.strategy === "installer-image" && !KNOWN_INSTALLER_IMAGE_TEMPLATES.has(p.seed.template)) {
+    errors.push(
+      `unknown installer-image template "${p.seed.template}" — the backend ships only: ${[...KNOWN_INSTALLER_IMAGE_TEMPLATES].join(", ")}`,
     );
   }
 
