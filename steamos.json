@@ -2,8 +2,13 @@
   "id": "steamos",
   "name": "SteamOS",
   "description": "Valve's gaming-focused Linux distribution, installed from the official Steam Deck recovery image. Boots to the KDE Plasma desktop with the Steam client; Gaming Mode (gamescope) requires an AMD GPU passed through to the virtual PC — on the emulated display the desktop session is used instead. Sign in with your Steam account after the install completes.",
+  "icon": "_icons/steam.svg",
   "category": "desktop",
   "website": "https://store.steampowered.com/steamos",
+  "screenshots": [
+    "steamos/screenshots/desktop.jpg",
+    "steamos/screenshots/desktop-plasma.jpg"
+  ],
   "provisioning": {
     "strategy": "installer-image",
     "source": {

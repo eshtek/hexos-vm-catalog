@@ -50,6 +50,8 @@ One row per file. When adding images, record where it came from, who made it, an
 | `omarchy/screenshots/theme-ristretto.jpg` | [Omarchy Ristretto theme.png](https://commons.wikimedia.org/wiki/File:Omarchy_Ristretto_theme.png) | David Heinemeier Hansson | GPL | version not stated upstream |
 | `home-assistant-os/screenshots/dashboard.jpg` | [Screenshot of Home Assistant Frontend.png](https://commons.wikimedia.org/wiki/File:Screenshot_of_Home_Assistant_Frontend.png) | Fabian.a | CC BY-SA 4.0 | frontend, version not stated |
 | `openwrt/screenshots/luci.jpg` | [LuCI Interface, OpenWRT 25.12.2.png](https://commons.wikimedia.org/wiki/File:LuCI_Interface,_OpenWRT_25.12.2.png) | Gábor Juhos, Florian Fainelli, Hauke Mehrtens, Jo-Philipp Wich | GPL | LuCI on OpenWrt 25.12.2 (we pin 25.12.5 — same series) |
+| `steamos/screenshots/desktop.jpg` | [SteamOS 3.0 desktop (Deck recovery image) screenshot.png](https://commons.wikimedia.org/wiki/File:SteamOS_3.0_desktop_(Deck_recovery_image)_screenshot.png) | Software: KDE developers; Wallpaper: Valve Corporation; Screenshot: thelimeydragon at GamingOnLinux | GPL | SteamOS 3.0 recovery image, Plasma 5.23 (we ship 3.8.14 — same install source) |
+| `steamos/screenshots/desktop-plasma.jpg` | [KDE Plasma 5.23 on Steam Deck Desktop screenshot.png](https://commons.wikimedia.org/wiki/File:KDE_Plasma_5.23_on_Steam_Deck_Desktop_screenshot.png) | Software: KDE developers; Wallpaper: ruvkr; Screenshot: Liam Dawe/GamingOnLinux | CC BY-SA 4.0 | SteamOS 3.x desktop mode, Plasma 5.23 (we ship 3.8.14) |
 
 ## Blueprints with no screenshots, on purpose
 
@@ -105,6 +107,7 @@ Brand icons under `_icons/` are mirrored verbatim from the HexOS frontend's bund
 the blueprint instead of requiring a platform release. Each file is the upstream project's logo
 mark: these are trademarks of their respective projects (Canonical, the Fedora Project, AlmaLinux
 OS Foundation, the Debian Project, RESF, SUSE, the OpenWrt Project, System76, the Linux Mint team,
-Zorin Group, the Home Assistant project, the Flatcar/Bazzite/CachyOS teams, Microsoft, and the
-Linux/Tux mark), used here nominatively to identify the software the blueprint installs. If an
+Zorin Group, the Home Assistant project, the Flatcar/Bazzite/CachyOS teams, Microsoft, Valve
+Corporation, and the Linux/Tux mark), used here nominatively to identify the software the
+blueprint installs. If an
 upstream project objects or rebrands, replace or remove the file here — nothing else references it.
