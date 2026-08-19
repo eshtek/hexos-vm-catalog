@@ -1,0 +1,53 @@
+{
+    "id": "almalinux-10",
+    "name": "AlmaLinux 10",
+    "description": "AlmaLinux 10 from the official GenericCloud image — the newest community-governed enterprise release, binary-compatible with Red Hat Enterprise Linux. Requires a CPU supporting x86-64-v3 (roughly Intel Haswell / AMD Excavator or newer).",
+    "icon": "_icons/almalinux.svg",
+    "website": "https://almalinux.org/",
+    "category": "server",
+    "truenasVersion": ">=25.04.2.6",
+    "cpuFeatures": [
+        "avx",
+        "avx2",
+        "bmi1",
+        "bmi2",
+        "f16c",
+        "fma",
+        "abm",
+        "movbe",
+        "xsave"
+    ],
+    "provisioning": {
+        "strategy": "cloud-init",
+        "source": {
+            "url": "https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-{version}.x86_64.qcow2",
+            "version": "10.2-20260526.0",
+            "format": "qcow2",
+            "compression": "none",
+            "sha256": "47f2218668dd4776be140dd92fa3bea700be1766e2c7d88bdfd6a4b50f477b4d",
+            "releasesUrl": "https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/"
+        },
+        "cloudInit": {
+            "userDataTemplate": "linux-default"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 2048,
+        "recMemoryMb": 4096,
+        "minVcpus": 1,
+        "recVcpus": 2,
+        "diskGb": 32
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

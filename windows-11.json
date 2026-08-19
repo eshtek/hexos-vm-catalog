@@ -1,0 +1,52 @@
+{
+    "id": "windows-11",
+    "name": "Windows 11 Pro",
+    "description": "Windows 11 Pro installed hands-free from your own installer ISO — bring the ISO (Microsoft doesn't allow us to ship it), and HexOS handles partitioning, setup answers, and your first account.",
+    "icon": "_icons/windows.svg",
+    "website": "https://www.microsoft.com/windows/windows-11",
+    "screenshots": [
+        "windows-11/screenshots/desktop.jpg",
+        "windows-11/screenshots/start-menu.jpg"
+    ],
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "answer-file",
+        "source": {
+            "type": "user-iso",
+            "isoHelpUrl": "https://www.microsoft.com/software-download/windows11",
+            "releasesUrl": "https://www.microsoft.com/software-download/windows11"
+        },
+        "answerFile": {
+            "template": "win11-pro"
+        },
+        "extraMedia": [
+            {
+                "id": "virtio-drivers",
+                "url": "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.285-1/virtio-win-0.1.285.iso",
+                "sha256": "e14cf2b94492c3e925f0070ba7fdfedeb2048c91eea9c5a5afb30232a3976331"
+            }
+        ]
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "maxUsefulVcpus": 8,
+        "diskGb": 64
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": true,
+        "secureBoot": false,
+        "hypervEnlightenments": true,
+        "autostart": false,
+        "gpuPassthrough": true,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

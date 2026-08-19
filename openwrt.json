@@ -1,0 +1,45 @@
+{
+    "id": "openwrt",
+    "name": "OpenWrt 25.12",
+    "description": "The OpenWrt router and firewall appliance, written straight to disk from the official x86-64 image — run VLAN routing, a firewall, or a VPN gateway alongside your storage. Configure it from the LuCI web interface after first boot.",
+    "icon": "_icons/openwrt.svg",
+    "website": "https://openwrt.org/",
+    "screenshots": [
+        "openwrt/screenshots/luci.jpg"
+    ],
+    "category": "appliance",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "image",
+        "source": {
+            "url": "https://downloads.openwrt.org/releases/{version}/targets/x86/64/openwrt-{version}-x86-64-generic-ext4-combined-efi.img.gz",
+            "version": "25.12.5",
+            "format": "raw",
+            "compression": "gz",
+            "sha256": "c8ee59ce7b0f635a6b50c1b7307b07ee7785214a6faf2af42280dd4ef4310290",
+            "releasesUrl": "https://downloads.openwrt.org/releases/"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 256,
+        "recMemoryMb": 512,
+        "minVcpus": 1,
+        "recVcpus": 1,
+        "maxUsefulVcpus": 2,
+        "diskGb": 8
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": true,
+        "readiness": {
+            "type": "arp",
+            "port": 80
+        },
+        "postInstallUrl": "http://{ip}"
+    }
+}

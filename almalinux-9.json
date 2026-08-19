@@ -1,0 +1,42 @@
+{
+    "id": "almalinux-9",
+    "name": "AlmaLinux 9",
+    "description": "AlmaLinux 9 from the official GenericCloud image — a community-governed enterprise Linux, binary-compatible with Red Hat Enterprise Linux.",
+    "icon": "_icons/almalinux.svg",
+    "website": "https://almalinux.org/",
+    "category": "server",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "cloud-init",
+        "source": {
+            "url": "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-{version}.x86_64.qcow2",
+            "version": "9.8-20260526",
+            "format": "qcow2",
+            "compression": "none",
+            "sha256": "c397eed7023e92c841155831b1f47e26300e5bef0f0256c129322307c897a251",
+            "releasesUrl": "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/"
+        },
+        "cloudInit": {
+            "userDataTemplate": "linux-default"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 2048,
+        "recMemoryMb": 4096,
+        "minVcpus": 1,
+        "recVcpus": 2,
+        "diskGb": 32
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

@@ -1,0 +1,43 @@
+{
+    "id": "fedora-coreos",
+    "name": "Fedora CoreOS",
+    "description": "Fedora CoreOS from the official stable stream — a minimal, automatically-updating host built to run containers and nothing else. Configured at first boot from an Ignition document; there is no package manager and no interactive install.",
+    "icon": "_icons/fedora.svg",
+    "website": "https://fedoraproject.org/coreos/",
+    "category": "server",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "machine-config",
+        "source": {
+            "url": "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/{version}/x86_64/fedora-coreos-{version}-openstack.x86_64.qcow2.xz",
+            "version": "44.20260720.3.1",
+            "format": "qcow2",
+            "compression": "xz",
+            "sha256": "adec22e77be1ccca1bcf58e728e1dc5a3c3087715ffbf59b682784a57140f29a",
+            "releasesUrl": "https://builds.coreos.fedoraproject.org/streams/stable.json"
+        },
+        "machineConfig": {
+            "template": "fcos-ignition",
+            "delivery": "config-drive"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 2048,
+        "recMemoryMb": 4096,
+        "minVcpus": 2,
+        "recVcpus": 2,
+        "diskGb": 32
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": true,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

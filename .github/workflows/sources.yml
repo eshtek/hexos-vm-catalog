@@ -1,0 +1,56 @@
+# Upstream drift check. Blueprints break far more often because a publisher
+# moved or pruned a file than because an install regressed, and that failure is
+# invisible until a user hits it. This runs on GitHub-hosted runners with no
+# secrets and no VM, so it is safe to run on pull_request from forks.
+name: Check source URLs
+
+on:
+  pull_request:
+  schedule:
+    # Daily. Cheap enough that there is no reason to run it less often.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      verify:
+        description: "Stream every image and verify its digest (slow, ~57 GiB of transfer)"
+        type: boolean
+        default: false
+
+jobs:
+  head:
+    name: URL liveness
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: _lib
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun run check-sources
+
+  digests:
+    name: Digest verification
+    # Only on demand. Runner disk is not a constraint — check-sources hashes the
+    # response stream chunk by chunk and never writes the image anywhere, so
+    # peak memory is one chunk and peak disk is the checkout (measured: a 325 MiB
+    # image verifies in ~134 MiB RSS and zero bytes stored). Transfer is the
+    # cost: ~57 GiB sequentially, which is also why this is manual — pulling
+    # that from community mirrors on a schedule would be abusive, and the daily
+    # job above answers the question that actually rots (did the file move?)
+    # with HEAD requests alone.
+    #
+    # 240 rather than 120 minutes: the budget has to cover the slowest mirror in
+    # the set, and 57 GiB in 120 min needs ~8 MB/s sustained end to end. The
+    # university and community mirrors here do not always give that.
+    if: github.event_name == 'workflow_dispatch' && inputs.verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    defaults:
+      run:
+        working-directory: _lib
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun run check-sources -- --verify

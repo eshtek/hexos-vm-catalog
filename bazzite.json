@@ -1,0 +1,47 @@
+{
+    "id": "bazzite",
+    "name": "Bazzite",
+    "description": "The gaming-focused Linux desktop from Universal Blue, installed hands-free from the official installer with the KDE desktop — Steam and game-streaming tools preinstalled, updated as one atomic image. Attach a GPU for Steam Game Mode.",
+    "icon": "_icons/bazzite.svg",
+    "website": "https://bazzite.gg/",
+    "screenshots": [
+        "bazzite/screenshots/desktop-gnome.jpg",
+        "bazzite/screenshots/menu-kde.jpg",
+        "bazzite/screenshots/files.jpg"
+    ],
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "installer-iso",
+        "source": {
+            "url": "https://download.bazzite.gg/bazzite-stable-amd64.iso",
+            "version": "41-20251018",
+            "sha256": "9c8d06cd8e57f2274678edeb14b4b13a79b8117c70571a65199919a66305b5c7",
+            "releasesUrl": "https://github.com/ublue-os/bazzite/releases"
+        },
+        "seed": {
+            "template": "bazzite-kickstart"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "maxUsefulVcpus": 6,
+        "diskGb": 128
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "gpuPassthrough": true,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

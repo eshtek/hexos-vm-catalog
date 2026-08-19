@@ -1,0 +1,48 @@
+{
+    "id": "cachyos",
+    "name": "CachyOS",
+    "description": "The performance-tuned Arch Linux with the KDE Plasma desktop, installed hands-free by CachyOS's own headless installer — optimized kernels and CPU-tuned packages, rolling updates. Attach a GPU for gaming workloads.",
+    "icon": "_icons/cachyos.svg",
+    "website": "https://cachyos.org/",
+    "screenshots": [
+        "cachyos/screenshots/desktop.jpg",
+        "cachyos/screenshots/desktop-kde.jpg",
+        "cachyos/screenshots/theme-nord.jpg",
+        "cachyos/screenshots/desktop-xfce.jpg"
+    ],
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "installer-iso",
+        "source": {
+            "url": "https://build.cachyos.org/ISO/desktop/{version}/cachyos-desktop-linux-{version}.iso",
+            "version": "260628",
+            "sha256": "136c84942eacdc6deed205fe7018c69fe7b70757f2f9b4010936ee05e060f336",
+            "releasesUrl": "https://build.cachyos.org/ISO/desktop/"
+        },
+        "seed": {
+            "template": "cachyos-headless"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "maxUsefulVcpus": 6,
+        "diskGb": 64
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "gpuPassthrough": true,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

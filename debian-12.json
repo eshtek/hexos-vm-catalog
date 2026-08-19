@@ -1,0 +1,42 @@
+{
+    "id": "debian-12",
+    "name": "Debian 12 (Bookworm)",
+    "description": "Debian 12 from the official cloud image, configured on first boot — the previous stable release, for workloads pinned to it while Trixie settles.",
+    "icon": "_icons/debian.svg",
+    "website": "https://www.debian.org/",
+    "category": "server",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "cloud-init",
+        "source": {
+            "url": "https://cloud.debian.org/images/cloud/bookworm/{version}/debian-12-genericcloud-amd64-{version}.qcow2",
+            "version": "20260806-2562",
+            "format": "qcow2",
+            "compression": "none",
+            "sha512": "3622c990108a044ed411652f8741e77c5822c365114d7b940206b243f8fb617b8586792df4cdb7afba1b71d1a09289d8ed632124688f2c8352cb08190a1e9868",
+            "releasesUrl": "https://cloud.debian.org/images/cloud/bookworm/"
+        },
+        "cloudInit": {
+            "userDataTemplate": "linux-default"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 1024,
+        "recMemoryMb": 2048,
+        "minVcpus": 1,
+        "recVcpus": 2,
+        "diskGb": 20
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

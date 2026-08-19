@@ -1,0 +1,48 @@
+{
+    "id": "omarchy",
+    "name": "Omarchy 3.8",
+    "description": "DHH's opinionated Arch Linux desktop with the Hyprland tiling compositor, installed hands-free from the official ISO — a keyboard-driven, developer-focused desktop that updates continuously. Attach a GPU for a smooth Wayland session.",
+    "icon": "_icons/penguin.svg",
+    "website": "https://omarchy.org/",
+    "screenshots": [
+        "omarchy/screenshots/theme-gruvbox.jpg",
+        "omarchy/screenshots/theme-nord.jpg",
+        "omarchy/screenshots/theme-ristretto.jpg"
+    ],
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "internal": true,
+    "provisioning": {
+        "strategy": "installer-iso",
+        "source": {
+            "url": "https://iso.omarchy.org/omarchy-{version}.iso",
+            "version": "3.8.4",
+            "sha256": "7bc1dc7d98f3d088e57dc06581a494ea441fb15f3edd191360fd1696931bd895",
+            "releasesUrl": "https://github.com/basecamp/omarchy/releases"
+        },
+        "seed": {
+            "template": "omarchy-autoinstall"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "maxUsefulVcpus": 6,
+        "diskGb": 64
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "gpuPassthrough": true,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

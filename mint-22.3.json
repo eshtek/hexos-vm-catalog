@@ -1,0 +1,47 @@
+{
+    "id": "mint-22.3",
+    "name": "Linux Mint 22.3 Cinnamon",
+    "description": "Linux Mint 22.3 with the Cinnamon desktop, installed hands-free from the official ISO — the classic, familiar Linux desktop that many consider the easiest switch from Windows.",
+    "icon": "_icons/mint.svg",
+    "website": "https://linuxmint.com/",
+    "screenshots": [
+        "mint-22.3/screenshots/desktop.jpg",
+        "mint-22.3/screenshots/cinnamon.jpg",
+        "mint-22.3/screenshots/software-manager.jpg",
+        "mint-22.3/screenshots/update-manager.jpg"
+    ],
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "installer-iso",
+        "source": {
+            "url": "https://mirrors.edge.kernel.org/linuxmint/stable/{version}/linuxmint-{version}-cinnamon-64bit.iso",
+            "version": "22.3",
+            "sha256": "a081ab202cfda17f6924128dbd2de8b63518ac0531bcfe3f1a1b88097c459bd4",
+            "releasesUrl": "https://mirrors.edge.kernel.org/linuxmint/stable/"
+        },
+        "seed": {
+            "template": "mint-preseed"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "maxUsefulVcpus": 6,
+        "diskGb": 64
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}
