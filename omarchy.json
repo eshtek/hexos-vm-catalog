@@ -1,23 +1,23 @@
 {
     "id": "omarchy",
-    "name": "Omarchy 3.8",
+    "name": "Omarchy 4",
     "description": "DHH's opinionated Arch Linux desktop with the Hyprland tiling compositor, installed hands-free from the official ISO — a keyboard-driven, developer-focused desktop that updates continuously. Attach a GPU for a smooth Wayland session.",
-    "icon": "_icons/penguin.svg",
+    "icon": "_icons/omarchy.svg",
     "website": "https://omarchy.org/",
     "screenshots": [
+        "omarchy/screenshots/quattro.jpg",
         "omarchy/screenshots/theme-gruvbox.jpg",
         "omarchy/screenshots/theme-nord.jpg",
         "omarchy/screenshots/theme-ristretto.jpg"
     ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
-    "internal": true,
     "provisioning": {
         "strategy": "installer-iso",
         "source": {
             "url": "https://iso.omarchy.org/omarchy-{version}.iso",
-            "version": "3.8.4",
-            "sha256": "7bc1dc7d98f3d088e57dc06581a494ea441fb15f3edd191360fd1696931bd895",
+            "version": "4.0.0",
+            "sha256": "9224fab3720560f771969a99a499e5f7e0f8e2d6a0681d872d52f05fb5003da4",
             "releasesUrl": "https://github.com/basecamp/omarchy/releases"
         },
         "seed": {

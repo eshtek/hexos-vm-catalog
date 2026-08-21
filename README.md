@@ -35,7 +35,7 @@ Grouped by `category`, which is how the HexOS UI groups them too.
 | [Kubuntu 26.04 LTS](kubuntu-26.04.json) | Ubuntu with the KDE Plasma desktop, installed hands-free from the official ISO |
 | [Linux Mint 22.3 Cinnamon](mint-22.3.json) | Cinnamon desktop, installed hands-free from the official ISO |
 | [openSUSE Leap 16.0](opensuse-leap-16.json) | Fixed-release SLE-based desktop, installed hands-free by Agama |
-| [Omarchy 3.8](omarchy.json) | DHH's Arch + Hyprland desktop, installed hands-free via the ISO's own autoinstall — `internal: true`, so it does not appear in the user-facing catalog yet |
+| [Omarchy 4](omarchy.json) | DHH's Arch + Hyprland desktop, installed hands-free via the ISO's own autoinstall |
 | [Pop!_OS 24.04 LTS](pop-os-24.04.json) | System76's COSMIC desktop, installed hands-free from the official ISO |
 | [Ubuntu Desktop 26.04 LTS](ubuntu-desktop-26.04.json) | The Ubuntu desktop, installed hands-free from Canonical's official installer |
 | [Windows 10 Pro](windows-10.json) | Unattended install from a user-supplied installer ISO |

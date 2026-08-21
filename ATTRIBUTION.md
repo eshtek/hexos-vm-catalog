@@ -45,6 +45,7 @@ One row per file. When adding images, record where it came from, who made it, an
 | `opensuse-leap-16/screenshots/desktop-dark.jpg` | [OpenSUSE Leap 16.0 dark mode screenshot.webp](https://commons.wikimedia.org/wiki/File:OpenSUSE_Leap_16.0_dark_mode_screenshot.webp) | Software: openSUSE and KDE developersWallpaper: openSUSEScreenshot: Di | GPL | matches the version we ship |
 | `opensuse-leap-16/screenshots/desktop-gnome.jpg` | [OpenSUSE Leap 16.0 GNOME screenshot.webp](https://commons.wikimedia.org/wiki/File:OpenSUSE_Leap_16.0_GNOME_screenshot.webp) | Software: openSUSE and GNOME developersWallpaper: openSUSEScreenshot:  | GPL | matches the version we ship |
 | `opensuse-leap-16/screenshots/desktop-alt.jpg` | [Opensuse 16.0 Leap.png](https://commons.wikimedia.org/wiki/File:Opensuse_16.0_Leap.png) | openSUSE Project | GPL | matches the version we ship |
+| `omarchy/screenshots/quattro.jpg` | [v4.0.0 release notes](https://github.com/basecamp/omarchy/releases/tag/v4.0.0) | David Heinemeier Hansson | not stated (author-published release screenshot; includes the author's webcam overlay) | Omarchy 4.0.0 — matches the version we ship |
 | `omarchy/screenshots/theme-gruvbox.jpg` | [Omarchy Gruvbox theme.png](https://commons.wikimedia.org/wiki/File:Omarchy_Gruvbox_theme.png) | David Heinemeier Hansson | GPL | version not stated upstream |
 | `omarchy/screenshots/theme-nord.jpg` | [Omarchy Nord theme.png](https://commons.wikimedia.org/wiki/File:Omarchy_Nord_theme.png) | David Heinemeier Hansson | GPL | version not stated upstream |
 | `omarchy/screenshots/theme-ristretto.jpg` | [Omarchy Ristretto theme.png](https://commons.wikimedia.org/wiki/File:Omarchy_Ristretto_theme.png) | David Heinemeier Hansson | GPL | version not stated upstream |
@@ -102,12 +103,14 @@ permit limited use in some contexts; that judgement has NOT been made here.
 
 # Icon attribution
 
-Brand icons under `_icons/` are mirrored verbatim from the HexOS frontend's bundled artwork
-(`eshtek/hexos-platform`, `packages/frontend/public/icons/vms/`), so a blueprint's icon ships with
-the blueprint instead of requiring a platform release. Each file is the upstream project's logo
+This repo is the sole home of blueprint brand icons: a blueprint's icon ships with the blueprint
+instead of requiring a platform release. The platform bundles only the Add-VM wizard's five coarse
+OS icons (Windows, Ubuntu, FreeBSD, Chrome, Custom in `packages/frontend/public/icons/vms/`);
+everything under `_icons/` here exists nowhere else. Each file is the upstream project's logo
 mark: these are trademarks of their respective projects (Canonical, the Fedora Project, AlmaLinux
 OS Foundation, the Debian Project, RESF, SUSE, the OpenWrt Project, System76, the Linux Mint team,
 Zorin Group, the Home Assistant project, the Flatcar/Bazzite/CachyOS teams, Microsoft, Valve
-Corporation, and the Linux/Tux mark), used here nominatively to identify the software the
-blueprint installs. If an
-upstream project objects or rebrands, replace or remove the file here — nothing else references it.
+Corporation, 37signals for the Omarchy mark, and the Linux/Tux mark), used here nominatively to
+identify the software the blueprint installs. `omarchy.svg` is an exact-geometry vectorization of
+the omarchy.org favicon (the project publishes no vector of its mark). If an upstream project
+objects or rebrands, replace or remove the file here — nothing else references it.
