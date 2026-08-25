@@ -1,7 +1,7 @@
 {
     "id": "openwrt",
     "name": "OpenWrt 25.12",
-    "description": "The OpenWrt router and firewall appliance, written straight to disk from the official x86-64 image — run VLAN routing, a firewall, or a VPN gateway alongside your storage. Configure it from the LuCI web interface after first boot.",
+    "description": "The OpenWrt router and firewall appliance, written straight to disk from the official x86-64 image \u2014 run VLAN routing, a firewall, or a VPN gateway alongside your storage. Configure it from the LuCI web interface after first boot.",
     "icon": "_icons/openwrt.svg",
     "website": "https://openwrt.org/",
     "screenshots": [
@@ -18,6 +18,9 @@
             "compression": "gz",
             "sha256": "c8ee59ce7b0f635a6b50c1b7307b07ee7785214a6faf2af42280dd4ef4310290",
             "releasesUrl": "https://downloads.openwrt.org/releases/"
+        },
+        "firstBoot": {
+            "profile": "openwrt-lan-dhcp"
         }
     },
     "resources": {
