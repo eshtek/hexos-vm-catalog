@@ -137,6 +137,18 @@ export const vmExtraMediaSchema = z.object({
 const provisioningImageSchema = z.object({
     strategy: z.literal('image'),
     source: vmImageSourceSchema,
+    /**
+     * Named first-boot file set shipped in the backend (not arbitrary
+     * catalog-supplied files — same posture as cloud-init's userDataTemplate),
+     * written into the image after the image write. OpenWRT uses
+     * "openwrt-lan-dhcp" to join the LAN as a DHCP client instead of running
+     * a router on it, and to phone home on its first lease.
+     */
+    firstBoot: z
+        .object({
+            profile: z.string().min(1).max(64),
+        })
+        .optional(),
 });
 
 const provisioningCloudInitSchema = z.object({
@@ -298,9 +310,10 @@ export const vmBlueprintSchema = z.object({
      * which is what the same document holds AFTER syncVMBlueprintCatalog
      * resolves that path — the stored document re-validates on every sync, so
      * rejecting the resolved form would disable every blueprint; and a legacy
-     * VMIcons-style key (e.g. "vms/haos"), resolved against the frontend's
+     * VMIcons-style key (e.g. "vms/ubuntu"), resolved against the frontend's
      * bundled artwork — VMs installed before the catalog carried its own icons
-     * persisted that key forever.
+     * persisted that key forever. Only the wizard's five OS keys still ship
+     * artwork; a legacy brand key renders the custom tile.
      */
     icon: z.string().max(512).optional(),
     /**
@@ -629,3 +642,27 @@ export const VM_SSH_PUBLIC_KEY_PATTERN =
     /^(ssh-(rsa|ed25519)|ecdsa-sha2-nistp(256|384|521)|sk-(ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com) [A-Za-z0-9+/=]+( [\x20-\x7e]{1,128})?$/;
 /** Tokened relay endpoints on main (phone-home / update-status). */
 export const VM_HTTPS_RELAY_URL_PATTERN = /^https:\/\/[A-Za-z0-9.:_/-]+$/;
+/**
+ * Direct on-box phone-home endpoint: the VM shim's address on macvtap boxes,
+ * the host's own LAN address on bridged ones. Plain HTTP by design — the box's
+ * certificate is issued for its `*.local.hexos.com` name, which resolves to an
+ * address a macvtap guest cannot reach, and the shim path is switched inside
+ * the host's kernel (macvlan bridge mode), so the token never crosses the wire.
+ */
+export const VM_LOCAL_RELAY_URL_PATTERN = /^http:\/\/(?:\d{1,3}\.){3}\d{1,3}:\d{1,5}\/[A-Za-z0-9._/-]+$/;
+
+/**
+ * The two channels a provisioning guest can post to — phone-home and the
+ * Windows Update stage's status stream both carry the same pair.
+ */
+export interface VMRelayTargets {
+    /** Tokened relay endpoint on main; absent when main was unreachable. */
+    url?: string;
+    /** Direct on-box endpoint; absent when no host address serves this guest. */
+    localUrl?: string;
+}
+
+/** Seed order: the on-box endpoint first, main as the fallback guests fall through to. */
+export function orderRelayTargets(targets: VMRelayTargets): string[] {
+    return [targets.localUrl, targets.url].filter((url): url is string => url !== undefined);
+}
