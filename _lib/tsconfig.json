@@ -7,7 +7,11 @@
     "skipLibCheck": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    // TypeScript 7 (the runner-global tsc on CI) no longer auto-includes
+    // node_modules/@types; without this field every node:* import and the Bun
+    // global fail to resolve. @types/bun pulls in @types/node transitively.
+    "types": ["bun"]
   },
   "include": ["."]
 }
