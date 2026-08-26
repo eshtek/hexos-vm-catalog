@@ -1,7 +1,7 @@
 {
     "id": "flatcar",
     "name": "Flatcar Container Linux",
-    "description": "Flatcar Container Linux from the official stable channel — an immutable, automatically-updating container host in the CoreOS lineage. Configured at first boot from an Ignition document.",
+    "description": "Flatcar Container Linux from the official stable channel, an immutable and automatically-updating container host in the CoreOS lineage. Configured at first boot from an Ignition document.",
     "icon": "_icons/flatcar.svg",
     "website": "https://www.flatcar.org/",
     "category": "server",

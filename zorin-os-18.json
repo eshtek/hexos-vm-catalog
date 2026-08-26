@@ -1,7 +1,7 @@
 {
     "id": "zorin-os-18",
     "name": "Zorin OS 18.1 Core",
-    "description": "Zorin OS 18.1 Core, installed hands-free from the official ISO — a polished, Windows-familiar Linux desktop designed to feel instantly at home for people leaving Windows behind.",
+    "description": "A polished, Windows-familiar Linux desktop designed to feel instantly at home for people leaving Windows behind. Zorin OS 18.1 Core installs hands-free from the official ISO.",
     "icon": "_icons/zorin.svg",
     "website": "https://zorin.com/os/",
     "screenshots": [

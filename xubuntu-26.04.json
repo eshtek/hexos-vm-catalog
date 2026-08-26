@@ -1,7 +1,7 @@
 {
     "id": "xubuntu-26.04",
     "name": "Xubuntu 26.04 LTS",
-    "description": "Ubuntu 26.04 LTS with the Xfce desktop, installed hands-free from Canonical's official installer — the same Ubuntu base and update schedule with a lightweight, conventional desktop that runs well on modest resources.",
+    "description": "Ubuntu 26.04 LTS with the Xfce desktop, installed hands-free from Canonical's official installer. It keeps the same Ubuntu base and update schedule, paired with a lightweight, conventional desktop that runs well on modest resources.",
     "icon": "_icons/xubuntu.svg",
     "website": "https://xubuntu.org/",
     "screenshots": [

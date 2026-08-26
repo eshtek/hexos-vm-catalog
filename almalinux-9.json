@@ -1,7 +1,7 @@
 {
     "id": "almalinux-9",
     "name": "AlmaLinux 9",
-    "description": "AlmaLinux 9 from the official GenericCloud image — a community-governed enterprise Linux, binary-compatible with Red Hat Enterprise Linux.",
+    "description": "A community-governed enterprise Linux, binary-compatible with Red Hat Enterprise Linux, installed from the official AlmaLinux 9 GenericCloud image.",
     "icon": "_icons/almalinux.svg",
     "website": "https://almalinux.org/",
     "category": "server",

@@ -1,7 +1,7 @@
 {
     "id": "omarchy",
     "name": "Omarchy 4",
-    "description": "DHH's opinionated Arch Linux desktop with the Hyprland tiling compositor, installed hands-free from the official ISO — a keyboard-driven, developer-focused desktop that updates continuously. Attach a GPU for a smooth Wayland session.",
+    "description": "A keyboard-driven, developer-focused desktop that updates continuously. DHH's opinionated Arch Linux build with the Hyprland tiling compositor installs hands-free from the official ISO. Attach a GPU for a smooth Wayland session.",
     "icon": "_icons/omarchy.svg",
     "website": "https://omarchy.org/",
     "screenshots": [

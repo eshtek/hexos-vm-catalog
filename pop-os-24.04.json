@@ -1,7 +1,7 @@
 {
     "id": "pop-os-24.04",
     "name": "Pop!_OS 24.04 LTS",
-    "description": "System76's Pop!_OS 24.04 LTS with the COSMIC desktop, installed hands-free from the official ISO — a keyboard-driven, developer-friendly Linux desktop.",
+    "description": "System76's Pop!_OS 24.04 LTS, a keyboard-driven and developer-friendly Linux desktop, installed hands-free from the official ISO with COSMIC.",
     "icon": "_icons/pop-os.svg",
     "website": "https://system76.com/pop/",
     "screenshots": [

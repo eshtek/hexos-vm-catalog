@@ -1,7 +1,7 @@
 {
     "id": "windows-10",
     "name": "Windows 10 Pro",
-    "description": "Windows 10 Pro installed hands-free from your own installer ISO — bring the ISO (Microsoft doesn't allow us to ship it), and HexOS handles partitioning, setup answers, and your first account. Note: Windows 10 reached end of support in October 2025 — pick Windows 11 if you want ongoing security updates.",
+    "description": "Windows 10 Pro installed hands-free from your own installer ISO. Bring the ISO (Microsoft doesn't allow us to ship it) and HexOS handles partitioning, setup answers, and your first account. Note: Windows 10 reached end of support in October 2025, so pick Windows 11 if you want ongoing security updates.",
     "icon": "_icons/windows.svg",
     "website": "https://www.microsoft.com/windows/end-of-support",
     "screenshots": [
