@@ -72,6 +72,14 @@ export const KNOWN_INSTALLER_IMAGE_TEMPLATES = new Set(["steamos-repair"]);
 // the platform deploys. The UI groups these; unknown slugs land in "Other".
 export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
 
+// Mirror of HEXOS_VM_CAPABILITIES in the platform's vm-blueprints.ts — the
+// install-pipeline capabilities shipped backends can declare support for.
+// Extend ONLY after the platform change ships (same rule as the template
+// allowlists): a capability listed here before it exists upstream turns the
+// check into a rubber stamp. Values are exact-match (no case folding) — the
+// backend compares them verbatim.
+export const KNOWN_VM_CAPABILITIES = new Set(["firstBoot"]);
+
 // How many screenshots the detail-sheet gallery actually renders (the UI's
 // ScreenshotViewer is handed a 5-item slice). Extra images cost repo size and
 // are never seen.
@@ -220,6 +228,33 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
   if (bp.category && !KNOWN_CATEGORIES.has(bp.category)) {
     errors.push(
       `unknown category "${bp.category}" — allowed values: ${[...KNOWN_CATEGORIES].join(", ")} (extend KNOWN_CATEGORIES deliberately when adding one)`,
+    );
+  }
+
+  // Capability declarations are a closed vocabulary this repo controls, unlike
+  // cpuFeatures' open kernel-flag namespace — an unknown value is either a typo
+  // (hides the blueprint on every up-to-date host) or a capability that hasn't
+  // shipped upstream yet, and both are errors.
+  for (const capability of bp.requiredCapabilities ?? []) {
+    if (!KNOWN_VM_CAPABILITIES.has(capability)) {
+      errors.push(
+        `requiredCapabilities value "${capability}" isn't a shipped capability — allowed values: ${[...KNOWN_VM_CAPABILITIES].join(", ")} (extend KNOWN_VM_CAPABILITIES only after the platform change ships)`,
+      );
+    }
+  }
+  // The declaration is the whole point of the gate: a blueprint using
+  // first-boot injection without declaring it installs "successfully" on
+  // backends that predate the feature — for OpenWRT that means booting a live
+  // DHCP server at 192.168.1.1 on the user's LAN.
+  const usesFirstBoot = p.strategy === "image" && p.firstBoot !== undefined;
+  const declaresFirstBoot = (bp.requiredCapabilities ?? []).includes("firstBoot");
+  if (usesFirstBoot && !declaresFirstBoot) {
+    errors.push(
+      `provisioning.firstBoot is set but requiredCapabilities doesn't declare "firstBoot" — backends without first-boot support would install this blueprint silently unconfigured`,
+    );
+  } else if (!usesFirstBoot && declaresFirstBoot) {
+    warnings.push(
+      `requiredCapabilities declares "firstBoot" but provisioning has no firstBoot profile — harmless over-gating that hides the blueprint from hosts that could run it`,
     );
   }
 
