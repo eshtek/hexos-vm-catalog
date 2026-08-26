@@ -361,6 +361,20 @@ export const vmBlueprintSchema = z.object({
         .array(z.string().regex(/^[A-Za-z0-9_]{1,32}$/, 'letters, digits and _ only'))
         .max(32)
         .optional(),
+    /**
+     * Install-pipeline capabilities this blueprint depends on (values from
+     * HEXOS_VM_CAPABILITIES; evaluated with missingVMCapabilities). The
+     * catalog updates fleet-wide instantly while backend code rolls out
+     * per-box, so a blueprint using a new capability must declare it — a
+     * backend that lacks it refuses the install (and the deck hides the row)
+     * instead of silently installing a degraded VM. Backends that predate
+     * this FIELD strip it and install anyway: it closes the window for
+     * capabilities newer than itself, not older ones.
+     */
+    requiredCapabilities: z
+        .array(z.string().regex(/^[a-zA-Z][a-zA-Z0-9-]{0,63}$/, 'capability slug'))
+        .max(16)
+        .optional(),
     /** Skipped when syncing the prod catalog branch (mirrors app install scripts). */
     internal: z.boolean().default(false),
     provisioning: vmProvisioningSchema,
@@ -560,6 +574,37 @@ export function missingCpuFeatures(hostFlags: string[] | null | undefined, requi
     if (!required?.length || !hostFlags?.length) return [];
     const available = new Set(hostFlags.map((flag) => flag.toLowerCase()));
     return required.filter((flag) => !available.has(flag.toLowerCase()));
+}
+
+/**
+ * Install-pipeline capabilities THIS build supports, compiled into every
+ * backend release — each box's own list is authoritative for that box (the
+ * hosted deck asks the box, never trusts its own build). Add an entry
+ * whenever the install pipeline gains a behavior blueprints will declare in
+ * `requiredCapabilities`; never remove one — a capability once shipped stays
+ * supported, or every blueprint declaring it goes dark fleet-wide.
+ */
+export const HEXOS_VM_CAPABILITIES = [
+    /** Named first-boot file injection into image installs (vmFirstBoot profiles). */
+    'firstBoot',
+] as const;
+
+/**
+ * Blueprint capability gate: which of `required` the given build lacks.
+ * A null/undefined supported list means the box is too old to report one —
+ * the visibility filter fails OPEN there (those builds predate the gate and
+ * cannot be protected by it), while the install pipeline always passes its
+ * own compiled-in HEXOS_VM_CAPABILITIES, which is never unknown — so the
+ * authoritative check fails CLOSED.
+ */
+export function missingVMCapabilities(
+    supported: readonly string[] | null | undefined,
+    required: string[] | undefined,
+): string[] {
+    if (!required?.length) return [];
+    if (!supported) return [];
+    const available = new Set(supported);
+    return required.filter((capability) => !available.has(capability));
 }
 
 /**

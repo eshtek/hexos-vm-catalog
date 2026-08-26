@@ -9,6 +9,9 @@
     ],
     "category": "appliance",
     "truenasVersion": ">=25.04.2.6",
+    "requiredCapabilities": [
+        "firstBoot"
+    ],
     "provisioning": {
         "strategy": "image",
         "source": {
