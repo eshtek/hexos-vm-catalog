@@ -1,7 +1,7 @@
 {
     "id": "fedora-coreos",
     "name": "Fedora CoreOS",
-    "description": "Fedora CoreOS from the official stable stream — a minimal, automatically-updating host built to run containers and nothing else. Configured at first boot from an Ignition document; there is no package manager and no interactive install.",
+    "description": "A minimal, automatically-updating host built to run containers and nothing else, from the official Fedora CoreOS stable stream. Configured at first boot from an Ignition document; there is no package manager and no interactive install.",
     "icon": "_icons/fedora.svg",
     "website": "https://fedoraproject.org/coreos/",
     "category": "server",

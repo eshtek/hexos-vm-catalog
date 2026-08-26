@@ -1,7 +1,7 @@
 {
     "id": "windows-11",
     "name": "Windows 11 Pro",
-    "description": "Windows 11 Pro installed hands-free from your own installer ISO — bring the ISO (Microsoft doesn't allow us to ship it), and HexOS handles partitioning, setup answers, and your first account.",
+    "description": "Windows 11 Pro installed hands-free from your own installer ISO. Bring the ISO (Microsoft doesn't allow us to ship it) and HexOS handles partitioning, setup answers, and your first account.",
     "icon": "_icons/windows.svg",
     "website": "https://www.microsoft.com/windows/windows-11",
     "screenshots": [

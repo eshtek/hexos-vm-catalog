@@ -1,7 +1,7 @@
 {
     "id": "haos",
     "name": "Home Assistant OS",
-    "description": "The official Home Assistant appliance OS — full home automation platform with add-on support, managed updates, and backups.",
+    "description": "The official Home Assistant appliance OS, a full home automation platform with add-on support, managed updates, and backups.",
     "icon": "_icons/haos.svg",
     "website": "https://www.home-assistant.io/",
     "screenshots": [

@@ -1,7 +1,7 @@
 {
     "id": "cachyos",
     "name": "CachyOS",
-    "description": "The performance-tuned Arch Linux with the KDE Plasma desktop, installed hands-free by CachyOS's own headless installer — optimized kernels and CPU-tuned packages, rolling updates. Attach a GPU for gaming workloads.",
+    "description": "The performance-tuned Arch Linux with the KDE Plasma desktop, installed hands-free by CachyOS's own headless installer. It ships optimized kernels and CPU-tuned packages on a rolling update schedule. Attach a GPU for gaming workloads.",
     "icon": "_icons/cachyos.svg",
     "website": "https://cachyos.org/",
     "screenshots": [
