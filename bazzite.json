@@ -42,7 +42,11 @@
         "secureBoot": false,
         "hypervEnlightenments": false,
         "autostart": false,
-        "gpuPassthrough": true,
+        "passthrough": [
+            "gpu",
+            "usb",
+            "usb-controller"
+        ],
         "readiness": {
             "type": "phone-home"
         }

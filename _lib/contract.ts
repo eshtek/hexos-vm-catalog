@@ -81,6 +81,13 @@ export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
 // backend compares them verbatim.
 export const KNOWN_VM_CAPABILITIES = new Set(["firstBoot"]);
 
+// Passthrough class vocabulary, enforced here for the same reason as
+// KNOWN_CATEGORIES: the schema leaves `guest.passthrough` an open slug array so
+// a catalog naming a class before the platform deploys is ignored rather than
+// validation-hidden. The platform's blueprintPassthroughClasses drops unknown
+// names, so a typo here silently withholds a picker — hence a CI error.
+export const KNOWN_PASSTHROUGH_CLASSES = new Set(["gpu", "usb", "usb-controller"]);
+
 // App grouping vocabulary, enforced here for the same reason as
 // KNOWN_CATEGORIES: the schema leaves `category` an open slug so a catalog that
 // adds a group before the platform deploys buckets under "Other" rather than
@@ -277,6 +284,37 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
   if (bp.category && !KNOWN_CATEGORIES.has(bp.category)) {
     errors.push(
       `unknown category "${bp.category}" — allowed values: ${[...KNOWN_CATEGORIES].join(", ")} (extend KNOWN_CATEGORIES deliberately when adding one)`,
+    );
+  }
+
+  // Passthrough declarations, cross-checked against category. These decide what
+  // the install dialog PROMOTES, not what the install permits, so a wrong value
+  // costs a click — but withholding is deliberate editorial fact (a headless
+  // server offered a GPU invites blacking out the host console for nothing),
+  // so the cross-checks keep the declarations honest.
+  const passthrough = new Set(bp.guest?.passthrough ?? []);
+  for (const name of passthrough) {
+    if (!KNOWN_PASSTHROUGH_CLASSES.has(name)) {
+      errors.push(
+        `unknown passthrough class "${name}" — allowed values: ${[...KNOWN_PASSTHROUGH_CLASSES].join(", ")} (the platform ignores unknown names, so this silently withholds a picker)`,
+      );
+    }
+  }
+  if (bp.guest?.gpuPassthrough || bp.guest?.usbPassthrough) {
+    warnings.push(
+      `legacy gpuPassthrough/usbPassthrough boolean — declare the class in guest.passthrough instead (the booleans still work but are deprecated)`,
+    );
+  }
+  if (bp.category === "server" && passthrough.size > 0) {
+    errors.push(
+      `guest.passthrough on a "server" blueprint — a headless guest has nothing to drive a GPU or USB picker with; drop the declaration or reclassify the blueprint`,
+    );
+  }
+  if (bp.category === "desktop" && !passthrough.has("gpu")) {
+    // Not an error — a desktop may deliberately withhold the GPU — but silent
+    // omission is the likelier cause, same reasoning as the apps.runtime nudge.
+    warnings.push(
+      `no "gpu" in guest.passthrough on a desktop blueprint — its install dialog will never offer GPU passthrough; declare it or withhold deliberately`,
     );
   }
 
