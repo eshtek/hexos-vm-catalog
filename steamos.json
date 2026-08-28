@@ -1,44 +1,47 @@
 {
-  "id": "steamos",
-  "name": "SteamOS",
-  "description": "Valve's gaming-focused Linux distribution, installed from the official Steam Deck recovery image. Boots to the KDE Plasma desktop with the Steam client; Gaming Mode (gamescope) requires an AMD GPU passed through to the virtual PC, and on the emulated display the desktop session is used instead. Sign in with your Steam account after the install completes.",
-  "icon": "_icons/steam.svg",
-  "category": "desktop",
-  "website": "https://store.steampowered.com/steamos",
-  "screenshots": [
-    "steamos/screenshots/desktop.jpg",
-    "steamos/screenshots/desktop-plasma.jpg"
-  ],
-  "provisioning": {
-    "strategy": "installer-image",
-    "source": {
-      "url": "https://steamdeck-images.steamos.cloud/recovery/steamdeck-oobe-repair-20260707.10-3.8.14.img.bz2",
-      "version": "3.8.14",
-      "format": "raw",
-      "compression": "bz2",
-      "sha256": "4254ee02ec34ae8add9aceef1881a2ce675a9d0176171df92e0eaa1bf014c594",
-      "releasesUrl": "https://steamdeck-images.steamos.cloud/recovery/"
+    "id": "steamos",
+    "name": "SteamOS",
+    "description": "Valve's gaming-focused Linux distribution, installed from the official Steam Deck recovery image. Boots to the KDE Plasma desktop with the Steam client; Gaming Mode (gamescope) requires an AMD GPU passed through to the virtual PC, and on the emulated display the desktop session is used instead. Sign in with your Steam account after the install completes.",
+    "icon": "_icons/steam.svg",
+    "category": "desktop",
+    "website": "https://store.steampowered.com/steamos",
+    "screenshots": [
+        "steamos/screenshots/desktop.jpg",
+        "steamos/screenshots/desktop-plasma.jpg"
+    ],
+    "apps": {
+        "runtime": "flatpak"
     },
-    "seed": {
-      "template": "steamos-repair"
+    "provisioning": {
+        "strategy": "installer-image",
+        "source": {
+            "url": "https://steamdeck-images.steamos.cloud/recovery/steamdeck-oobe-repair-20260707.10-3.8.14.img.bz2",
+            "version": "3.8.14",
+            "format": "raw",
+            "compression": "bz2",
+            "sha256": "4254ee02ec34ae8add9aceef1881a2ce675a9d0176171df92e0eaa1bf014c594",
+            "releasesUrl": "https://steamdeck-images.steamos.cloud/recovery/"
+        },
+        "seed": {
+            "template": "steamos-repair"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "maxUsefulVcpus": 8,
+        "diskGb": 64
+    },
+    "guest": {
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "autostart": false,
+        "gpuPassthrough": true,
+        "installSnapshot": true,
+        "readiness": {
+            "type": "phone-home"
+        }
     }
-  },
-  "resources": {
-    "minMemoryMb": 4096,
-    "recMemoryMb": 8192,
-    "minVcpus": 2,
-    "recVcpus": 4,
-    "maxUsefulVcpus": 8,
-    "diskGb": 64
-  },
-  "guest": {
-    "diskBus": "VIRTIO",
-    "nicModel": "VIRTIO",
-    "autostart": false,
-    "gpuPassthrough": true,
-    "installSnapshot": true,
-    "readiness": {
-      "type": "phone-home"
-    }
-  }
 }

@@ -26,22 +26,26 @@ Grouped by `category`, which is how the HexOS UI groups them too.
 
 ### Desktop
 
-| Blueprint | Description |
-|-----------|-------------|
-| [Bazzite](bazzite.json) | Gaming-focused atomic KDE desktop from Universal Blue; offers GPU passthrough |
-| [CachyOS](cachyos.json) | Performance-tuned Arch with KDE Plasma, installed hands-free by its own headless installer |
-| [Fedora KDE Plasma Desktop 44](fedora-kde-44.json) | KDE Plasma, from the same Fedora network installer as Workstation |
-| [Fedora Workstation 44](fedora-workstation-44.json) | GNOME desktop, installed hands-free by Fedora's network installer |
-| [Kubuntu 26.04 LTS](kubuntu-26.04.json) | Ubuntu with the KDE Plasma desktop, installed hands-free from the official ISO |
-| [Linux Mint 22.3 Cinnamon](mint-22.3.json) | Cinnamon desktop, installed hands-free from the official ISO |
-| [openSUSE Leap 16.0](opensuse-leap-16.json) | Fixed-release SLE-based desktop, installed hands-free by Agama |
-| [Omarchy 4](omarchy.json) | DHH's Arch + Hyprland desktop, installed hands-free via the ISO's own autoinstall |
-| [Pop!_OS 24.04 LTS](pop-os-24.04.json) | System76's COSMIC desktop, installed hands-free from the official ISO |
-| [Ubuntu Desktop 26.04 LTS](ubuntu-desktop-26.04.json) | The Ubuntu desktop, installed hands-free from Canonical's official installer |
-| [Windows 10 Pro](windows-10.json) | Unattended install from a user-supplied installer ISO |
-| [Windows 11 Pro](windows-11.json) | Unattended install from a user-supplied installer ISO |
-| [Xubuntu 26.04 LTS](xubuntu-26.04.json) | Ubuntu with the Xfce desktop, light on resources |
-| [Zorin OS 18.1 Core](zorin-os-18.json) | Windows-familiar desktop, installed hands-free from the official ISO |
+Every desktop blueprint offers the optional [Apps](#available-apps) step. The `Apps` column is the
+package runtime that guest has, which is what decides which apps are offered on it.
+
+| Blueprint | Apps | Description |
+|-----------|------|-------------|
+| [Bazzite](bazzite.json) | `flatpak` | Gaming-focused atomic KDE desktop from Universal Blue; offers GPU passthrough |
+| [CachyOS](cachyos.json) | `flatpak` | Performance-tuned Arch with KDE Plasma, installed hands-free by its own headless installer |
+| [Fedora KDE Plasma Desktop 44](fedora-kde-44.json) | `flatpak` | KDE Plasma, from the same Fedora network installer as Workstation |
+| [Fedora Workstation 44](fedora-workstation-44.json) | `flatpak` | GNOME desktop, installed hands-free by Fedora's network installer |
+| [Kubuntu 26.04 LTS](kubuntu-26.04.json) | `flatpak` | Ubuntu with the KDE Plasma desktop, installed hands-free from the official ISO |
+| [Linux Mint 22.3 Cinnamon](mint-22.3.json) | `flatpak` | Cinnamon desktop, installed hands-free from the official ISO |
+| [Omarchy 4](omarchy.json) | `flatpak` | DHH's Arch + Hyprland desktop, installed hands-free via the ISO's own autoinstall |
+| [openSUSE Leap 16.0](opensuse-leap-16.json) | `flatpak` | Fixed-release SLE-based desktop, installed hands-free by Agama |
+| [Pop!_OS 24.04 LTS](pop-os-24.04.json) | `flatpak` | System76's COSMIC desktop, installed hands-free from the official ISO |
+| [SteamOS](steamos.json) | `flatpak` | Valve's Steam Deck OS from the official recovery image; Gaming Mode needs a passed-through AMD GPU |
+| [Ubuntu Desktop 26.04 LTS](ubuntu-desktop-26.04.json) | `flatpak` | The Ubuntu desktop, installed hands-free from Canonical's official installer |
+| [Windows 10 Pro](windows-10.json) | `winget` | Unattended install from a user-supplied installer ISO |
+| [Windows 11 Pro](windows-11.json) | `winget` | Unattended install from a user-supplied installer ISO |
+| [Xubuntu 26.04 LTS](xubuntu-26.04.json) | `flatpak` | Ubuntu with the Xfce desktop, light on resources |
+| [Zorin OS 18.1 Core](zorin-os-18.json) | `flatpak` | Windows-familiar desktop, installed hands-free from the official ISO |
 
 ### Appliance
 
@@ -55,6 +59,97 @@ the maintainer's machine — a draft carries `TODO` digests and URLs nobody has
 confirmed yet, and neither the sync nor the validator looks at underscore-
 prefixed paths. Nothing is published from this repo until it reaches the root
 with a real digest.
+
+## Available Apps
+
+Optional software a desktop VM install can lay down after the guest is up, picked from a multi-select step in the install flow (the Ninite idea, in the HexOS wizard). Apps install **last** — after the OS, after Windows Update — and a failed app never fails a working VM.
+
+Each app declares a package id per guest runtime: `winget` for Windows guests, `flatpak` (Flathub) for Linux desktops. A blueprint opts in by declaring the one runtime its guest has, and only apps carrying a target for that runtime are offered. That is also how single-platform apps express themselves: 7-Zip and PowerToys are Windows software, and FileZilla is absent from winget entirely, so each simply carries one target.
+
+`W` = offered on Windows guests, `L` = offered on Linux desktops.
+
+### Browsers
+
+| App | | Package ids | Description |
+|-----|-|-------------|-------------|
+| [Brave](apps/brave.json) | WL | `Brave.Brave`<br>`com.brave.Browser` | Chromium-based browser that blocks ads and trackers by default. |
+| [Firefox](apps/firefox.json) ★ | WL | `Mozilla.Firefox`<br>`org.mozilla.firefox` | Mozilla's browser, with tracking protection on by default. |
+| [Google Chrome](apps/chrome.json) | WL | `Google.Chrome`<br>`com.google.Chrome` | Google's browser. |
+
+### Messaging and meetings
+
+| App | | Package ids | Description |
+|-----|-|-------------|-------------|
+| [Discord](apps/discord.json) | WL | `Discord.Discord`<br>`com.discordapp.Discord` | Voice, video and text chat built around servers and channels. |
+| [Signal](apps/signal.json) | WL | `OpenWhisperSystems.Signal`<br>`org.signal.Signal` | End-to-end encrypted messaging and calls. |
+| [Slack](apps/slack.json) | WL | `SlackTechnologies.Slack`<br>`com.slack.Slack` | Team chat, channels and calls. |
+| [Telegram](apps/telegram.json) | WL | `Telegram.TelegramDesktop`<br>`org.telegram.desktop` | Cloud-synced messaging with large group and file support. |
+| [Zoom](apps/zoom.json) | WL | `Zoom.Zoom`<br>`us.zoom.Zoom` | Video meetings and screen sharing. |
+
+### Media
+
+| App | | Package ids | Description |
+|-----|-|-------------|-------------|
+| [Audacity](apps/audacity.json) | WL | `Audacity.Audacity`<br>`org.audacityteam.Audacity` | Multi-track audio recording and editing. |
+| [HandBrake](apps/handbrake.json) | WL | `HandBrake.HandBrake`<br>`fr.handbrake.ghb` | Video transcoder for converting almost any source into common formats. |
+| [OBS Studio](apps/obs-studio.json) | WL | `OBSProject.OBSStudio`<br>`com.obsproject.Studio` | Screen recording and live streaming with scene compositing. |
+| [Spotify](apps/spotify.json) | WL | `Spotify.Spotify`<br>`com.spotify.Client` | Music streaming client. |
+| [VLC](apps/vlc.json) ★ | WL | `VideoLAN.VLC`<br>`org.videolan.VLC` | Plays essentially every media format without extra codecs. |
+
+### Gaming
+
+| App | | Package ids | Description |
+|-----|-|-------------|-------------|
+| [Steam](apps/steam.json) | WL | `Valve.Steam`<br>`com.valvesoftware.Steam` | Valve's game store and library client. Games install on top of this. |
+
+### Graphics and 3D
+
+| App | | Package ids | Description |
+|-----|-|-------------|-------------|
+| [Blender](apps/blender.json) | WL | `BlenderFoundation.Blender`<br>`org.blender.Blender` | 3D modelling, animation, simulation and rendering suite. |
+| [GIMP](apps/gimp.json) | WL | `GIMP.GIMP`<br>`org.gimp.GIMP` | Raster image editor for photo retouching and composition. |
+| [Inkscape](apps/inkscape.json) | WL | `Inkscape.Inkscape`<br>`org.inkscape.Inkscape` | Vector graphics editor working natively in SVG. |
+| [Krita](apps/krita.json) | WL | `KDE.Krita`<br>`org.kde.krita` | Digital painting and illustration, built around brush engines. |
+
+### Documents and mail
+
+| App | | Package ids | Description |
+|-----|-|-------------|-------------|
+| [LibreOffice](apps/libreoffice.json) ★ | WL | `TheDocumentFoundation.LibreOffice`<br>`org.libreoffice.LibreOffice` | Word processor, spreadsheet, presentations and more. |
+| [Thunderbird](apps/thunderbird.json) | WL | `Mozilla.Thunderbird`<br>`org.mozilla.Thunderbird` | Mail, calendar and contacts client from Mozilla. |
+
+### Developer tools
+
+| App | | Package ids | Description |
+|-----|-|-------------|-------------|
+| [FileZilla](apps/filezilla.json) | L | `org.filezillaproject.Filezilla` | FTP, FTPS and SFTP client. |
+| [Git](apps/git.json) | W | `Git.Git` | Version control, plus Git Bash on Windows. |
+| [Node.js](apps/nodejs.json) | W | `OpenJS.NodeJS` | JavaScript runtime and npm. |
+| [PuTTY](apps/putty.json) | W | `PuTTY.PuTTY` | SSH and serial terminal client for Windows. |
+| [Python](apps/python.json) | W | `Python.Python.3.14` | The CPython 3.14 runtime and pip. |
+| [Visual Studio Code](apps/vscode.json) | WL | `Microsoft.VisualStudioCode`<br>`com.visualstudio.code` | Microsoft's code editor, with an extension marketplace. |
+| [WinSCP](apps/winscp.json) | W | `WinSCP.WinSCP` | SFTP, FTP and SCP file transfer client for Windows. |
+
+### Utilities
+
+| App | | Package ids | Description |
+|-----|-|-------------|-------------|
+| [7-Zip](apps/7zip.json) ★ | W | `7zip.7zip` | Archive manager handling 7z, zip, rar and most other formats. |
+| [Bitwarden](apps/bitwarden.json) | WL | `Bitwarden.Bitwarden`<br>`com.bitwarden.desktop` | Password manager desktop client. |
+| [KeePassXC](apps/keepassxc.json) | WL | `KeePassXCTeam.KeePassXC`<br>`org.keepassxc.KeePassXC` | Offline password manager using local KeePass databases. |
+| [Notepad++](apps/notepad-plus-plus.json) | W | `Notepad++.Notepad++` | Lightweight text and source editor for Windows. |
+| [PowerToys](apps/powertoys.json) | W | `Microsoft.PowerToys` | Microsoft's power-user utilities: FancyZones, PowerRename and more. |
+
+★ marks an app that arrives pre-checked in the picker. Keep that set small: it is what a user who clicks straight through actually installs.
+
+Two things worth knowing about the ids above:
+
+- **Five winget packages are user-scope only** — Discord, Slack, Telegram, Signal and Spotify publish per-user installers, so they cannot be installed by a SYSTEM-context task and have to run in the created account's logon session instead. `bun run validate` warns on every one so the cost of adding another is visible at review time. Everything else installs machine-wide.
+- **`Python.Python.3.14` pins a minor version**, because winget's id does. Bumping Python here is a deliberate commit, the same as bumping a blueprint's image version.
+
+Apps carry no download URL and no digest, unlike blueprints: the package manager owns fetching and verification, and a second copy of that claim in this repo would only be a staler one. What does rot is the **identifier** — winget-pkgs removed FileZilla outright over its bundled installer, Flathub retires ids when a project moves — so `bun run check-sources` resolves every id nightly alongside the blueprint URLs.
+
+Icons live under `_icons/apps/`, one per app, mirrored here exactly like the blueprint icons and recorded per file in [ATTRIBUTION.md](ATTRIBUTION.md). Most come from [Simple Icons](https://simpleicons.org/) (CC0, pinned), which is where several blueprint icons already came from; six needed another source and two of those ship as PNG because their project publishes no vector at all. An app with no `icon` renders a lettered tile, so removing one is always safe.
 
 ## Blueprint format
 
@@ -81,6 +176,13 @@ with a real digest.
                                            // (case-insensitive; hidden on hosts missing any — e.g.
                                            // list the x86-64-v3 flags for distros with that baseline)
     "internal": false,                     // true = never served from the prod branch
+    "apps": { "runtime": "flatpak" },      // opt in to the post-install Apps step, naming the
+                                           // package runtime THIS guest has ("winget" | "flatpak").
+                                           // Absent = offers no apps, which is right for servers
+                                           // and appliances. The runtime also decides WHICH apps
+                                           // are offered: only those with a target for it (see
+                                           // "Available Apps"). CI checks it matches the guest the
+                                           // strategy implies — answer-file is Windows, so winget
     "provisioning": {
         "strategy": "image",               // "image" | "cloud-init" | "answer-file" | "installer-iso"
                                            //   | "installer-image" | "machine-config"
@@ -283,6 +385,30 @@ in the UI long after the fact.
 
 The authoritative schema is `vmBlueprintSchema` in `hexos-platform/packages/shared/eshtek/vm-blueprints.ts` — documents failing it are rejected at sync time. A verbatim copy is vendored here at [`_lib/vm-blueprint.schema.ts`](_lib/vm-blueprint.schema.ts) so blueprints can be validated locally and in CI without the private platform package; the server remains the real gate.
 
+## App format
+
+One JSON document per app under [`apps/`](apps/). A subdirectory rather than root files on purpose: the blueprint sync ingests every non-underscore `*.json` in the ROOT and ignores directories, so apps ride the same repo without the blueprint sync ever seeing them.
+
+```jsonc
+{
+    "id": "firefox",                   // unique, lowercase, stable forever
+    "name": "Firefox",
+    "description": "…",                // one line; the picker shows it under the name
+    "website": "https://www.mozilla.org/firefox/",
+    "category": "browsers",            // CI-enforced vocabulary; the picker groups by this
+    "recommended": true,               // pre-checked in the picker; keep the set small
+    "sizeMb": 400,                     // approximate installed footprint, err high — the
+                                       // wizard raises its disk default from the total
+    "internal": false,                 // true = never served from the prod branch
+    "targets": {                       // at least one required
+        "winget":  { "id": "Mozilla.Firefox", "scope": "machine" },   // scope defaults to "machine"
+        "flatpak": { "id": "org.mozilla.firefox", "remote": "flathub" }  // remote defaults to "flathub"
+    }
+}
+```
+
+`scope` is a property of the package, not a preference: asking for machine scope on a package that only publishes a per-user installer fails with "no applicable installer", and the guest stage can't tell that apart from a real failure without knowing what to expect. Take it from the package's winget manifest.
+
 ## Validating locally
 
 CI runs on every PR ([`.github/workflows/validate.yml`](.github/workflows/validate.yml)), but you can check your blueprint before pushing. Requires [Bun](https://bun.sh). All tooling lives under [`_lib/`](_lib/) — the catalog sync ingests every non-underscore `*.json` in the repo root, so anything that isn't a blueprint (this tooling, its `package.json`) is kept out of the root.
@@ -293,18 +419,26 @@ bun install
 bun run validate
 ```
 
-The validator checks each root `*.json` against the vendored schema, then applies a few contract checks the schema can't express ([`_lib/contract.ts`](_lib/contract.ts)):
+The validator checks each root `*.json` against the vendored blueprint schema and each `apps/*.json` against the vendored app schema, then applies a few contract checks the schema can't express ([`_lib/contract.ts`](_lib/contract.ts)):
 
 - `cloudInit.userDataTemplate` / `answerFile.template` / `seed.template` must name a template the backend actually ships (`linux-default`, `win11-pro`, `win10-pro`, `ubuntu-desktop-autoinstall`, `fedora-workstation-kickstart`, `fedora-kde-kickstart`, `opensuse-agama-profile`, `bazzite-kickstart`, `mint-preseed`, `zorin-preseed`, `pop-live-exec`, `omarchy-autoinstall`, `cachyos-headless`, `steamos-repair`, plus the machine-config pair `fcos-ignition` / `flatcar-ignition` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
 - a duplicate `id` across two files is an error (the sync skips the duplicate)
+- every blueprint must have a row in the README tables above — this is the step that has actually been skipped in practice, so it is an error rather than a convention
+- `apps.runtime` must match the guest the provisioning strategy implies (answer-file is Windows, so `winget`); a desktop with no `apps.runtime` warns, since it will offer no apps at all
 - `source.releasesUrl` must be present — the schema leaves it optional for admin-authored rows, but a catalog blueprint that doesn't say where its next version comes from is how `-latest` URLs and guessed digests get in
 - warnings for an `id` that differs from its filename stem, an off-convention `icon`, a `truenasVersion` with no comparison operator (a no-op gate), an unrecognized `cpuFeatures` flag name (a typo would hide the blueprint on every host), `extraMedia` with no `sha256`, or a `releasesUrl` pointing at a file rather than a listing
 
+On the app side:
+
+- `category` must be one of the slugs the picker groups by (`browsers`, `messaging`, `media`, `gaming`, `graphics`, `documents`, `developer`, `utilities`) — same reasoning as blueprint categories, enforced here rather than as a schema enum so a new group buckets under "Other" instead of hiding every app in it
+- at least one runtime target is required (schema-level); an app with none would be structurally valid and completely inert
+- warnings for a user-scope winget package (it can't ride the SYSTEM install stage), a flatpak remote other than Flathub (the guest stage only adds that one), a missing `sizeMb` (it contributes nothing to the wizard's disk estimate), and — catalog-wide, reported once — how many apps still have no icon and whether the pre-checked set has outgrown what the picker shows comfortably
+
 Errors fail the run; warnings don't.
 
-### Keeping the schema copy current
+### Keeping the schema copies current
 
-The vendored schema is a copy, so it can drift as the platform schema evolves. Re-vendor from a local platform checkout (defaults to a `../hexos-platform` sibling; override with `HEXOS_PLATFORM`):
+The vendored schemas are copies, so they can drift as the platform schemas evolve. `sync-schema` re-vendors both (blueprints and apps) from a local platform checkout, which defaults to a `../hexos-platform` sibling; override with `HEXOS_PLATFORM`:
 
 ```bash
 cd _lib
@@ -327,10 +461,17 @@ bun run releases -- --json    # machine-readable
 
 Nothing fetches `releasesUrl` at sync or install time and no client renders it, so `--check` reports and always exits 0 — unlike `bun run check-sources`, which HEADs the pinned artifacts nightly and fails when one 404s.
 
+Apps have no version to bump, so `releases` skips them; what goes stale there is the package id, which `check-sources` resolves on the same nightly run:
+
+```bash
+cd _lib
+bun run check-sources -- --apps    # only the app package ids
+```
+
 ## Contributing
 
 1. Fork this repository
-2. Add your blueprint JSON in the root directory (filename should match the `id`)
+2. Add your blueprint JSON in the root directory (filename should match the `id`), or your app JSON under `apps/`
 3. Run `bun run validate` and fix any errors
 4. Test it against a staging/dev HexOS environment (sync from your branch, or point `VM_CATALOG_PATH` at your checkout)
 5. Submit a pull request including where the image is published, how its checksum was obtained, and any special guest requirements

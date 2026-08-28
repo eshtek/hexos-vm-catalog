@@ -1,4 +1,4 @@
-name: Validate blueprints
+name: Validate catalog
 
 on:
   pull_request:
@@ -24,7 +24,7 @@ jobs:
       # green catalog.
       - name: Typecheck the tooling
         run: bun run typecheck
-      - name: Validate blueprints
+      - name: Validate blueprints and apps
         run: bun run validate
       # The checker's own tests: proves a dead URL is still detected as dead
       # and that the stall guard fires. Cheap (a few seconds, two small

@@ -1,0 +1,17 @@
+{
+    "id": "keepassxc",
+    "name": "KeePassXC",
+    "description": "Offline password manager using local KeePass databases.",
+    "icon": "_icons/apps/keepassxc.svg",
+    "website": "https://keepassxc.org/",
+    "category": "utilities",
+    "sizeMb": 100,
+    "targets": {
+        "winget": {
+            "id": "KeePassXCTeam.KeePassXC"
+        },
+        "flatpak": {
+            "id": "org.keepassxc.KeePassXC"
+        }
+    }
+}

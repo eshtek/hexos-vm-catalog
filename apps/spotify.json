@@ -1,0 +1,18 @@
+{
+    "id": "spotify",
+    "name": "Spotify",
+    "description": "Music streaming client.",
+    "icon": "_icons/apps/spotify.svg",
+    "website": "https://www.spotify.com/",
+    "category": "media",
+    "sizeMb": 400,
+    "targets": {
+        "winget": {
+            "id": "Spotify.Spotify",
+            "scope": "user"
+        },
+        "flatpak": {
+            "id": "com.spotify.Client"
+        }
+    }
+}

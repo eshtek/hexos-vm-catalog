@@ -1,0 +1,14 @@
+{
+    "id": "filezilla",
+    "name": "FileZilla",
+    "description": "FTP, FTPS and SFTP client.",
+    "icon": "_icons/apps/filezilla.svg",
+    "website": "https://filezilla-project.org/",
+    "category": "developer",
+    "sizeMb": 60,
+    "targets": {
+        "flatpak": {
+            "id": "org.filezillaproject.Filezilla"
+        }
+    }
+}

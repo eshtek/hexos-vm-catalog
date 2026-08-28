@@ -1,0 +1,14 @@
+{
+    "id": "notepad-plus-plus",
+    "name": "Notepad++",
+    "description": "Lightweight text and source editor for Windows.",
+    "icon": "_icons/apps/notepad-plus-plus.svg",
+    "website": "https://notepad-plus-plus.org/",
+    "category": "utilities",
+    "sizeMb": 20,
+    "targets": {
+        "winget": {
+            "id": "Notepad++.Notepad++"
+        }
+    }
+}

@@ -1,0 +1,17 @@
+{
+    "id": "zoom",
+    "name": "Zoom",
+    "description": "Video meetings and screen sharing.",
+    "icon": "_icons/apps/zoom.svg",
+    "website": "https://zoom.us/",
+    "category": "messaging",
+    "sizeMb": 350,
+    "targets": {
+        "winget": {
+            "id": "Zoom.Zoom"
+        },
+        "flatpak": {
+            "id": "us.zoom.Zoom"
+        }
+    }
+}

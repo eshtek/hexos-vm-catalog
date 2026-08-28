@@ -1,0 +1,18 @@
+{
+    "id": "signal",
+    "name": "Signal",
+    "description": "End-to-end encrypted messaging and calls.",
+    "icon": "_icons/apps/signal.svg",
+    "website": "https://signal.org/",
+    "category": "messaging",
+    "sizeMb": 350,
+    "targets": {
+        "winget": {
+            "id": "OpenWhisperSystems.Signal",
+            "scope": "user"
+        },
+        "flatpak": {
+            "id": "org.signal.Signal"
+        }
+    }
+}

@@ -4,10 +4,18 @@ Guidance for Claude Code working in this repo.
 
 ## What this is
 
-`eshtek/hexos-vm-catalog` — the one-click VM blueprint catalog for HexOS. Each
-root-level `*.json` is one blueprint. The HexOS backend syncs this repo and
-re-validates every document against the real schema at read time, so **the
-server is the authoritative gate; local validation is a convenience.**
+`eshtek/hexos-vm-catalog` — the one-click VM catalog for HexOS. It publishes two
+kinds of document: each root-level `*.json` is one **blueprint** (a VM to
+deploy), and each `apps/*.json` is one **app** (optional software a desktop
+install lays down last, the Ninite-style picker step). The HexOS backend syncs
+this repo and re-validates every document against the real schema at read time,
+so **the server is the authoritative gate; local validation is a convenience.**
+
+The two are synced separately and must stay separable: the blueprint sync
+ingests every non-underscore `*.json` in the ROOT and ignores directories, which
+is the only reason apps can live here at all. Never move an app document to the
+root — the blueprint sync would pick it up, fail to validate it as a blueprint,
+and log an error every run.
 
 Default branch is `staging`. `prod` feeds production.
 
@@ -16,20 +24,27 @@ Default branch is `staging`. `prod` feeds production.
 ```bash
 cd _lib
 bun install
-bun run validate        # schema + contract checks on every root blueprint
-bun run check-sources   # HEAD every source URL — catches upstream pruning a file
+bun run validate        # schema + contract checks on every blueprint AND every app
+bun run check-sources   # HEAD every source URL and resolve every app package id
+bun run check-sources -- --apps     # only the app package ids
 bun run check-sources -- --verify   # stream + verify every digest (~57 GiB transferred, nothing stored)
 bun run releases        # pinned version + releases page per blueprint (--pending, --check, --json)
 ./fetch-checksums.sh    # print official checksums for _pending/ drafts
 ```
 
-Run `bun run validate` before proposing any blueprint change.
+Run `bun run validate` before proposing any blueprint or app change.
 
 ## Hard rules
 
-**Never invent a checksum or a download URL.** Every `sha256`/`sha512` in this
-repo must come from the publisher's own manifest, and every URL must have been
-confirmed to exist. A fabricated digest fails at install time on a user's
+**Never invent a checksum, a download URL, or a package id.** Every
+`sha256`/`sha512` in this repo must come from the publisher's own manifest, and
+every URL must have been confirmed to exist. The same rule covers app
+`targets`: resolve each winget id against a real manifest directory in
+`microsoft/winget-pkgs` and each flatpak id against Flathub before the document
+leaves `_pending/` — `bun run check-sources -- --apps` does exactly that, so
+there is no excuse for a guessed one. A plausible-looking id is worse than a
+missing app: it ships a picker entry that installs nothing, silently, for
+everyone who ticks it. A fabricated digest fails at install time on a user's
 machine; a fabricated URL is the same class of mistake. If a value cannot be
 confirmed, write `"TODO"` and leave the draft in `_pending/` — that is the
 correct outcome, not a failure.
@@ -56,9 +71,10 @@ starts. It is editorial metadata: nothing fetches it and no client renders it
 weeks. Pin the dated filename. Bumping a version should be a visible commit
 changing both the version and the digest.
 
-**`_lib/vm-blueprint.schema.ts` is vendored, not authored here.** It is a copy
-of `packages/shared/eshtek/vm-blueprints.ts` in `hexos-platform`, refreshed by
-`bun run sync-schema`. Never hand-edit it to preview a schema change: the next
+**`_lib/vm-blueprint.schema.ts` and `_lib/vm-app.schema.ts` are vendored, not
+authored here.** They are copies of `packages/shared/eshtek/vm-blueprints.ts`
+and `packages/shared/eshtek/vm-apps.ts` in `hexos-platform`, refreshed together
+by `bun run sync-schema`. Never hand-edit one to preview a schema change: the next
 re-vendor silently reverts the edit, and because `_lib/validate.ts` runs the
 contract checks against Zod's *parsed* output, a field the vendored copy no
 longer knows is stripped before those checks see it — every blueprint then
@@ -76,6 +92,17 @@ add a template name before the matching template exists in `hexos-platform`;
 that turns the contract check into a rubber stamp and lets a blueprint reach
 production naming a template that does not exist.
 
+## Order of operations for a new app
+
+1. Confirm both package ids exist (`bun run check-sources -- --apps` after writing
+   the document, or by hand against winget-pkgs and Flathub).
+2. Read the package's winget manifest for its `Scope`. A user-scope package
+   cannot ride the SYSTEM install stage; record `"scope": "user"` so the
+   pipeline defers it rather than discovering the failure on a user's machine.
+3. Write `apps/<id>.json` with a `category` already in `KNOWN_APP_CATEGORIES`.
+4. `bun run validate`.
+5. Add the row to the README table, in its category section.
+
 ## Order of operations for a new blueprint
 
 1. Land any needed seed/config template in `hexos-platform`.
@@ -83,14 +110,28 @@ production naming a template that does not exist.
 3. Confirm the download URL exists and fetch the official digest; record the
    listing you found them on as `source.releasesUrl`.
 4. Move the blueprint from `_pending/` to the repo root.
-5. `bun run validate`, then test against staging.
-6. Add the row to the README table (grouped by `category`).
+5. Add the row to the README table (grouped by `category`); desktops also
+   declare `apps.runtime` and carry it in the table's `Apps` column.
+6. `bun run validate`, then test against staging.
 
-Step 6 is the one that has been skipped before — four blueprints shipped
-without ever appearing in the README.
+Step 5 used to be step 6, and used to be the one that got skipped — four
+blueprints shipped without ever appearing in the README, and SteamOS made five.
+`bun run validate` now ERRORS on a blueprint with no README row, so it can no
+longer be forgotten; it is listed before validate so the order matches how it
+is actually caught.
 
 ## Standing constraints
 
+- **A desktop blueprint should declare `apps.runtime`.** It is what turns the
+  Apps step on and picks which catalog the guest is offered (`winget` for
+  Windows, `flatpak` for Linux). Validate warns on a desktop without one, and
+  errors when the runtime contradicts the guest the strategy implies — a
+  Windows blueprint declaring flatpak would offer a picker whose every pick
+  fails in the guest.
+- **App documents carry no URL and no digest, deliberately.** The package
+  manager owns fetching and verifying; a copy of that claim here would only be
+  a staler one. What rots instead is the identifier, which is why
+  `check-sources` resolves every id nightly.
 - **`MIN_SHA512_TRUENAS_VERSION` in `contract.ts` is empty on purpose.** It
   would gate sha512-only blueprints away from backends that predate digest
   support, but digest support shipped in the same change as blueprint sync

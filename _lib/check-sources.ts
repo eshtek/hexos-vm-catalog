@@ -1,9 +1,11 @@
 // Check that every blueprint's source URL is still live, and optionally that
-// its digest still matches. Run from this directory:
+// its digest still matches. Also check that every app's package ids still
+// resolve — same failure, different registry. Run from this directory:
 //
 //   bun check-sources.ts              # HEAD only — fast, no downloads
 //   bun check-sources.ts --verify     # also download and verify every digest
 //   bun check-sources.ts --verify --id openwrt
+//   bun check-sources.ts --apps       # only the app package ids
 //   bun check-sources.ts --self-test  # prove the checker itself works, stall guard included
 //
 // Why this exists: the most common way a blueprint breaks is not a bad
@@ -13,15 +15,17 @@
 // 404s today and the first person to notice is a user whose install failed.
 // HEAD-ing every URL nightly catches that for the cost of a few dozen requests.
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { vmAppSchema } from './vm-app.schema';
 import { sourceDigests, vmBlueprintSchema } from './vm-blueprint.schema';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = new Set(process.argv.slice(2));
 const VERIFY = args.has('--verify');
+const APPS_ONLY = args.has('--apps');
 const idFlag = process.argv.indexOf('--id');
 const ONLY = idFlag !== -1 ? process.argv[idFlag + 1] : null;
 
@@ -209,17 +213,90 @@ async function selfTest(): Promise<number> {
     return failed;
 }
 
+// ── App package ids ──────────────────────────────────────────────────────────
+// The app-catalog equivalent of a dead source URL. An app document carries no
+// URL and no digest — the package manager owns fetching and verification — so
+// what rots here is the IDENTIFIER: winget-pkgs removes a package outright
+// (FileZilla is gone from it over its bundled installer), publishers rename
+// across a major version (Python.Python.3.14 will one day be 3.15), and
+// Flathub app ids get retired when a project moves. Each of those turns a
+// perfectly valid document into a picker entry that installs nothing, silently,
+// for every user who ticks it.
+//
+// winget is checked through github.com's HTML tree rather than the REST API on
+// purpose: the API allows 60 unauthenticated requests an hour PER IP, and CI
+// runners share addresses, so a scheduled run would flake for reasons that have
+// nothing to do with the catalog.
+const WINGET_TREE = 'https://github.com/microsoft/winget-pkgs/tree/master/manifests';
+const FLATHUB_SUMMARY = 'https://flathub.org/api/v2/summary';
+
+interface AppTarget {
+    app: string;
+    label: string;
+    url: string;
+}
+
+function collectApps(): AppTarget[] {
+    const dir = join(ROOT, 'apps');
+    if (!existsSync(dir)) return [];
+    const targets: AppTarget[] = [];
+    for (const file of readdirSync(dir).filter((f) => f.endsWith('.json') && !f.startsWith('_')).sort()) {
+        const parsed = vmAppSchema.safeParse(JSON.parse(readFileSync(join(dir, file), 'utf8')));
+        if (!parsed.success) {
+            console.log(`⚠ apps/${file}: does not validate — run \`bun run validate\` first; skipping`);
+            continue;
+        }
+        const app = parsed.data;
+        if (ONLY && app.id !== ONLY) continue;
+        if (app.targets.winget) {
+            // "Publisher.Package.Variant" is the manifest directory path, with
+            // the publisher's first letter (lowercased) as the shard.
+            const [publisher, ...rest] = app.targets.winget.id.split('.');
+            targets.push({
+                app: app.id,
+                label: `winget:${app.targets.winget.id}`,
+                url: `${WINGET_TREE}/${publisher[0].toLowerCase()}/${publisher}/${rest.join('/')}`,
+            });
+        }
+        if (app.targets.flatpak) {
+            targets.push({
+                app: app.id,
+                label: `flatpak:${app.targets.flatpak.id}`,
+                url: `${FLATHUB_SUMMARY}/${app.targets.flatpak.id}`,
+            });
+        }
+    }
+    return targets;
+}
+
 const targets = collect();
 if (args.has('--self-test')) process.exit((await selfTest()) > 0 ? 1 : 0);
 
-console.log(`checking ${targets.length} source URL(s)${VERIFY ? ' with full digest verification' : ''}\n`);
+const appTargets = collectApps();
 let failures = 0;
-for (const t of targets) {
-    const r = VERIFY ? await verify(t.url, t.digests) : await head(t.url);
-    if (!r.ok) failures++;
-    console.log(`${r.ok ? '✓' : '✗'} ${t.blueprint} (${t.label}) — ${r.detail}`);
-    if (!r.ok) console.log(`    ${t.url}`);
+
+if (!APPS_ONLY) {
+    console.log(`checking ${targets.length} source URL(s)${VERIFY ? ' with full digest verification' : ''}\n`);
+    for (const t of targets) {
+        const r = VERIFY ? await verify(t.url, t.digests) : await head(t.url);
+        if (!r.ok) failures++;
+        console.log(`${r.ok ? '✓' : '✗'} ${t.blueprint} (${t.label}) — ${r.detail}`);
+        if (!r.ok) console.log(`    ${t.url}`);
+    }
 }
 
-console.log(`\n${targets.length} checked — ${failures} failure(s)`);
+if (appTargets.length > 0) {
+    // Always HEAD-only: there is no digest to verify, and --verify's throughput
+    // floor is meaningless against a metadata endpoint.
+    console.log(`${APPS_ONLY ? '' : '\n'}checking ${appTargets.length} app package id(s)\n`);
+    for (const t of appTargets) {
+        const r = await head(t.url);
+        if (!r.ok) failures++;
+        console.log(`${r.ok ? '✓' : '✗'} ${t.app} (${t.label})${r.ok ? '' : ` — ${r.detail}`}`);
+        if (!r.ok) console.log(`    ${t.url}`);
+    }
+}
+
+const checked = (APPS_ONLY ? 0 : targets.length) + appTargets.length;
+console.log(`\n${checked} checked — ${failures} failure(s)`);
 process.exit(failures > 0 ? 1 : 0);

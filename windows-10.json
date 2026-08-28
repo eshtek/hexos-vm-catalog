@@ -10,6 +10,9 @@
     ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
+    "apps": {
+        "runtime": "winget"
+    },
     "provisioning": {
         "strategy": "answer-file",
         "source": {
