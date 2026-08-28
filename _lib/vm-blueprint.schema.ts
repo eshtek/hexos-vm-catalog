@@ -281,16 +281,31 @@ export const vmBlueprintGuestSchema = z.object({
     hypervEnlightenments: z.boolean().default(false),
     /** Start the VM with the host. Appliance-style guests want true. */
     autostart: z.boolean().default(true),
-    /** Offer attaching a host GPU (PCI passthrough) in the install dialog. */
-    gpuPassthrough: z.boolean().default(false),
     /**
-     * Offer attaching host USB devices in the one-click install dialog even
-     * without a GPU pick. For blueprints where a USB stick is the point of the
-     * VM (Home Assistant's Zigbee/Z-Wave dongles). This flag only decides what
-     * the dialog PROMOTES — the install accepts USB devices for any blueprint
-     * (the wizard's Custom-install handoff always could), so a wrong value here
-     * costs a click, never a capability.
+     * Host device classes the one-click install dialog offers this guest, as a
+     * set. Declared per blueprint rather than derived from `category` because
+     * the two appliances want different things: Home Assistant needs its
+     * Zigbee/Z-Wave dongles, OpenWrt needs nothing.
+     *
+     *  - `gpu`            — a host graphics card, whole function group.
+     *  - `usb`            — individual host USB devices.
+     *  - `usb-controller` — a whole USB controller, via PCI passthrough.
+     *
+     * These decide what the dialog PROMOTES, not what the install permits: the
+     * install accepts every class for any blueprint (the wizard's Custom-install
+     * handoff always could), so a wrong value here costs a click, never a
+     * capability. Withholding is still meaningful — offering a headless server a
+     * GPU invites a user to black out their host console for nothing.
+     *
+     * Not a hard enum for the same reason `category` isn't: sync re-validates
+     * every stored document, so a catalog that names a class before the platform
+     * deploys must not validationError-hide the blueprint. Unknown classes are
+     * ignored by `blueprintPassthroughClasses`.
      */
+    passthrough: z.array(z.string().max(32)).max(8).optional(),
+    /** @deprecated Superseded by `passthrough: ["gpu"]`; still honoured on stored documents. */
+    gpuPassthrough: z.boolean().default(false),
+    /** @deprecated Superseded by `passthrough: ["usb"]`; still honoured on stored documents. */
     usbPassthrough: z.boolean().default(false),
     /** Take a "fresh install" zvol snapshot once the install is confirmed online. */
     installSnapshot: z.boolean().default(true),
@@ -485,6 +500,35 @@ export const blueprintNeedsWindowsSetup = (provisioning: VMProvisioningDoc): boo
     provisioning.strategy === 'answer-file';
 
 /** Strategies that read/stage installer media in the Install Media location. */
+export const VM_PASSTHROUGH_CLASSES = ['gpu', 'usb', 'usb-controller'] as const;
+
+export type VMPassthroughClass = (typeof VM_PASSTHROUGH_CLASSES)[number];
+
+const PASSTHROUGH_CLASS_SET: ReadonlySet<string> = new Set(VM_PASSTHROUGH_CLASSES);
+
+/**
+ * The device classes a blueprint's install dialog may offer.
+ *
+ * Reads the `passthrough` set and folds in the two legacy booleans, so a stored
+ * document written before the set existed keeps working: the catalog and the
+ * platform deploy independently, and every stored blueprint re-validates on
+ * every sync. Unknown class names are dropped rather than rejected — same
+ * forward-compatibility deal `category` gets.
+ */
+export const blueprintPassthroughClasses = (guest: {
+    passthrough?: string[];
+    gpuPassthrough?: boolean;
+    usbPassthrough?: boolean;
+}): Set<VMPassthroughClass> => {
+    const classes = new Set<VMPassthroughClass>();
+    for (const name of guest.passthrough ?? []) {
+        if (PASSTHROUGH_CLASS_SET.has(name)) classes.add(name as VMPassthroughClass);
+    }
+    if (guest.gpuPassthrough) classes.add('gpu');
+    if (guest.usbPassthrough) classes.add('usb');
+    return classes;
+};
+
 export const blueprintUsesInstallMedia = (provisioning: VMProvisioningDoc): boolean =>
     provisioning.strategy === 'answer-file' || provisioning.strategy === 'installer-iso';
 

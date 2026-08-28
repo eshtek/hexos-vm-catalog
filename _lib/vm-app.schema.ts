@@ -83,7 +83,12 @@ const wingetTargetSchema = z.strictObject({
 const flatpakTargetSchema = z.strictObject({
     id: z.string().min(1).max(255).regex(FLATPAK_APP_ID, 'reverse-DNS flatpak app id'),
     /** Flatpak remote the id is installed from. Flathub unless a vendor runs its own. */
-    remote: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/, 'lowercase remote name').default('flathub'),
+    remote: z
+        .string()
+        .min(1)
+        .max(64)
+        .regex(/^[a-z0-9][a-z0-9-]*$/, 'lowercase remote name')
+        .default('flathub'),
 });
 
 export const vmAppTargetsSchema = z
@@ -110,7 +115,7 @@ export const vmAppSchema = z.object({
      */
     icon: z.string().min(1).max(512).optional(),
     /** Product page, for the picker's "learn more" affordance. */
-    website: z.url().max(512).optional(),
+    website: z.string().url().max(512).optional(),
     /**
      * Grouping slug for the picker. Open like blueprint `category` and for the
      * same reason: the catalog updates fleet-wide instantly while clients roll
@@ -164,6 +169,31 @@ export interface VMAppRecord {
     removedFromCatalog: boolean;
     document: VMApp;
     updatedAt: Date;
+}
+
+// Admin management view: every row regardless of visibility, with provenance.
+// `document` is null when a stored document no longer validates — a schema
+// change, since apps carry no override to merge.
+export interface VMAppAdminRecord extends Omit<VMAppRecord, 'document'> {
+    document: VMApp | null;
+    lastCatalogSync: Date | null;
+}
+
+/** Roll-up of the app catalog's health, for the admin table's header. */
+export interface VMAppCatalogStatus {
+    total: number;
+    visible: number;
+    disabled: number;
+    hidden: number;
+    removedFromCatalog: number;
+    invalid: number;
+    adminAuthored: number;
+    lastSync: Date | null;
+}
+
+export interface AdminVMAppsResponse {
+    apps: VMAppAdminRecord[];
+    status: VMAppCatalogStatus;
 }
 
 /** The apps offerable to a guest whose blueprint declares `runtime`. */

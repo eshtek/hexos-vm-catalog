@@ -38,8 +38,12 @@
         "diskBus": "VIRTIO",
         "nicModel": "VIRTIO",
         "autostart": false,
-        "gpuPassthrough": true,
         "installSnapshot": true,
+        "passthrough": [
+            "gpu",
+            "usb",
+            "usb-controller"
+        ],
         "readiness": {
             "type": "phone-home"
         }

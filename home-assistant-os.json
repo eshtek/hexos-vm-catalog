@@ -34,12 +34,15 @@
         "tpm": false,
         "secureBoot": false,
         "hypervEnlightenments": false,
+        "passthrough": [
+            "usb",
+            "usb-controller"
+        ],
         "readiness": {
             "type": "mdns",
             "hostname": "homeassistant.local",
             "port": 8123
         },
-        "postInstallUrl": "http://{ip}:8123",
-        "usbPassthrough": true
+        "postInstallUrl": "http://{ip}:8123"
     }
 }
