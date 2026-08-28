@@ -1,0 +1,19 @@
+{
+    "blueprintId": "debian-13",
+    "strategy": "cloud-init",
+    "options": {
+        "username": true,
+        "password": true,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": true,
+        "reboot": true,
+        "seed": {
+            "dtype": "RAW",
+            "order": 2,
+            "label": "cidata"
+        }
+    },
+    "frameReview": "'e2e-debian-13 login:' = seed consumed; 'localhost login:' = cloud-init never ran (broken)."
+}

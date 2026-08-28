@@ -1,0 +1,15 @@
+{
+    "blueprintId": "windows-11",
+    "strategy": "answer-file",
+    "options": {
+        "username": true,
+        "password": true,
+        "userIso": true
+    },
+    "checks": {
+        "guestRead": false,
+        "reboot": true,
+        "seed": null
+    },
+    "frameReview": "Windows lock screen or desktop = installed. The Windows Setup language screen or an OOBE page = the unattend was not applied (broken)."
+}

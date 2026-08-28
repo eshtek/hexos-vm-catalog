@@ -1,0 +1,19 @@
+{
+    "blueprintId": "omarchy",
+    "strategy": "installer-iso",
+    "options": {
+        "username": true,
+        "password": true,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": true,
+        "reboot": false,
+        "seed": {
+            "dtype": "CDROM",
+            "order": 2
+        }
+    },
+    "knownIssue": "Phone-home is missing on AMDHW (TN26) only, so it soft-completes there while IntelHW confirms; the offline read shows the account and hostname applied.",
+    "frameReview": "Omarchy's lock screen (a dark, not black, theme colour; low luminance spread is normal) = installed. The archinstall prompt = broken."
+}

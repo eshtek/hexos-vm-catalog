@@ -1,0 +1,19 @@
+{
+    "blueprintId": "kubuntu-26.04",
+    "strategy": "installer-iso",
+    "options": {
+        "username": true,
+        "password": true,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": true,
+        "reboot": false,
+        "seed": {
+            "dtype": "CDROM",
+            "order": 2
+        }
+    },
+    "knownIssue": "Parked: the autoinstall never starts. Every sweep ends on the live session's welcome screen after the full readiness window.",
+    "frameReview": "'Try Kubuntu / Install Kubuntu' welcome = live session, never installed (broken). A SDDM greeter with the hexe2e account would be installed (unmonitored)."
+}

@@ -1,0 +1,19 @@
+{
+    "blueprintId": "xubuntu-26.04",
+    "strategy": "installer-iso",
+    "options": {
+        "username": true,
+        "password": true,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": true,
+        "reboot": false,
+        "seed": {
+            "dtype": "CDROM",
+            "order": 2
+        }
+    },
+    "knownIssue": "Intermittent on IntelHW (25.10): passes and fails on consecutive runs with no code change. Judge it by repeats (--runs 3), not one pass.",
+    "frameReview": "LightDM greeter with the hexe2e account = installed. The live session's desktop or the installer = broken."
+}
