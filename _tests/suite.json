@@ -1,0 +1,18 @@
+{
+    "schemaVersion": 1,
+    "boxes": [
+        { "key": "AMDHW", "label": "AMDHW-DEV", "truenasTrain": "TN26" },
+        { "key": "INTEL", "label": "IntelHW-DEV", "truenasTrain": "25.10" }
+    ],
+    "username": "hexe2e",
+    "passwordEnv": "E2E_VM_PASSWORD",
+    "ceilingMinutes": {
+        "image": 35,
+        "cloud-init": 35,
+        "machine-config": 35,
+        "installer-image": 70,
+        "installer-iso": 80,
+        "answer-file": 130
+    },
+    "promptTemplate": "Run the VM catalog sweep for: {{blueprints}}\nBoxes: {{boxes}}\nCatalog: eshtek/hexos-vm-catalog @ {{catalogRef}} (specs in _tests/). Platform: eshtek/hexos-platform @ {{platformRef}}.\nWhy: {{reason}}\n\n1. Health-check the dev runner first (dashboard :3333, main-backend, BOTH box instances, Docker) and fix it before anything else.\n2. Sync the catalog on the dev main from the catalog checkout at the ref above (Admin > VM Blueprints > Sync Catalog) so every box installs from it. Un-park any parked blueprint in the list ONCE before the first run and re-park after the LAST run, never in between.\n3. cd packages/dev/scripts/vm-catalog-sweep; python3 plan.py <port> plan.json --catalog=<catalog checkout> --only=<ids>; run one sweep.py per box concurrently (sequential inside a box), --baseline = that box's previous results file, and ONE shared --run-id for the sweep.\n4. Do NOT edit packages/backend while a sweep runs: bun --watch hot-restarts the local backends and kills live installs.\n5. Review every soft-complete's console frame into reviewed.json: an installed greeter or lock screen = unmonitored, a live installer / welcome screen / unconfigured host = broken.\n6. python3 submit.py per box with --plan plan.json --reviewed reviewed.json; results and frames appear at {{resultsUrl}}.\n7. Report the matrix (report.py) and every regression against the baseline. Never park a blueprint automatically: recommend it with the evidence, a human confirms in a catalog PR."
+}

@@ -17,6 +17,7 @@ platform="${HEXOS_PLATFORM:-$catalog_root/../hexos-platform}"
 schemas=(
   "vm-blueprints.ts:vm-blueprint.schema.ts"
   "vm-apps.ts:vm-app.schema.ts"
+  "vm-blueprint-tests.ts:vm-blueprint-tests.schema.ts"
 )
 
 for entry in "${schemas[@]}"; do

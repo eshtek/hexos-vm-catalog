@@ -1,0 +1,19 @@
+{
+    "blueprintId": "debian-12",
+    "strategy": "cloud-init",
+    "options": {
+        "username": true,
+        "password": true,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": true,
+        "reboot": true,
+        "seed": {
+            "dtype": "RAW",
+            "order": 2,
+            "label": "cidata"
+        }
+    },
+    "frameReview": "'e2e-debian-12 login:' = seed consumed. A bare 'localhost login:' means the hostname was never applied, so cloud-init never ran and no account exists (broken)."
+}

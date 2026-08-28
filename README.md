@@ -468,6 +468,30 @@ cd _lib
 bun run check-sources -- --apps    # only the app package ids
 ```
 
+## Test specs and status
+
+Every blueprint has a **test spec** in [`_tests/spec/<id>.json`](_tests/spec/) and the suite-wide settings live in [`_tests/suite.json`](_tests/suite.json). Specs are source: they say how the install dialog is answered under test (as a *shape* — never a value; the guest password comes from the environment variable `suite.json` names), the wall-clock ceiling, which assertions apply (offline guest read, stop/start steady state, the seed device the guest should see), and what a reviewer should look for on the console frame when an install soft-completes. The `_` prefix keeps the directory invisible to the catalog sync.
+
+```bash
+cd _lib
+bun run tests                  # every blueprint, its spec, ceiling and checks
+bun run generate-tests         # write a spec for every blueprint that lacks one (derived from the blueprint)
+bun run generate-tests -- --force   # regenerate the derivable fields everywhere, keeping the prose
+```
+
+`bun run validate` fails when a blueprint has no spec, a spec names a blueprint that does not exist, or a spec's strategy disagrees with its blueprint; it warns when the derivable fields drift.
+
+**Results are not kept in this repo.** The sweep harness in `hexos-platform` (`packages/dev/scripts/vm-catalog-sweep/`) installs every blueprint on the lab boxes, records evidence (task verdict, readiness, console frame, offline guest read, reboot, delete) and posts it to the HexOS main server, where the admin console's **VM Blueprints** page shows each blueprint's status per box:
+
+| Status | Meaning |
+|---|---|
+| 🟢 confirmed | installs **and** readiness was actively observed |
+| 🟡 unmonitored | installs to a login screen, but readiness is unobservable (a reviewer's call on the frame) |
+| 🔴 broken | no usable installed system — the candidate for parking |
+| ⚪ untested | no result, or the result predates a functional change to the blueprint |
+
+A result records a digest of the blueprint's *functional* fields (`provisioning`, `guest`, `resources`, `requiredCapabilities`, `truenasVersion`, `cpuFeatures`), so bumping a version or changing a template marks it ⚪ until the sweep is re-run, while copy edits never expire a result. The rule for bumping a pinned version: open the PR, run the sweep against the PR branch, and merge once the blueprint reads 🟢 or 🟡 on every box for the *new* document — the old pinned version stays in place until then. Red never parks a blueprint by itself: parking is a change to `internal` in a reviewed PR.
+
 ## Contributing
 
 1. Fork this repository

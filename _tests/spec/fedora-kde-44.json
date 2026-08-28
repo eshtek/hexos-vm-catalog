@@ -1,0 +1,17 @@
+{
+    "blueprintId": "fedora-kde-44",
+    "strategy": "installer-iso",
+    "options": {
+        "username": true,
+        "password": true,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": true,
+        "reboot": false,
+        "seed": {
+            "dtype": "CDROM",
+            "order": 2
+        }
+    }
+}

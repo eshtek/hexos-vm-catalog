@@ -1,0 +1,19 @@
+{
+    "blueprintId": "bazzite",
+    "strategy": "installer-iso",
+    "options": {
+        "username": true,
+        "password": true,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": true,
+        "reboot": false,
+        "seed": {
+            "dtype": "CDROM",
+            "order": 2
+        }
+    },
+    "knownIssue": "Installs fully but never phones home: the install soft-completes after the readiness window on both boxes. The SDDM greeter with the hexe2e account is the pass condition.",
+    "frameReview": "SDDM greeter showing the hexe2e user = installed (unmonitored). A Bazzite live installer or Anaconda screen = never installed (broken)."
+}
