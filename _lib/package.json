@@ -9,6 +9,8 @@
     "sync-schema": "bash sync-schema.sh",
     "check-sources": "bun check-sources.ts",
     "releases": "bun releases.ts",
+    "tests": "bun tests.ts",
+    "generate-tests": "bun tests.ts --generate",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

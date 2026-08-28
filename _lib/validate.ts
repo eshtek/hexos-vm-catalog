@@ -10,6 +10,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkAppContract, checkContract, MAX_RECOMMENDED_APPS, MIRRORED_ICON_FILE } from "./contract";
+import { checkTests, readBlueprints } from "./tests";
 import { type VMApp, vmAppSchema } from "./vm-app.schema";
 import { type VMBlueprint, vmBlueprintSchema } from "./vm-blueprint.schema";
 
@@ -197,6 +198,22 @@ if (existsSync(readmePath)) {
     }
     errorCount += unlisted.length;
   }
+}
+
+// ── Test specs ───────────────────────────────────────────────────────────────
+// `_tests/` is source: every published blueprint carries a spec that says how
+// it is installed under test and what to assert, reviewed in the same PR as
+// the blueprint. Results never live here (they go to the HexOS main server),
+// so the checks are structural: suite present, every spec valid, one per
+// blueprint, and the derivable half in step with the blueprint it tests.
+const tests = checkTests(readBlueprints());
+if (tests.present) {
+  console.log("");
+  console.log(`${tests.errors.length ? "✗" : tests.warnings.length ? "⚠" : "✓"} _tests/`);
+  for (const e of tests.errors) console.log(`    error:   ${e}`);
+  for (const w of tests.warnings) console.log(`    warning: ${w}`);
+  errorCount += tests.errors.length;
+  warningCount += tests.warnings.length;
 }
 
 console.log("");
