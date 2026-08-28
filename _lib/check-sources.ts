@@ -6,7 +6,7 @@
 //   bun check-sources.ts --verify     # also download and verify every digest
 //   bun check-sources.ts --verify --id openwrt
 //   bun check-sources.ts --apps       # only the app package ids
-//   bun check-sources.ts --self-test  # prove the checker itself works, stall guard included
+//   bun check-sources.ts --self-test  # prove the checker itself works, guards and retries included
 //
 // Why this exists: the most common way a blueprint breaks is not a bad
 // install, it is upstream moving the file. Canonical deletes superseded point
@@ -84,14 +84,13 @@ function formatBytes(n: number): string {
 // checked at all. Neither number is arbitrary:
 //
 //  - HEAD is a metadata request that should answer in well under a second, so
-//    it gets a flat deadline.
+//    it gets a deadline (see the retry ladder below).
 //  - A verify legitimately runs for minutes (7 GiB files), so a deadline would
 //    be wrong; what it needs is a THROUGHPUT FLOOR. These are the same terms
 //    the install pipeline's curl already uses on the host (--speed-limit 10240
 //    --speed-time 120): under 10 KiB/s averaged over two minutes counts as
 //    stalled. Keeping the two in step matters — a mirror this tool accepts
 //    should be one an install can actually finish from.
-const HEAD_TIMEOUT_MS = 30_000;
 const STALL_MIN_BYTES_PER_SEC = 10 * 1024;
 // --self-test drops to a 3s window so proving the guard works takes three
 // seconds rather than two minutes. It exercises the same code path; only the
@@ -100,10 +99,45 @@ const STALL_WINDOW_MS = Number(
     process.env.CHECK_SOURCES_STALL_WINDOW_MS ?? (process.argv.includes('--self-test') ? 3_000 : 120_000),
 );
 
-async function head(url: string): Promise<{ ok: boolean; detail: string }> {
+// ── HEAD retry ladder ────────────────────────────────────────────────────────
+// A mirror that times out once is usually not a mirror that is gone. A single
+// attempt cannot tell "deleted" from "busy right now", and answering that
+// question wrong in the busy direction is expensive: it fails a run, and the
+// next person to look sees a URL that serves perfectly.
+//
+// So ask again — but only where asking again can change the answer:
+//
+//  - 404/410 is the exact signal this tool exists to raise. It reads the same
+//    on every attempt, so a retry buys nothing and delays a real report behind
+//    two backoffs. One request, then out.
+//  - Transport errors, timeouts, 408, 429 and 5xx are the transient class: the
+//    host exists and is declining to answer this second. Those get the ladder.
+//  - Every other 4xx is a durable statement about the URL, not the moment.
+//
+// The deadline GROWS per attempt rather than repeating flat. A healthy mirror
+// answers a HEAD in well under a second, so 10s is already ten times the
+// headroom the common case needs and keeps a whole-catalog run brisk; a mirror
+// that is merely slow then earns more patience each time, instead of being
+// retried under the deadline it just missed.
+const HEAD_ATTEMPT_TIMEOUTS_MS = [10_000, 20_000, 30_000];
+// Backing off matters more than the attempt count — an overloaded mirror is
+// not helped by a second request 5ms later. --self-test drops this to 50ms so
+// exercising the ladder costs milliseconds; it is the same code path.
+const HEAD_BACKOFF_MS = Number(
+    process.env.CHECK_SOURCES_RETRY_BACKOFF_MS ?? (process.argv.includes('--self-test') ? 50 : 2_000),
+);
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Transient by status: the host answered, just not with an answer about the URL. */
+function isTransientStatus(status: number): boolean {
+    return status === 408 || status === 429 || status >= 500;
+}
+
+async function headOnce(url: string, timeoutMs: number): Promise<{ ok: boolean; detail: string; retriable: boolean }> {
     try {
         // Some mirrors reject HEAD; fall back to a zero-length ranged GET.
-        const signal = AbortSignal.timeout(HEAD_TIMEOUT_MS);
+        const signal = AbortSignal.timeout(timeoutMs);
         let res = await fetch(url, { method: 'HEAD', redirect: 'follow', signal });
         if (res.status === 405 || res.status === 501) {
             res = await fetch(url, { headers: { Range: 'bytes=0-0' }, redirect: 'follow', signal });
@@ -111,13 +145,37 @@ async function head(url: string): Promise<{ ok: boolean; detail: string }> {
         const size = res.headers.get('content-length');
         const human = size ? formatBytes(Number(size)) : 'size unknown';
         if (res.status === 404 || res.status === 410) {
-            return { ok: false, detail: `${res.status} — upstream removed this file; the version almost certainly moved` };
+            return {
+                ok: false,
+                retriable: false,
+                detail: `${res.status} — upstream removed this file; the version almost certainly moved`,
+            };
         }
-        if (!res.ok && res.status !== 206) return { ok: false, detail: `HTTP ${res.status}` };
-        return { ok: true, detail: human };
+        if (!res.ok && res.status !== 206) {
+            return { ok: false, detail: `HTTP ${res.status}`, retriable: isTransientStatus(res.status) };
+        }
+        return { ok: true, detail: human, retriable: false };
     } catch (e) {
-        return { ok: false, detail: `unreachable: ${(e as Error).message}` };
+        // Timeouts and transport errors both land here, and both are the case
+        // the ladder exists for.
+        return { ok: false, detail: `unreachable: ${(e as Error).message}`, retriable: true };
     }
+}
+
+async function head(url: string): Promise<{ ok: boolean; detail: string }> {
+    let attempts = 0;
+    let last: { ok: boolean; detail: string; retriable: boolean } = { ok: false, detail: 'not attempted', retriable: true };
+    for (const timeoutMs of HEAD_ATTEMPT_TIMEOUTS_MS) {
+        last = await headOnce(url, timeoutMs);
+        attempts++;
+        // A retry that succeeds is still worth saying out loud. A mirror that
+        // needs two goes today is one to move off before it needs four, and a
+        // silently-swallowed retry hides that until the day it fails outright.
+        if (last.ok) return { ok: true, detail: attempts > 1 ? `${last.detail} (after ${attempts} attempts)` : last.detail };
+        if (!last.retriable) break;
+        if (attempts < HEAD_ATTEMPT_TIMEOUTS_MS.length) await sleep(HEAD_BACKOFF_MS * 2 ** (attempts - 1));
+    }
+    return { ok: false, detail: attempts > 1 ? `${last.detail} (${attempts} attempts)` : last.detail };
 }
 
 async function verify(url: string, digests: Target['digests']): Promise<{ ok: boolean; detail: string }> {
@@ -209,6 +267,32 @@ async function selfTest(): Promise<number> {
     const stallPass = !stallCase.ok && stallCase.detail.startsWith('stalled');
     console.log(`${stallPass ? '✓' : '✗'} self-test stalled mirror: ${stallCase.detail}`);
     if (!stallPass) failed++;
+
+    // The retry ladder, against the case that prompted it: a mirror that is
+    // busy rather than gone. Two 503s and then a 200 — one attempt would call
+    // this dead and fail the run over a URL that serves fine.
+    let busyHits = 0;
+    const busy = Bun.serve({
+        port: 0,
+        fetch: () => (++busyHits < 3 ? new Response('busy', { status: 503 }) : new Response(null, { status: 200 })),
+    });
+    const busyCase = await head(`http://localhost:${busy.port}/flaky.iso`);
+    busy.stop(true);
+    const busyPass = busyCase.ok && busyHits === 3;
+    console.log(`${busyPass ? '✓' : '✗'} self-test busy mirror: ${busyHits} attempt(s) — ${busyCase.detail}`);
+    if (!busyPass) failed++;
+
+    // ...and the other half of the ladder: a 404 must cost exactly one request.
+    // Retrying it would triple every genuine upstream-deleted report and push
+    // it out behind two backoffs, which is the opposite of what this tool is
+    // for.
+    let goneHits = 0;
+    const gone = Bun.serve({ port: 0, fetch: () => (goneHits++, new Response('gone', { status: 404 })) });
+    const goneCase = await head(`http://localhost:${gone.port}/deleted.iso`);
+    gone.stop(true);
+    const gonePass = !goneCase.ok && goneHits === 1;
+    console.log(`${gonePass ? '✓' : '✗'} self-test deleted file not retried: ${goneHits} attempt(s) — ${goneCase.detail}`);
+    if (!gonePass) failed++;
 
     return failed;
 }
