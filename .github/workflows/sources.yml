@@ -20,6 +20,13 @@ jobs:
   head:
     name: URL liveness
     runs-on: ubuntu-latest
+    # A healthy run is under a minute. This bound exists because check-sources
+    # retries a stalling mirror up to three times with backoff, so a run where
+    # EVERY host is unreachable pays that ladder 80-odd times over. Cut it off
+    # well short of the 6h default: the log already lists each result as it
+    # goes, and a run that gets here is telling you about the network, not the
+    # catalog.
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: _lib
