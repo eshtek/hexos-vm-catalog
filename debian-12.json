@@ -6,6 +6,9 @@
     "website": "https://www.debian.org/",
     "category": "server",
     "truenasVersion": ">=25.04.2.6",
+    "requiredCapabilities": [
+        "virtioSeed"
+    ],
     "provisioning": {
         "strategy": "cloud-init",
         "source": {

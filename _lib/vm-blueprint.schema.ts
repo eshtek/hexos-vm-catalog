@@ -664,6 +664,13 @@ export const HEXOS_VM_CAPABILITIES = [
      * deck must not offer the picker until the box reports it.
      */
     'appInstall',
+    /**
+     * The cloud-init seed attaches as a RAW disk on the guest's boot bus
+     * rather than a SATA CDROM, so a guest whose kernel omits AHCI (Debian
+     * 12's cloud flavour) still finds it. Declared by blueprints that are
+     * unusable without it — on the CDROM path they boot with no account.
+     */
+    'virtioSeed',
 ] as const;
 
 /**

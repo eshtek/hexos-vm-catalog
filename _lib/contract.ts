@@ -79,7 +79,7 @@ export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
 // allowlists): a capability listed here before it exists upstream turns the
 // check into a rubber stamp. Values are exact-match (no case folding) — the
 // backend compares them verbatim.
-export const KNOWN_VM_CAPABILITIES = new Set(["firstBoot"]);
+export const KNOWN_VM_CAPABILITIES = new Set(["firstBoot", "virtioSeed"]);
 
 // Passthrough class vocabulary, enforced here for the same reason as
 // KNOWN_CATEGORIES: the schema leaves `guest.passthrough` an open slug array so
