@@ -15,10 +15,10 @@
     "provisioning": {
         "strategy": "installer-iso",
         "source": {
-            "url": "https://mirror.umd.edu/zorin/18/Zorin-OS-{version}-Core-64-bit.iso",
+            "url": "https://mirrors.edge.kernel.org/zorinos-isos/18/Zorin-OS-{version}-Core-64-bit.iso",
             "version": "18.1",
             "sha256": "44649b97bd307fc4c8529205d098ebbf98575a1e1ba2ee7d7005b697af1721d5",
-            "releasesUrl": "https://mirror.umd.edu/zorin/18/"
+            "releasesUrl": "https://mirrors.edge.kernel.org/zorinos-isos/18/"
         },
         "seed": {
             "template": "zorin-preseed"
