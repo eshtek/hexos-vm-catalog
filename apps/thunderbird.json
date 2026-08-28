@@ -1,0 +1,17 @@
+{
+    "id": "thunderbird",
+    "name": "Thunderbird",
+    "description": "Mail, calendar and contacts client from Mozilla.",
+    "icon": "_icons/apps/thunderbird.svg",
+    "website": "https://www.thunderbird.net/",
+    "category": "documents",
+    "sizeMb": 400,
+    "targets": {
+        "winget": {
+            "id": "Mozilla.Thunderbird"
+        },
+        "flatpak": {
+            "id": "org.mozilla.Thunderbird"
+        }
+    }
+}

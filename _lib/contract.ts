@@ -11,6 +11,7 @@
 //   - installer-iso: hexos-platform  packages/backend/src/lib/installerSeed.ts   (INSTALLER_SEED_TEMPLATES)
 
 import { sourceDigests, type VMBlueprint } from "./vm-blueprint.schema";
+import type { VMApp } from "./vm-app.schema";
 
 // A backend that requires sha256 on every source rejects a sha512-only
 // document at sync time, which sets validationError and silently disables the
@@ -79,6 +80,29 @@ export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
 // check into a rubber stamp. Values are exact-match (no case folding) — the
 // backend compares them verbatim.
 export const KNOWN_VM_CAPABILITIES = new Set(["firstBoot"]);
+
+// App grouping vocabulary, enforced here for the same reason as
+// KNOWN_CATEGORIES: the schema leaves `category` an open slug so a catalog that
+// adds a group before the platform deploys buckets under "Other" rather than
+// validation-hiding every app in it. Extend deliberately — a typo'd slug is a
+// silently mis-grouped app, and the picker's section order is authored against
+// this list.
+export const KNOWN_APP_CATEGORIES = new Set([
+  "browsers",
+  "messaging",
+  "media",
+  "gaming",
+  "graphics",
+  "documents",
+  "developer",
+  "utilities",
+]);
+
+// Recommended apps arrive pre-checked, so the set is what a user who clicks
+// straight through actually installs. A ceiling rather than a rule of thumb:
+// past this the "just continue" path stops being a sensible default and starts
+// being a surprise download.
+export const MAX_RECOMMENDED_APPS = 6;
 
 // How many screenshots the detail-sheet gallery actually renders (the UI's
 // ScreenshotViewer is handed a 5-item slice). Extra images cost repo size and
@@ -225,6 +249,31 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
     );
   }
 
+  // The app runtime has to match what the guest actually is: a Windows
+  // blueprint declaring flatpak (or a Linux one declaring winget) offers the
+  // user a picker whose every pick then fails in the guest. The strategy is
+  // the honest discriminator — answer-file IS Windows.
+  if (bp.apps) {
+    const expected = p.strategy === "answer-file" ? "winget" : "flatpak";
+    if (bp.apps.runtime !== expected) {
+      errors.push(
+        `apps.runtime is "${bp.apps.runtime}" but this blueprint's provisioning strategy (${p.strategy}) means the guest is ${expected === "winget" ? "Windows" : "Linux"} — every app pick would fail in the guest`,
+      );
+    }
+    if (bp.category !== "desktop") {
+      warnings.push(
+        `apps.runtime is set on a "${bp.category ?? "(none)"}" blueprint — offering apps only makes sense where there is a desktop to put them on`,
+      );
+    }
+  } else if (bp.category === "desktop") {
+    // The inverse: a desktop that forgot to opt in. Not an error — a desktop
+    // may deliberately offer no apps — but silent omission is the likelier
+    // cause, and it costs the user the whole step with nothing to show why.
+    warnings.push(
+      `no apps.runtime on a desktop blueprint — it will offer no apps at all; set "winget" (Windows) or "flatpak" (Linux), or leave it off deliberately`,
+    );
+  }
+
   if (bp.category && !KNOWN_CATEGORIES.has(bp.category)) {
     errors.push(
       `unknown category "${bp.category}" — allowed values: ${[...KNOWN_CATEGORIES].join(", ")} (extend KNOWN_CATEGORIES deliberately when adding one)`,
@@ -317,6 +366,79 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
 
   if (!bp.website) {
     warnings.push(`no website — the detail sheet renders without its "Website" button`);
+  }
+
+  return { errors, warnings };
+}
+
+/**
+ * Contract checks for an app document. Same division of labour as
+ * checkContract: everything expressible in Zod lives in the schema, and this
+ * covers what the schema cannot — the closed vocabularies this repo owns and
+ * the couplings that fail silently rather than loudly.
+ *
+ * `recommendedCount` is the whole catalog's count, passed in because the cap is
+ * a property of the SET, not of any one document; validate.ts reports it once
+ * against the last file rather than blaming an arbitrary app.
+ */
+export function checkAppContract(app: VMApp, filename: string): ContractResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  const stem = filename.replace(/\.json$/, "");
+  if (app.id !== stem) {
+    warnings.push(`id "${app.id}" differs from the filename stem "${stem}" — allowed, but keeping them equal is the convention`);
+  }
+
+  if (!app.category) {
+    warnings.push(`no category — the picker groups this app under "Other"`);
+  } else if (!KNOWN_APP_CATEGORIES.has(app.category)) {
+    errors.push(
+      `unknown category "${app.category}" — allowed values: ${[...KNOWN_APP_CATEGORIES].join(", ")} (extend KNOWN_APP_CATEGORIES deliberately when adding one)`,
+    );
+  }
+
+  // Deliberately NOT warned on: a single-runtime app. Nine of the starter set
+  // are one-runtime by nature (7-Zip and PowerToys are Windows software;
+  // FileZilla was pulled from winget), so flagging every one of them would put
+  // a warning on a quarter of the catalog and teach reviewers to skim past the
+  // warnings that mean something. The schema's "at least one target" rule is
+  // the real gate.
+
+  // A user-scope winget package cannot be installed by the stage's SYSTEM
+  // scheduled task; it has to be deferred to a logon-context run. Flagged so
+  // the cost of adding one is visible at review time rather than discovered as
+  // a failed install on a user's machine.
+  if (app.targets.winget?.scope === "user") {
+    warnings.push(
+      `winget package "${app.targets.winget.id}" is user-scope — it installs for the created account only, via the logon-context fallback rather than the SYSTEM stage`,
+    );
+  }
+
+  if (app.targets.flatpak && app.targets.flatpak.remote !== "flathub") {
+    warnings.push(
+      `flatpak remote "${app.targets.flatpak.remote}" is not flathub — the guest stage only adds the Flathub remote, so this app installs nothing unless the blueprint's guest already has that remote`,
+    );
+  }
+
+  if (app.sizeMb === undefined) {
+    warnings.push(`no sizeMb — this app contributes nothing to the wizard's disk-size estimate`);
+  }
+
+  if (!app.website) {
+    warnings.push(`no website — the picker renders without its "learn more" link`);
+  }
+
+  if (app.icon) {
+    if (/^https?:\/\//.test(app.icon)) {
+      warnings.push(
+        `icon "${app.icon}" is an absolute URL — catalog files carry repo-relative paths so the icon is mirrored here and cannot rot upstream`,
+      );
+    } else if (!MIRRORED_ICON_FILE.test(app.icon)) {
+      warnings.push(`icon "${app.icon}" has no image extension — the picker will fall back to a lettered tile`);
+    } else if (app.icon.startsWith("/") || app.icon.split("/").includes("..")) {
+      errors.push(`icon "${app.icon}" must be a path relative to the repo root, with no "/" prefix and no ".." segments`);
+    }
   }
 
   return { errors, warnings };

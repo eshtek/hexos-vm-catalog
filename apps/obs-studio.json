@@ -1,0 +1,17 @@
+{
+    "id": "obs-studio",
+    "name": "OBS Studio",
+    "description": "Screen recording and live streaming with scene compositing.",
+    "icon": "_icons/apps/obs-studio.svg",
+    "website": "https://obsproject.com/",
+    "category": "media",
+    "sizeMb": 600,
+    "targets": {
+        "winget": {
+            "id": "OBSProject.OBSStudio"
+        },
+        "flatpak": {
+            "id": "com.obsproject.Studio"
+        }
+    }
+}

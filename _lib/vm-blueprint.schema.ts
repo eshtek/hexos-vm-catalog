@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // VENDORED FILE — do not edit by hand.
 //
-// Verbatim copy of the blueprint schema from the hexOS platform monorepo:
+// Verbatim copy of a schema from the hexOS platform monorepo:
 //   packages/shared/eshtek/vm-blueprints.ts
 //
 // That file is the single source of truth. This repo keeps a copy rather than
@@ -13,7 +13,7 @@
 //   bun run sync-schema        # wraps _lib/sync-schema.sh
 //
 // If this copy drifts from upstream it only produces false local results — the
-// catalog sync in hexos-platform re-validates every blueprint with the real
+// catalog sync in hexos-platform re-validates every document with the real
 // schema at read time, so the server is always the authoritative gate.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -375,6 +375,24 @@ export const vmBlueprintSchema = z.object({
         .array(z.string().regex(/^[a-zA-Z][a-zA-Z0-9-]{0,63}$/, 'capability slug'))
         .max(16)
         .optional(),
+    /**
+     * Opt-in to the post-install app step, naming the package runtime THIS
+     * guest has: 'winget' for Windows, 'flatpak' for a Linux desktop. Absent
+     * means the blueprint offers no apps at all, which is the right answer for
+     * servers and appliances — an Ubuntu Server or an OpenWrt router has no
+     * desktop to put them on. Deliberately a declaration rather than something
+     * inferred from `category` or `strategy`: Ubuntu Server could opt into
+     * flatpak later without becoming a "desktop", and a new appliance built on
+     * a desktop strategy must not silently start offering GIMP.
+     *
+     * The RUNTIME also decides which apps are offered: only catalog apps
+     * carrying a target for it appear (see appsForRuntime).
+     */
+    apps: z
+        .strictObject({
+            runtime: z.enum(['winget', 'flatpak']),
+        })
+        .optional(),
     /** Skipped when syncing the prod catalog branch (mirrors app install scripts). */
     internal: z.boolean().default(false),
     provisioning: vmProvisioningSchema,
@@ -469,6 +487,14 @@ export const blueprintNeedsWindowsSetup = (provisioning: VMProvisioningDoc): boo
 /** Strategies that read/stage installer media in the Install Media location. */
 export const blueprintUsesInstallMedia = (provisioning: VMProvisioningDoc): boolean =>
     provisioning.strategy === 'answer-file' || provisioning.strategy === 'installer-iso';
+
+/**
+ * The app runtime a blueprint's guest has, or undefined when it offers none.
+ * The single gate for the whole app step — the deck hides the picker on it,
+ * and the install pipeline refuses picks without it.
+ */
+export const blueprintAppRuntime = (blueprint: Pick<VMBlueprint, 'apps'>): 'winget' | 'flatpak' | undefined =>
+    blueprint.apps?.runtime;
 
 /**
  * The version a provisioning source pins, whether that source is a disk
@@ -587,6 +613,13 @@ export function missingCpuFeatures(hostFlags: string[] | null | undefined, requi
 export const HEXOS_VM_CAPABILITIES = [
     /** Named first-boot file injection into image installs (vmFirstBoot profiles). */
     'firstBoot',
+    /**
+     * Post-install app stage: the guest installs the user's picked apps from
+     * the app catalog (winget on Windows, flatpak on Linux) and streams
+     * progress back. A box without this ignores `apps` on a blueprint, so the
+     * deck must not offer the picker until the box reports it.
+     */
+    'appInstall',
 ] as const;
 
 /**

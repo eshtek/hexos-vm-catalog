@@ -9,6 +9,9 @@
         "steamos/screenshots/desktop.jpg",
         "steamos/screenshots/desktop-plasma.jpg"
     ],
+    "apps": {
+        "runtime": "flatpak"
+    },
     "provisioning": {
         "strategy": "installer-image",
         "source": {

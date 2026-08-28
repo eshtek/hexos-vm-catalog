@@ -13,6 +13,9 @@
     ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
+    "apps": {
+        "runtime": "flatpak"
+    },
     "provisioning": {
         "strategy": "installer-iso",
         "source": {

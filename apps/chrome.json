@@ -1,0 +1,17 @@
+{
+    "id": "chrome",
+    "name": "Google Chrome",
+    "description": "Google's browser.",
+    "icon": "_icons/apps/chrome.svg",
+    "website": "https://www.google.com/chrome/",
+    "category": "browsers",
+    "sizeMb": 500,
+    "targets": {
+        "winget": {
+            "id": "Google.Chrome"
+        },
+        "flatpak": {
+            "id": "com.google.Chrome"
+        }
+    }
+}

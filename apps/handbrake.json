@@ -1,0 +1,17 @@
+{
+    "id": "handbrake",
+    "name": "HandBrake",
+    "description": "Video transcoder for converting almost any source into common formats.",
+    "icon": "_icons/apps/handbrake.png",
+    "website": "https://handbrake.fr/",
+    "category": "media",
+    "sizeMb": 150,
+    "targets": {
+        "winget": {
+            "id": "HandBrake.HandBrake"
+        },
+        "flatpak": {
+            "id": "fr.handbrake.ghb"
+        }
+    }
+}

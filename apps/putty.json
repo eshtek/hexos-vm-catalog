@@ -1,0 +1,14 @@
+{
+    "id": "putty",
+    "name": "PuTTY",
+    "description": "SSH and serial terminal client for Windows.",
+    "icon": "_icons/apps/putty.svg",
+    "website": "https://www.chiark.greenend.org.uk/~sgtatham/putty/",
+    "category": "developer",
+    "sizeMb": 10,
+    "targets": {
+        "winget": {
+            "id": "PuTTY.PuTTY"
+        }
+    }
+}

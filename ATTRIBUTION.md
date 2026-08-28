@@ -114,3 +114,59 @@ Corporation, 37signals for the Omarchy mark, and the Linux/Tux mark), used here 
 identify the software the blueprint installs. `omarchy.svg` is an exact-geometry vectorization of
 the omarchy.org favicon (the project publishes no vector of its mark). If an upstream project
 objects or rebrands, replace or remove the file here — nothing else references it.
+
+## App icons
+
+App icons live under `_icons/apps/`, one per `apps/*.json`, and resolve exactly like blueprint
+icons: the sync rewrites the repo-relative path against the branch's raw-GitHub base. The frontend
+renders every one on a white rounded tile in both themes (`VMIcon.vue`), so a black brand mark
+(7-Zip, Inkscape, Steam) is legible rather than invisible — do not "fix" those to a lighter colour.
+
+Most come from [Simple Icons](https://simpleicons.org/), pinned at **v16.28.0**, which is already how
+several blueprint icons in `_icons/` were sourced (`rocky.svg` and `cachyos.svg` are byte-identical
+to theirs). The SVG data is CC0 1.0; the marks themselves remain trademarks of their owners, used
+here nominatively to identify the software the app installs — the same basis as the blueprint icons
+above, and the same basis ninite.com displays these marks on. Repo convention is the Simple Icons
+path verbatim with the project's brand hex as the root `fill`.
+
+Six apps needed another source: Simple Icons removed the Slack and VS Code marks at those companies'
+request, and carries no HandBrake, PuTTY, WinSCP or PowerToys icon at all. Two of those six ship as
+PNG because no vector of the mark is published anywhere.
+
+| File | App | Source | Author | Licence | Note |
+|------|-----|--------|--------|---------|------|
+| `7zip.svg` | 7-Zip | [Simple Icons `7zip`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/7zip.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#000000`; upstream mark: https://commons.wikimedia.org/wiki/File:7ziplogo.svg |
+| `audacity.svg` | Audacity | [Simple Icons `audacity`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/audacity.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#0000CC`; upstream mark: https://github.com/audacity/audacity/blob/c818449c69193f5311b430fbf600d8d6cbe49047/images/audacity.svg |
+| `bitwarden.svg` | Bitwarden | [Simple Icons `bitwarden`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/bitwarden.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#175DDC`; upstream mark: https://bitwarden.com/brand |
+| `blender.svg` | Blender | [Simple Icons `blender`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/blender.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#E87D0D`; upstream mark: https://www.blender.org/about/logo |
+| `brave.svg` | Brave | [Simple Icons `brave`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/brave.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#FB542B`; upstream mark: https://brave.com/brave-branding-assets |
+| `discord.svg` | Discord | [Simple Icons `discord`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/discord.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#5865F2`; upstream mark: https://discord.com/branding |
+| `filezilla.svg` | FileZilla | [Simple Icons `filezilla`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/filezilla.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#BF0000`; upstream mark: https://commons.wikimedia.org/wiki/File:FileZilla_logo.svg |
+| `firefox.svg` | Firefox | [Simple Icons `firefox`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/firefox.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#FF7139`; upstream mark: https://mozilla.design/firefox/logos-usage/ |
+| `gimp.svg` | GIMP | [Simple Icons `gimp`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/gimp.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#8C8073`; upstream mark: https://gitlab.gnome.org/GNOME/gimp-data/-/blob/e62f1905dcef7ec831ea6c052bb035eb37eaa69e/images/logo/gimp-logo-unicolor.svg |
+| `git.svg` | Git | [Simple Icons `git`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/git.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#F03C2E`; upstream mark: https://git-scm.com/community/logos |
+| `chrome.svg` | Google Chrome | [Simple Icons `googlechrome`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/googlechrome.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#4285F4`; upstream mark: https://www.google.com/chrome |
+| `handbrake.png` | HandBrake | [HandBrake `gtk/icons/128x128/apps/fr.handbrake.ghb.png`](https://github.com/HandBrake/HandBrake/blob/master/gtk/icons/128x128/apps/fr.handbrake.ghb.png) | The HandBrake Team | GPL-2.0 | **PNG** — HandBrake publishes no true vector; its `scalable/` SVG is an 850 KB wrapper around an embedded raster |
+| `inkscape.svg` | Inkscape | [Simple Icons `inkscape`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/inkscape.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#000000`; upstream mark: https://inkscape.org/gallery/=inkscape-branding/inkscape-brand-assets/ |
+| `keepassxc.svg` | KeePassXC | [Simple Icons `keepassxc`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/keepassxc.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#6CAC4D`; upstream mark: https://github.com/keepassxreboot/keepassxc/tree/3fdafc6d25e85050976e0cc645db579086db3f45 |
+| `krita.svg` | Krita | [Simple Icons `krita`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/krita.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#3BABFF`; upstream mark: https://krita.org/en/about/press/ |
+| `libreoffice.svg` | LibreOffice | [Simple Icons `libreoffice`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/libreoffice.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#18A303`; upstream mark: https://wiki.documentfoundation.org/Marketing/Branding |
+| `nodejs.svg` | Node.js | [Simple Icons `nodedotjs`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/nodedotjs.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#5FA04E`; upstream mark: https://nodejs.org/en/about/branding |
+| `notepad-plus-plus.svg` | Notepad++ | [Simple Icons `notepadplusplus`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/notepadplusplus.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#90E59A`; upstream mark: https://github.com/notepad-plus-plus/notepad-plus-plus/blob/1f2c63cce173e3e1dc5922637c81a851693e2856/PowerEditor/misc/chameleon/chameleon-pencil.eps |
+| `obs-studio.svg` | OBS Studio | [Simple Icons `obsstudio`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/obsstudio.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#302E31`; upstream mark: https://commons.wikimedia.org/wiki/File:OBS.svg |
+| `powertoys.svg` | PowerToys | [File:2020 PowerToys Icon.svg](https://commons.wikimedia.org/wiki/File:2020_PowerToys_Icon.svg) | Niels Laute (Microsoft) | MIT | vectorized from the PowerToys repo's own icon assets |
+| `putty.svg` | PuTTY | [File:PuTTY Icon upstream.svg](https://commons.wikimedia.org/wiki/File:PuTTY_Icon_upstream.svg) | Simon Tatham, Jacob Nevins, Colin Watson | MIT | generated by PuTTY's own `icons/mksvg.py`, so it is the upstream mark rather than a fan vectorization |
+| `python.svg` | Python | [Simple Icons `python`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/python.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#3776AB`; upstream mark: https://www.python.org/community/logos/ |
+| `signal.svg` | Signal | [Simple Icons `signal`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/signal.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#3B45FD`; upstream mark: https://signal.org/brand |
+| `slack.svg` | Slack | [File:Slack icon 2019.svg](https://commons.wikimedia.org/wiki/File:Slack_icon_2019.svg) | Slack Technologies | Public domain | Slack's own brandfolder asset; Simple Icons carries no Slack mark (removed at Slack's request) |
+| `spotify.svg` | Spotify | [Simple Icons `spotify`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/spotify.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#1ED760`; upstream mark: https://developer.spotify.com/documentation/general/design-and-branding/#using-our-logo |
+| `steam.svg` | Steam | [Simple Icons `steam`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/steam.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#000000`; upstream mark: https://partner.steamgames.com/doc/marketing/branding |
+| `telegram.svg` | Telegram | [Simple Icons `telegram`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/telegram.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#26A5E4`; upstream mark: https://telegram.org/tour/screenshots |
+| `thunderbird.svg` | Thunderbird | [Simple Icons `thunderbird`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/thunderbird.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#0A84FF`; upstream mark: https://design.thunderbird.net/resources/logo |
+| `vscode.svg` | Visual Studio Code | [File:Visual Studio Code 1.35 icon.svg](https://commons.wikimedia.org/wiki/File:Visual_Studio_Code_1.35_icon.svg) | Microsoft | Public domain | from code.visualstudio.com/brand; Simple Icons carries no VS Code mark (removed at Microsoft's request) |
+| `vlc.svg` | VLC | [Simple Icons `vlcmediaplayer`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/vlcmediaplayer.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#FF8800`; upstream mark: https://code.videolan.org/videolan/vlc/-/blob/1ce7f686ee17a028d2d79627ae69f22d905f2e23/extras/package/macosx/asset_sources/vlc_app_icon.svg |
+| `winscp.png` | WinSCP | [winscp.net `logos/logo@3x.png`](https://winscp.net/) | Martin Prikryl / WinSCP | Trademark, nominative use | **PNG** — WinSCP publishes no vector of its mark anywhere, and Commons carries only screenshots |
+| `zoom.svg` | Zoom | [Simple Icons `zoom`](https://github.com/simple-icons/simple-icons/blob/16.28.0/icons/zoom.svg) | Simple Icons contributors | CC0 1.0 | brand hex `#0B5CFF`; upstream mark: https://brand.zoom.us/media-library/ |
+
+If an upstream project objects or rebrands, replace or remove the file and clear the `icon` field on
+its `apps/*.json` — the picker falls back to a lettered tile, and nothing else references it.

@@ -1,0 +1,18 @@
+{
+    "id": "slack",
+    "name": "Slack",
+    "description": "Team chat, channels and calls.",
+    "icon": "_icons/apps/slack.svg",
+    "website": "https://slack.com/",
+    "category": "messaging",
+    "sizeMb": 400,
+    "targets": {
+        "winget": {
+            "id": "SlackTechnologies.Slack",
+            "scope": "user"
+        },
+        "flatpak": {
+            "id": "com.slack.Slack"
+        }
+    }
+}

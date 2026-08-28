@@ -2,7 +2,7 @@
 # moved or pruned a file than because an install regressed, and that failure is
 # invisible until a user hits it. This runs on GitHub-hosted runners with no
 # secrets and no VM, so it is safe to run on pull_request from forks.
-name: Check source URLs
+name: Check sources and package ids
 
 on:
   pull_request:

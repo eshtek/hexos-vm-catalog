@@ -1,0 +1,18 @@
+{
+    "id": "vlc",
+    "name": "VLC",
+    "description": "Plays essentially every media format without extra codecs.",
+    "icon": "_icons/apps/vlc.svg",
+    "website": "https://www.videolan.org/vlc/",
+    "category": "media",
+    "recommended": true,
+    "sizeMb": 250,
+    "targets": {
+        "winget": {
+            "id": "VideoLAN.VLC"
+        },
+        "flatpak": {
+            "id": "org.videolan.VLC"
+        }
+    }
+}
