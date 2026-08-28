@@ -29,6 +29,8 @@ bun run check-sources   # HEAD every source URL and resolve every app package id
 bun run check-sources -- --apps     # only the app package ids
 bun run check-sources -- --verify   # stream + verify every digest (~57 GiB transferred, nothing stored)
 bun run releases        # pinned version + releases page per blueprint (--pending, --check, --json)
+bun run tests           # every blueprint's test spec (_tests/spec) — ceiling, checks, known issues
+bun run generate-tests  # write the spec for any blueprint that lacks one (validate fails without it)
 ./fetch-checksums.sh    # print official checksums for _pending/ drafts
 ```
 
