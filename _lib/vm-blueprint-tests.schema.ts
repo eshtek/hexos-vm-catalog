@@ -729,6 +729,19 @@ export function affectedBlueprintsForPaths(changedPaths: string[], blueprints: I
 
 // ─── Clipboard prompt ────────────────────────────────────────────────────────
 
+/** The catalog's `_tests/suite.json` as main last read it; `suite` is null when it is absent or invalid. */
+export interface AdminVMBlueprintTestSuiteResponse {
+    suite: VMBlueprintTestSuite | null;
+    /** Where it was read from ("local:<path>" in dev, "github:<branch>" otherwise). */
+    source: string;
+    error: string | null;
+    fetchedAt: Date;
+}
+
+/** Used when the catalog's suite.json cannot be read — the same shape, shorter. */
+export const VM_TEST_DEFAULT_PROMPT_TEMPLATE =
+    'Run the VM catalog sweep for: {{blueprints}}\nBoxes: {{boxes}}\nCatalog: eshtek/hexos-vm-catalog @ {{catalogRef}} (specs in _tests/). Platform: eshtek/hexos-platform @ {{platformRef}}.\nWhy: {{reason}}\n\nUse packages/dev/scripts/vm-catalog-sweep (plan.py --catalog, one sweep.py per box with a shared --run-id, review soft-completes into reviewed.json, submit.py per box). Results appear at {{resultsUrl}}. Never park a blueprint automatically.';
+
 export const VM_TEST_PROMPT_PLACEHOLDERS = [
     'blueprints',
     'boxes',
@@ -746,4 +759,194 @@ export function renderVMTestPrompt(
         const value = vars[key as (typeof VM_TEST_PROMPT_PLACEHOLDERS)[number]];
         return value === undefined ? match : value;
     });
+}
+
+// ─── Sweep evidence on GitHub (commit statuses posted by submit.py) ──────────
+//
+// Results live on main behind admin auth, where a CI runner cannot reach them.
+// What a PR check needs is only "did a sweep run against this pipeline code,
+// and how did it go" — so the harness, run by an engineer, posts one commit
+// status per box on the platform commit it tested, and the impact workflow
+// reads statuses back with the plain GITHUB_TOKEN (works on fork PRs, no
+// service account). GitHub caps a status description at 140 characters, hence
+// the compact grammar below; the full per-blueprint record stays on main.
+
+export const VM_SWEEP_STATUS_CONTEXT_PREFIX = 'vm-sweep/';
+export const VM_SWEEP_STATUS_DESCRIPTION_MAX = 140;
+export const VM_SWEEP_IMPACT_DIGEST_CHARS = 12;
+
+/** One `path → git object id` pair; `oid` is null when the path is absent at that commit. */
+export interface VMPlatformImpactEntry {
+    path: string;
+    oid: string | null;
+}
+
+/**
+ * Digest of the install pipeline's CONTENT at a commit: the git object ids of
+ * every VM_PLATFORM_IMPACT_RULES path (a tree id already digests a directory).
+ * Two commits with equal digests ship the same pipeline code, so a sweep of one
+ * counts for the other — a rebase or a docs-only commit never invalidates a
+ * sweep, while a base branch that touched the pipeline does.
+ */
+export function platformImpactDigest(entries: VMPlatformImpactEntry[]): string {
+    const lines = [...entries]
+        .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+        .map((entry) => `${entry.path}\0${entry.oid ?? 'missing'}`);
+    return sha256Hex(lines.join('\n'));
+}
+
+export interface VMSweepStatusSummary {
+    runId: string;
+    /** Blueprints the sweep tested (last attempt per blueprint). */
+    tested: number;
+    /** True when every shippable (non-internal) blueprint in the catalog was tested. */
+    full: boolean;
+    confirmed: number;
+    unmonitored: number;
+    broken: number;
+    /** The tested ids when the harness could list them; null when unknown or truncated. */
+    testedIds: string[] | null;
+    /** The broken ids; `[]` when nothing broke, null when unknown or truncated. */
+    brokenIds: string[] | null;
+    /** First VM_SWEEP_IMPACT_DIGEST_CHARS hex of platformImpactDigest at the tested commit, when recorded. */
+    impactDigest: string | null;
+}
+
+function parseIdList(text: string): string[] | null {
+    // "a,b,c" or "a,b +N" — the "+N" means ids were dropped to fit, so the list is unknown.
+    const match = text.trim().match(/^(\S+?)(?: \+(\d+))?$/);
+    if (!match || match[2] !== undefined) return null;
+    const ids = (match[1] as string).split(',').filter(Boolean);
+    return ids.length ? ids : null;
+}
+
+/**
+ * Parses a `vm-sweep/<box>` status description. Grammar (parts joined by " · "):
+ *   <runId> · <n> tested[ (full)] · <n> ok · <n> unmonitored · <n> broken[: id,id[ +N]] [· tested: id,id[ +N]] [· impact:<12 hex>]
+ * Unknown parts are ignored so the harness can add detail without breaking readers.
+ */
+export function parseVMSweepStatusDescription(description: string): VMSweepStatusSummary | null {
+    const parts = description.split(' · ').map((part) => part.trim());
+    const runId = parts[0];
+    const tested = parts[1]?.match(/^(\d+) tested( \(full\))?$/);
+    if (!runId || !tested) return null;
+    const summary: VMSweepStatusSummary = {
+        runId,
+        tested: Number(tested[1]),
+        full: tested[2] !== undefined,
+        confirmed: 0,
+        unmonitored: 0,
+        broken: 0,
+        testedIds: null,
+        brokenIds: null,
+        impactDigest: null,
+    };
+    for (const part of parts.slice(2)) {
+        const ok = part.match(/^(\d+) ok$/);
+        const unmonitored = part.match(/^(\d+) unmonitored$/);
+        const broken = part.match(/^(\d+) broken(?:: (.+))?$/);
+        const tested = part.match(/^tested: (.+)$/);
+        const impact = part.match(/^impact:([a-f0-9]{12})$/);
+        if (ok) summary.confirmed = Number(ok[1]);
+        else if (unmonitored) summary.unmonitored = Number(unmonitored[1]);
+        else if (broken) {
+            summary.broken = Number(broken[1]);
+            summary.brokenIds = summary.broken === 0 ? [] : broken[2] ? parseIdList(broken[2]) : null;
+        } else if (tested) summary.testedIds = parseIdList(tested[1] as string);
+        else if (impact) summary.impactDigest = impact[1] as string;
+    }
+    return summary;
+}
+
+/** A `vm-sweep/<box>` commit status as read back from GitHub. */
+export interface VMSweepStatusEvidence {
+    sha: string;
+    box: string;
+    /** GitHub's state: success | failure | error | pending. */
+    state: string;
+    description: string;
+    targetUrl: string | null;
+}
+
+/**
+ * exact          — a sweep ran on this very head
+ * same-pipeline  — a sweep ran on a commit whose impact digest equals the head's (rebase, docs commit)
+ * stale          — the newest sweep found predates the pipeline change
+ * none           — no sweep status on any candidate commit
+ */
+export type VMSweepCoverage = 'exact' | 'same-pipeline' | 'stale' | 'none';
+
+export interface VMSweepBoxVerdict {
+    box: string;
+    coverage: VMSweepCoverage;
+    evidence: VMSweepStatusEvidence | null;
+    summary: VMSweepStatusSummary | null;
+    /** Affected blueprints no sweep of this pipeline code tested; null when the status could not say which it tested. */
+    untestedAffected: string[] | null;
+    /** Affected blueprints a sweep of this pipeline code found broken; null when the status listed a truncated set. */
+    brokenAffected: string[] | null;
+}
+
+export type VMSweepOverallVerdict = 'covered' | 'partial' | 'stale' | 'none';
+
+function coverageOf(
+    status: VMSweepStatusEvidence,
+    summary: VMSweepStatusSummary | null,
+    headSha: string,
+    headDigest: string | null,
+): VMSweepCoverage {
+    if (status.sha === headSha) return 'exact';
+    if (summary?.impactDigest && headDigest?.startsWith(summary.impactDigest)) return 'same-pipeline';
+    return 'stale';
+}
+
+/**
+ * Per-box verdict from the statuses found on the candidate commits (newest
+ * candidate first). A box's exact match beats a same-pipeline match beats the
+ * newest stale one; boxes with no status at all are absent from the result.
+ */
+export function vmSweepEvidenceForChange(input: {
+    headSha: string;
+    headDigest: string | null;
+    affected: string[];
+    statuses: VMSweepStatusEvidence[];
+}): VMSweepBoxVerdict[] {
+    const rank: Record<VMSweepCoverage, number> = { exact: 3, 'same-pipeline': 2, stale: 1, none: 0 };
+    const best = new Map<string, VMSweepBoxVerdict>();
+    for (const status of input.statuses) {
+        const summary = parseVMSweepStatusDescription(status.description);
+        const coverage = coverageOf(status, summary, input.headSha, input.headDigest);
+        const current = best.get(status.box);
+        if (current && rank[current.coverage] >= rank[coverage]) continue;
+        const covers = coverage === 'exact' || coverage === 'same-pipeline';
+        let untestedAffected: string[] | null = input.affected;
+        let brokenAffected: string[] | null = [];
+        if (covers && summary) {
+            if (summary.testedIds) untestedAffected = input.affected.filter((id) => !summary.testedIds?.includes(id));
+            else if (summary.full) untestedAffected = [];
+            else untestedAffected = null;
+            brokenAffected = summary.brokenIds ? input.affected.filter((id) => summary.brokenIds?.includes(id)) : null;
+        } else if (covers) {
+            untestedAffected = null;
+            brokenAffected = null;
+        }
+        best.set(status.box, {
+            box: status.box,
+            coverage,
+            evidence: status,
+            summary,
+            untestedAffected,
+            brokenAffected,
+        });
+    }
+    return [...best.values()].sort((a, b) => (a.box < b.box ? -1 : a.box > b.box ? 1 : 0));
+}
+
+export function vmSweepOverallVerdict(verdicts: VMSweepBoxVerdict[]): VMSweepOverallVerdict {
+    if (verdicts.length === 0) return 'none';
+    const covering = verdicts.filter((v) => v.coverage === 'exact' || v.coverage === 'same-pipeline');
+    if (covering.length === 0) return 'stale';
+    if (covering.length === verdicts.length && covering.every((v) => v.untestedAffected?.length === 0))
+        return 'covered';
+    return 'partial';
 }
