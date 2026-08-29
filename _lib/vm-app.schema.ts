@@ -115,7 +115,7 @@ export const vmAppSchema = z.object({
      */
     icon: z.string().min(1).max(512).optional(),
     /** Product page, for the picker's "learn more" affordance. */
-    website: z.string().url().max(512).optional(),
+    website: z.url().max(512).optional(),
     /**
      * Grouping slug for the picker. Open like blueprint `category` and for the
      * same reason: the catalog updates fleet-wide instantly while clients roll

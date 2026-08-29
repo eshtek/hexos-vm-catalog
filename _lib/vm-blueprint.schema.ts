@@ -80,7 +80,7 @@ export function sourceDigests(source: { sha256?: string; sha512?: string }): Sou
 // no client renders it (that is isoHelpUrl's job, below).
 const releasesUrlField = {
     /** Vendor page listing available releases and their published digests. */
-    releasesUrl: z.string().url().startsWith('https://').max(512).optional(),
+    releasesUrl: z.url().startsWith('https://').max(512).optional(),
 };
 
 // Downloadable disk image. `url` may contain "{version}" placeholders that are
@@ -88,7 +88,7 @@ const releasesUrlField = {
 // two-field catalog change (version + digest).
 export const vmImageSourceSchema = z
     .object({
-        url: z.string().url().startsWith('https://'),
+        url: z.url().startsWith('https://'),
         version: z.string().min(1).max(64),
         format: z.enum(['raw', 'qcow2']),
         // bz2 is here for FreeBSD-derived appliance images (OPNsense ships
@@ -105,7 +105,7 @@ export const vmImageSourceSchema = z
 // `url` may contain "{version}" placeholders like vmImageSourceSchema.
 export const vmInstallerIsoSourceSchema = z
     .object({
-        url: z.string().url().startsWith('https://'),
+        url: z.url().startsWith('https://'),
         version: z.string().min(1).max(64),
         ...checksumFieldsSchema,
         ...releasesUrlField,
@@ -121,14 +121,14 @@ export const vmUserIsoSourceSchema = z.object({
      * from releasesUrl, which no client renders, even where the two point at
      * the same page: this one is product copy.
      */
-    isoHelpUrl: z.string().url().startsWith('https://').optional(),
+    isoHelpUrl: z.url().startsWith('https://').optional(),
     ...releasesUrlField,
 });
 
 export const vmExtraMediaSchema = z.object({
     /** Slug charset — the id becomes part of a host-side cache filename. */
     id: blueprintIdSchema,
-    url: z.string().url().startsWith('https://'),
+    url: z.url().startsWith('https://'),
     // Unlike the primary source, extra media may carry no digest at all
     // (historically permitted); catalog CI warns rather than rejecting.
     ...checksumFieldsSchema,
@@ -337,7 +337,7 @@ export const vmBlueprintSchema = z.object({
      * (maintainer-facing, never rendered) even when the two agree: this one is
      * product copy, the same role `homepage` plays for apps.
      */
-    website: z.string().url().startsWith('https://').max(512).optional(),
+    website: z.url().startsWith('https://').max(512).optional(),
     /**
      * Desktop screenshots of the version this blueprint installs, rendered as
      * the detail sheet's gallery (up to 5 shown).
