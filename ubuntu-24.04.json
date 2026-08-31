@@ -10,10 +10,10 @@
         "strategy": "cloud-init",
         "source": {
             "url": "https://cloud-images.ubuntu.com/releases/noble/{version}/ubuntu-24.04-server-cloudimg-amd64.img",
-            "version": "release-20260615",
+            "version": "release-20260826",
             "format": "qcow2",
             "compression": "none",
-            "sha256": "5fa5b05e5ec239858c4531485d6023b0896448c2df7c63b34f8dae6ea6051a44",
+            "sha256": "d0fe84bb5f80853425fa6be28e2c106f30104c3cfe8611933f2e65c9b63f0e30",
             "releasesUrl": "https://cloud-images.ubuntu.com/releases/noble/"
         },
         "cloudInit": {

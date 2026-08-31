@@ -21,8 +21,8 @@
         "strategy": "installer-iso",
         "source": {
             "url": "https://cdimage.ubuntu.com/kubuntu/releases/{version}/release/kubuntu-{version}-desktop-amd64.iso",
-            "version": "26.04",
-            "sha256": "95ce9cf68f13015b9a88bd1ef86fcf7eda77c99979fda48c69e28aa0a84f88ac",
+            "version": "26.04.1",
+            "sha256": "831e4d4bb85098339ba43d3502cd6619b27e76daf37246a084cd68a6413090b8",
             "releasesUrl": "https://cdimage.ubuntu.com/kubuntu/releases/"
         },
         "seed": {

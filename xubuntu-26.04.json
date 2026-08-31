@@ -21,8 +21,8 @@
         "strategy": "installer-iso",
         "source": {
             "url": "https://cdimage.ubuntu.com/xubuntu/releases/{version}/release/xubuntu-{version}-desktop-amd64.iso",
-            "version": "26.04",
-            "sha256": "ae030dbd99426a4c7b2d1c96731e0f435ec9d18f6a28c9e76f077dd5f46364bc",
+            "version": "26.04.1",
+            "sha256": "0cd5160f72ae6b7a26be7a29248b60cbd579b9e6aa8fbd274e95264da0ade43d",
             "releasesUrl": "https://cdimage.ubuntu.com/xubuntu/releases/"
         },
         "seed": {

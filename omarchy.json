@@ -19,8 +19,8 @@
         "strategy": "installer-iso",
         "source": {
             "url": "https://iso.omarchy.org/omarchy-{version}.iso",
-            "version": "4.0.0",
-            "sha256": "9224fab3720560f771969a99a499e5f7e0f8e2d6a0681d872d52f05fb5003da4",
+            "version": "4.0.2",
+            "sha256": "2ef8e624aa1bec7e277e28056b8535a6c9373ba48d7ede3f1a01cb6d2373cfb8",
             "releasesUrl": "https://github.com/basecamp/omarchy/releases"
         },
         "seed": {
