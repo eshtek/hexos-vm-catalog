@@ -426,7 +426,7 @@ The validator checks each root `*.json` against the vendored blueprint schema an
 - every blueprint must have a row in the README tables above — this is the step that has actually been skipped in practice, so it is an error rather than a convention
 - `apps.runtime` must match the guest the provisioning strategy implies (answer-file is Windows, so `winget`); a desktop with no `apps.runtime` warns, since it will offer no apps at all
 - `source.releasesUrl` must be present — the schema leaves it optional for admin-authored rows, but a catalog blueprint that doesn't say where its next version comes from is how `-latest` URLs and guessed digests get in
-- warnings for an `id` that differs from its filename stem, an off-convention `icon`, a `truenasVersion` with no comparison operator (a no-op gate), an unrecognized `cpuFeatures` flag name (a typo would hide the blueprint on every host), `extraMedia` with no `sha256`, or a `releasesUrl` pointing at a file rather than a listing
+- warnings for an `id` that differs from its filename stem, an off-convention `icon`, a missing `truenasVersion` (offered on every release) or one with no comparison operator (a no-op gate), an unrecognized `cpuFeatures` flag name (a typo would hide the blueprint on every host), `extraMedia` with no `sha256`, or a `releasesUrl` pointing at a file rather than a listing
 
 On the app side:
 

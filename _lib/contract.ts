@@ -353,7 +353,11 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
     }
   }
 
-  if (bp.truenasVersion && !VERSION_RANGE_OP.test(bp.truenasVersion)) {
+  if (!bp.truenasVersion) {
+    warnings.push(
+      `no truenasVersion — the blueprint is offered on every TrueNAS release, including ones the VM feature doesn't support; every shipped blueprint gates with ">=25.04.2.6", so omit it only deliberately`,
+    );
+  } else if (!VERSION_RANGE_OP.test(bp.truenasVersion)) {
     warnings.push(
       `truenasVersion "${bp.truenasVersion}" has no comparison operator (>=, >, <=, <) — it will be treated as no version gate at all`,
     );
