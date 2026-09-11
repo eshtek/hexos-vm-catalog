@@ -1,0 +1,18 @@
+{
+    "id": "firefox",
+    "name": "Firefox",
+    "description": "Mozilla's browser, with tracking protection on by default.",
+    "icon": "_icons/apps/firefox.svg",
+    "website": "https://www.mozilla.org/firefox/",
+    "category": "browsers",
+    "recommended": true,
+    "sizeMb": 400,
+    "targets": {
+        "winget": {
+            "id": "Mozilla.Firefox"
+        },
+        "flatpak": {
+            "id": "org.mozilla.firefox"
+        }
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "blueprintId": "ubuntu-24.04",
+    "strategy": "cloud-init",
+    "options": {
+        "username": true,
+        "password": true,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": true,
+        "reboot": true,
+        "seed": {
+            "dtype": "RAW",
+            "order": 2,
+            "label": "cidata"
+        }
+    }
+}

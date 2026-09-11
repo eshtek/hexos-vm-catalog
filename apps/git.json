@@ -1,0 +1,14 @@
+{
+    "id": "git",
+    "name": "Git",
+    "description": "Version control, plus Git Bash on Windows.",
+    "icon": "_icons/apps/git.svg",
+    "website": "https://git-scm.com/",
+    "category": "developer",
+    "sizeMb": 350,
+    "targets": {
+        "winget": {
+            "id": "Git.Git"
+        }
+    }
+}

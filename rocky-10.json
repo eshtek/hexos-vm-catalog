@@ -1,7 +1,7 @@
 {
     "id": "rocky-10",
     "name": "Rocky Linux 10",
-    "description": "Rocky Linux 10 from the official GenericCloud image — the newest enterprise-grade release, binary-compatible with Red Hat Enterprise Linux. Requires a CPU supporting x86-64-v3 (roughly Intel Haswell / AMD Excavator or newer).",
+    "description": "Rocky Linux 10 from the official GenericCloud image, the newest enterprise-grade release and binary-compatible with Red Hat Enterprise Linux. Requires a CPU supporting x86-64-v3 (roughly Intel Haswell / AMD Excavator or newer).",
     "icon": "_icons/rocky.svg",
     "website": "https://rockylinux.org/",
     "category": "server",

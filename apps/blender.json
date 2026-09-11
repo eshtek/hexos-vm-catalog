@@ -1,0 +1,17 @@
+{
+    "id": "blender",
+    "name": "Blender",
+    "description": "3D modelling, animation, simulation and rendering suite.",
+    "icon": "_icons/apps/blender.svg",
+    "website": "https://www.blender.org/",
+    "category": "graphics",
+    "sizeMb": 1200,
+    "targets": {
+        "winget": {
+            "id": "BlenderFoundation.Blender"
+        },
+        "flatpak": {
+            "id": "org.blender.Blender"
+        }
+    }
+}

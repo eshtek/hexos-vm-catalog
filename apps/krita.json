@@ -1,0 +1,17 @@
+{
+    "id": "krita",
+    "name": "Krita",
+    "description": "Digital painting and illustration, built around brush engines.",
+    "icon": "_icons/apps/krita.svg",
+    "website": "https://krita.org/",
+    "category": "graphics",
+    "sizeMb": 700,
+    "targets": {
+        "winget": {
+            "id": "KDE.Krita"
+        },
+        "flatpak": {
+            "id": "org.kde.krita"
+        }
+    }
+}

@@ -1,0 +1,14 @@
+{
+    "id": "winscp",
+    "name": "WinSCP",
+    "description": "SFTP, FTP and SCP file transfer client for Windows.",
+    "icon": "_icons/apps/winscp.png",
+    "website": "https://winscp.net/",
+    "category": "developer",
+    "sizeMb": 60,
+    "targets": {
+        "winget": {
+            "id": "WinSCP.WinSCP"
+        }
+    }
+}

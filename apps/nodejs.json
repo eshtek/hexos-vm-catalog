@@ -1,0 +1,14 @@
+{
+    "id": "nodejs",
+    "name": "Node.js",
+    "description": "JavaScript runtime and npm.",
+    "icon": "_icons/apps/nodejs.svg",
+    "website": "https://nodejs.org/",
+    "category": "developer",
+    "sizeMb": 100,
+    "targets": {
+        "winget": {
+            "id": "OpenJS.NodeJS"
+        }
+    }
+}

@@ -1,0 +1,17 @@
+{
+    "id": "audacity",
+    "name": "Audacity",
+    "description": "Multi-track audio recording and editing.",
+    "icon": "_icons/apps/audacity.svg",
+    "website": "https://www.audacityteam.org/",
+    "category": "media",
+    "sizeMb": 200,
+    "targets": {
+        "winget": {
+            "id": "Audacity.Audacity"
+        },
+        "flatpak": {
+            "id": "org.audacityteam.Audacity"
+        }
+    }
+}

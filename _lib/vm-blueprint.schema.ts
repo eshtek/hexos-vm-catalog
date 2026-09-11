@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // VENDORED FILE — do not edit by hand.
 //
-// Verbatim copy of the blueprint schema from the hexOS platform monorepo:
+// Verbatim copy of a schema from the hexOS platform monorepo:
 //   packages/shared/eshtek/vm-blueprints.ts
 //
 // That file is the single source of truth. This repo keeps a copy rather than
@@ -13,7 +13,7 @@
 //   bun run sync-schema        # wraps _lib/sync-schema.sh
 //
 // If this copy drifts from upstream it only produces false local results — the
-// catalog sync in hexos-platform re-validates every blueprint with the real
+// catalog sync in hexos-platform re-validates every document with the real
 // schema at read time, so the server is always the authoritative gate.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -80,7 +80,7 @@ export function sourceDigests(source: { sha256?: string; sha512?: string }): Sou
 // no client renders it (that is isoHelpUrl's job, below).
 const releasesUrlField = {
     /** Vendor page listing available releases and their published digests. */
-    releasesUrl: z.string().url().startsWith('https://').max(512).optional(),
+    releasesUrl: z.url().startsWith('https://').max(512).optional(),
 };
 
 // Downloadable disk image. `url` may contain "{version}" placeholders that are
@@ -88,7 +88,7 @@ const releasesUrlField = {
 // two-field catalog change (version + digest).
 export const vmImageSourceSchema = z
     .object({
-        url: z.string().url().startsWith('https://'),
+        url: z.url().startsWith('https://'),
         version: z.string().min(1).max(64),
         format: z.enum(['raw', 'qcow2']),
         // bz2 is here for FreeBSD-derived appliance images (OPNsense ships
@@ -105,7 +105,7 @@ export const vmImageSourceSchema = z
 // `url` may contain "{version}" placeholders like vmImageSourceSchema.
 export const vmInstallerIsoSourceSchema = z
     .object({
-        url: z.string().url().startsWith('https://'),
+        url: z.url().startsWith('https://'),
         version: z.string().min(1).max(64),
         ...checksumFieldsSchema,
         ...releasesUrlField,
@@ -121,14 +121,14 @@ export const vmUserIsoSourceSchema = z.object({
      * from releasesUrl, which no client renders, even where the two point at
      * the same page: this one is product copy.
      */
-    isoHelpUrl: z.string().url().startsWith('https://').optional(),
+    isoHelpUrl: z.url().startsWith('https://').optional(),
     ...releasesUrlField,
 });
 
 export const vmExtraMediaSchema = z.object({
     /** Slug charset — the id becomes part of a host-side cache filename. */
     id: blueprintIdSchema,
-    url: z.string().url().startsWith('https://'),
+    url: z.url().startsWith('https://'),
     // Unlike the primary source, extra media may carry no digest at all
     // (historically permitted); catalog CI warns rather than rejecting.
     ...checksumFieldsSchema,
@@ -137,6 +137,18 @@ export const vmExtraMediaSchema = z.object({
 const provisioningImageSchema = z.object({
     strategy: z.literal('image'),
     source: vmImageSourceSchema,
+    /**
+     * Named first-boot file set shipped in the backend (not arbitrary
+     * catalog-supplied files — same posture as cloud-init's userDataTemplate),
+     * written into the image after the image write. OpenWRT uses
+     * "openwrt-lan-dhcp" to join the LAN as a DHCP client instead of running
+     * a router on it, and to phone home on its first lease.
+     */
+    firstBoot: z
+        .object({
+            profile: z.string().min(1).max(64),
+        })
+        .optional(),
 });
 
 const provisioningCloudInitSchema = z.object({
@@ -269,16 +281,31 @@ export const vmBlueprintGuestSchema = z.object({
     hypervEnlightenments: z.boolean().default(false),
     /** Start the VM with the host. Appliance-style guests want true. */
     autostart: z.boolean().default(true),
-    /** Offer attaching a host GPU (PCI passthrough) in the install dialog. */
-    gpuPassthrough: z.boolean().default(false),
     /**
-     * Offer attaching host USB devices in the one-click install dialog even
-     * without a GPU pick. For blueprints where a USB stick is the point of the
-     * VM (Home Assistant's Zigbee/Z-Wave dongles). This flag only decides what
-     * the dialog PROMOTES — the install accepts USB devices for any blueprint
-     * (the wizard's Custom-install handoff always could), so a wrong value here
-     * costs a click, never a capability.
+     * Host device classes the one-click install dialog offers this guest, as a
+     * set. Declared per blueprint rather than derived from `category` because
+     * the two appliances want different things: Home Assistant needs its
+     * Zigbee/Z-Wave dongles, OpenWrt needs nothing.
+     *
+     *  - `gpu`            — a host graphics card, whole function group.
+     *  - `usb`            — individual host USB devices.
+     *  - `usb-controller` — a whole USB controller, via PCI passthrough.
+     *
+     * These decide what the dialog PROMOTES, not what the install permits: the
+     * install accepts every class for any blueprint (the wizard's Custom-install
+     * handoff always could), so a wrong value here costs a click, never a
+     * capability. Withholding is still meaningful — offering a headless server a
+     * GPU invites a user to black out their host console for nothing.
+     *
+     * Not a hard enum for the same reason `category` isn't: sync re-validates
+     * every stored document, so a catalog that names a class before the platform
+     * deploys must not validationError-hide the blueprint. Unknown classes are
+     * ignored by `blueprintPassthroughClasses`.
      */
+    passthrough: z.array(z.string().max(32)).max(8).optional(),
+    /** @deprecated Superseded by `passthrough: ["gpu"]`; still honoured on stored documents. */
+    gpuPassthrough: z.boolean().default(false),
+    /** @deprecated Superseded by `passthrough: ["usb"]`; still honoured on stored documents. */
     usbPassthrough: z.boolean().default(false),
     /** Take a "fresh install" zvol snapshot once the install is confirmed online. */
     installSnapshot: z.boolean().default(true),
@@ -298,9 +325,10 @@ export const vmBlueprintSchema = z.object({
      * which is what the same document holds AFTER syncVMBlueprintCatalog
      * resolves that path — the stored document re-validates on every sync, so
      * rejecting the resolved form would disable every blueprint; and a legacy
-     * VMIcons-style key (e.g. "vms/haos"), resolved against the frontend's
+     * VMIcons-style key (e.g. "vms/ubuntu"), resolved against the frontend's
      * bundled artwork — VMs installed before the catalog carried its own icons
-     * persisted that key forever.
+     * persisted that key forever. Only the wizard's five OS keys still ship
+     * artwork; a legacy brand key renders the custom tile.
      */
     icon: z.string().max(512).optional(),
     /**
@@ -309,7 +337,7 @@ export const vmBlueprintSchema = z.object({
      * (maintainer-facing, never rendered) even when the two agree: this one is
      * product copy, the same role `homepage` plays for apps.
      */
-    website: z.string().url().startsWith('https://').max(512).optional(),
+    website: z.url().startsWith('https://').max(512).optional(),
     /**
      * Desktop screenshots of the version this blueprint installs, rendered as
      * the detail sheet's gallery (up to 5 shown).
@@ -347,6 +375,38 @@ export const vmBlueprintSchema = z.object({
     cpuFeatures: z
         .array(z.string().regex(/^[A-Za-z0-9_]{1,32}$/, 'letters, digits and _ only'))
         .max(32)
+        .optional(),
+    /**
+     * Install-pipeline capabilities this blueprint depends on (values from
+     * HEXOS_VM_CAPABILITIES; evaluated with missingVMCapabilities). The
+     * catalog updates fleet-wide instantly while backend code rolls out
+     * per-box, so a blueprint using a new capability must declare it — a
+     * backend that lacks it refuses the install (and the deck hides the row)
+     * instead of silently installing a degraded VM. Backends that predate
+     * this FIELD strip it and install anyway: it closes the window for
+     * capabilities newer than itself, not older ones.
+     */
+    requiredCapabilities: z
+        .array(z.string().regex(/^[a-zA-Z][a-zA-Z0-9-]{0,63}$/, 'capability slug'))
+        .max(16)
+        .optional(),
+    /**
+     * Opt-in to the post-install app step, naming the package runtime THIS
+     * guest has: 'winget' for Windows, 'flatpak' for a Linux desktop. Absent
+     * means the blueprint offers no apps at all, which is the right answer for
+     * servers and appliances — an Ubuntu Server or an OpenWrt router has no
+     * desktop to put them on. Deliberately a declaration rather than something
+     * inferred from `category` or `strategy`: Ubuntu Server could opt into
+     * flatpak later without becoming a "desktop", and a new appliance built on
+     * a desktop strategy must not silently start offering GIMP.
+     *
+     * The RUNTIME also decides which apps are offered: only catalog apps
+     * carrying a target for it appear (see appsForRuntime).
+     */
+    apps: z
+        .strictObject({
+            runtime: z.enum(['winget', 'flatpak']),
+        })
         .optional(),
     /** Skipped when syncing the prod catalog branch (mirrors app install scripts). */
     internal: z.boolean().default(false),
@@ -440,8 +500,45 @@ export const blueprintNeedsWindowsSetup = (provisioning: VMProvisioningDoc): boo
     provisioning.strategy === 'answer-file';
 
 /** Strategies that read/stage installer media in the Install Media location. */
+export const VM_PASSTHROUGH_CLASSES = ['gpu', 'usb', 'usb-controller'] as const;
+
+export type VMPassthroughClass = (typeof VM_PASSTHROUGH_CLASSES)[number];
+
+const PASSTHROUGH_CLASS_SET: ReadonlySet<string> = new Set(VM_PASSTHROUGH_CLASSES);
+
+/**
+ * The device classes a blueprint's install dialog may offer.
+ *
+ * Reads the `passthrough` set and folds in the two legacy booleans, so a stored
+ * document written before the set existed keeps working: the catalog and the
+ * platform deploy independently, and every stored blueprint re-validates on
+ * every sync. Unknown class names are dropped rather than rejected — same
+ * forward-compatibility deal `category` gets.
+ */
+export const blueprintPassthroughClasses = (guest: {
+    passthrough?: string[];
+    gpuPassthrough?: boolean;
+    usbPassthrough?: boolean;
+}): Set<VMPassthroughClass> => {
+    const classes = new Set<VMPassthroughClass>();
+    for (const name of guest.passthrough ?? []) {
+        if (PASSTHROUGH_CLASS_SET.has(name)) classes.add(name as VMPassthroughClass);
+    }
+    if (guest.gpuPassthrough) classes.add('gpu');
+    if (guest.usbPassthrough) classes.add('usb');
+    return classes;
+};
+
 export const blueprintUsesInstallMedia = (provisioning: VMProvisioningDoc): boolean =>
     provisioning.strategy === 'answer-file' || provisioning.strategy === 'installer-iso';
+
+/**
+ * The app runtime a blueprint's guest has, or undefined when it offers none.
+ * The single gate for the whole app step — the deck hides the picker on it,
+ * and the install pipeline refuses picks without it.
+ */
+export const blueprintAppRuntime = (blueprint: Pick<VMBlueprint, 'apps'>): 'winget' | 'flatpak' | undefined =>
+    blueprint.apps?.runtime;
 
 /**
  * The version a provisioning source pins, whether that source is a disk
@@ -550,6 +647,51 @@ export function missingCpuFeatures(hostFlags: string[] | null | undefined, requi
 }
 
 /**
+ * Install-pipeline capabilities THIS build supports, compiled into every
+ * backend release — each box's own list is authoritative for that box (the
+ * hosted deck asks the box, never trusts its own build). Add an entry
+ * whenever the install pipeline gains a behavior blueprints will declare in
+ * `requiredCapabilities`; never remove one — a capability once shipped stays
+ * supported, or every blueprint declaring it goes dark fleet-wide.
+ */
+export const HEXOS_VM_CAPABILITIES = [
+    /** Named first-boot file injection into image installs (vmFirstBoot profiles). */
+    'firstBoot',
+    /**
+     * Post-install app stage: the guest installs the user's picked apps from
+     * the app catalog (winget on Windows, flatpak on Linux) and streams
+     * progress back. A box without this ignores `apps` on a blueprint, so the
+     * deck must not offer the picker until the box reports it.
+     */
+    'appInstall',
+    /**
+     * The cloud-init seed attaches as a RAW disk on the guest's boot bus
+     * rather than a SATA CDROM, so a guest whose kernel omits AHCI (Debian
+     * 12's cloud flavour) still finds it. Declared by blueprints that are
+     * unusable without it — on the CDROM path they boot with no account.
+     */
+    'virtioSeed',
+] as const;
+
+/**
+ * Blueprint capability gate: which of `required` the given build lacks.
+ * A null/undefined supported list means the box is too old to report one —
+ * the visibility filter fails OPEN there (those builds predate the gate and
+ * cannot be protected by it), while the install pipeline always passes its
+ * own compiled-in HEXOS_VM_CAPABILITIES, which is never unknown — so the
+ * authoritative check fails CLOSED.
+ */
+export function missingVMCapabilities(
+    supported: readonly string[] | null | undefined,
+    required: string[] | undefined,
+): string[] {
+    if (!required?.length) return [];
+    if (!supported) return [];
+    const available = new Set(supported);
+    return required.filter((capability) => !available.has(capability));
+}
+
+/**
  * First-user names that collide with accounts or groups already baked into
  * Linux cloud images. cloud-init cannot create these (e.g. `root` already
  * exists, and Ubuntu ships with root logins disabled), so the machine comes
@@ -629,3 +771,27 @@ export const VM_SSH_PUBLIC_KEY_PATTERN =
     /^(ssh-(rsa|ed25519)|ecdsa-sha2-nistp(256|384|521)|sk-(ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com) [A-Za-z0-9+/=]+( [\x20-\x7e]{1,128})?$/;
 /** Tokened relay endpoints on main (phone-home / update-status). */
 export const VM_HTTPS_RELAY_URL_PATTERN = /^https:\/\/[A-Za-z0-9.:_/-]+$/;
+/**
+ * Direct on-box phone-home endpoint: the VM shim's address on macvtap boxes,
+ * the host's own LAN address on bridged ones. Plain HTTP by design — the box's
+ * certificate is issued for its `*.local.hexos.com` name, which resolves to an
+ * address a macvtap guest cannot reach, and the shim path is switched inside
+ * the host's kernel (macvlan bridge mode), so the token never crosses the wire.
+ */
+export const VM_LOCAL_RELAY_URL_PATTERN = /^http:\/\/(?:\d{1,3}\.){3}\d{1,3}:\d{1,5}\/[A-Za-z0-9._/-]+$/;
+
+/**
+ * The two channels a provisioning guest can post to — phone-home and the
+ * Windows Update stage's status stream both carry the same pair.
+ */
+export interface VMRelayTargets {
+    /** Tokened relay endpoint on main; absent when main was unreachable. */
+    url?: string;
+    /** Direct on-box endpoint; absent when no host address serves this guest. */
+    localUrl?: string;
+}
+
+/** Seed order: the on-box endpoint first, main as the fallback guests fall through to. */
+export function orderRelayTargets(targets: VMRelayTargets): string[] {
+    return [targets.localUrl, targets.url].filter((url): url is string => url !== undefined);
+}

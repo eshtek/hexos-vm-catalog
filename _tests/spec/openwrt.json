@@ -1,0 +1,15 @@
+{
+    "blueprintId": "openwrt",
+    "strategy": "image",
+    "options": {
+        "username": false,
+        "password": false,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": false,
+        "reboot": false,
+        "seed": null
+    },
+    "frameReview": "The OpenWrt banner and a shell prompt on the serial console = booted; readiness is ARP-observed, so a blank frame alone is not evidence."
+}

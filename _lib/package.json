@@ -9,10 +9,12 @@
     "sync-schema": "bash sync-schema.sh",
     "check-sources": "bun check-sources.ts",
     "releases": "bun releases.ts",
+    "tests": "bun tests.ts",
+    "generate-tests": "bun tests.ts --generate",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "zod": "^4.1.5"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14"

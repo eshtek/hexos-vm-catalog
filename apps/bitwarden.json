@@ -1,0 +1,17 @@
+{
+    "id": "bitwarden",
+    "name": "Bitwarden",
+    "description": "Password manager desktop client.",
+    "icon": "_icons/apps/bitwarden.svg",
+    "website": "https://bitwarden.com/",
+    "category": "utilities",
+    "sizeMb": 300,
+    "targets": {
+        "winget": {
+            "id": "Bitwarden.Bitwarden"
+        },
+        "flatpak": {
+            "id": "com.bitwarden.desktop"
+        }
+    }
+}

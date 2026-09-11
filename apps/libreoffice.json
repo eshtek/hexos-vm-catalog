@@ -1,0 +1,18 @@
+{
+    "id": "libreoffice",
+    "name": "LibreOffice",
+    "description": "Word processor, spreadsheet, presentations and more.",
+    "icon": "_icons/apps/libreoffice.svg",
+    "website": "https://www.libreoffice.org/",
+    "category": "documents",
+    "recommended": true,
+    "sizeMb": 1200,
+    "targets": {
+        "winget": {
+            "id": "TheDocumentFoundation.LibreOffice"
+        },
+        "flatpak": {
+            "id": "org.libreoffice.LibreOffice"
+        }
+    }
+}

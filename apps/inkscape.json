@@ -1,0 +1,17 @@
+{
+    "id": "inkscape",
+    "name": "Inkscape",
+    "description": "Vector graphics editor working natively in SVG.",
+    "icon": "_icons/apps/inkscape.svg",
+    "website": "https://inkscape.org/",
+    "category": "graphics",
+    "sizeMb": 700,
+    "targets": {
+        "winget": {
+            "id": "Inkscape.Inkscape"
+        },
+        "flatpak": {
+            "id": "org.inkscape.Inkscape"
+        }
+    }
+}

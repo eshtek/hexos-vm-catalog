@@ -1,0 +1,14 @@
+{
+    "blueprintId": "mint-22.3",
+    "strategy": "installer-iso",
+    "options": {
+        "username": true,
+        "password": true,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": true,
+        "reboot": false,
+        "seed": null
+    }
+}

@@ -1,0 +1,14 @@
+{
+    "id": "powertoys",
+    "name": "PowerToys",
+    "description": "Microsoft's power-user utilities: FancyZones, PowerRename and more.",
+    "icon": "_icons/apps/powertoys.svg",
+    "website": "https://learn.microsoft.com/windows/powertoys/",
+    "category": "utilities",
+    "sizeMb": 400,
+    "targets": {
+        "winget": {
+            "id": "Microsoft.PowerToys"
+        }
+    }
+}

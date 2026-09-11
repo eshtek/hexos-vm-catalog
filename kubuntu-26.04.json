@@ -1,7 +1,7 @@
 {
     "id": "kubuntu-26.04",
     "name": "Kubuntu 26.04 LTS",
-    "description": "Ubuntu 26.04 LTS with the KDE Plasma desktop, installed hands-free from Canonical's official installer — the same Ubuntu base and update schedule with a far more customizable interface.",
+    "description": "Ubuntu 26.04 LTS with the KDE Plasma desktop, installed hands-free from Canonical's official installer. You get the same Ubuntu base and update schedule with a far more customizable interface.",
     "icon": "_icons/kubuntu.svg",
     "website": "https://kubuntu.org/",
     "screenshots": [
@@ -14,12 +14,15 @@
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
     "internal": true,
+    "apps": {
+        "runtime": "flatpak"
+    },
     "provisioning": {
         "strategy": "installer-iso",
         "source": {
             "url": "https://cdimage.ubuntu.com/kubuntu/releases/{version}/release/kubuntu-{version}-desktop-amd64.iso",
-            "version": "26.04",
-            "sha256": "95ce9cf68f13015b9a88bd1ef86fcf7eda77c99979fda48c69e28aa0a84f88ac",
+            "version": "26.04.1",
+            "sha256": "831e4d4bb85098339ba43d3502cd6619b27e76daf37246a084cd68a6413090b8",
             "releasesUrl": "https://cdimage.ubuntu.com/kubuntu/releases/"
         },
         "seed": {
@@ -42,6 +45,11 @@
         "secureBoot": false,
         "hypervEnlightenments": false,
         "autostart": false,
+        "passthrough": [
+            "gpu",
+            "usb",
+            "usb-controller"
+        ],
         "readiness": {
             "type": "phone-home"
         }

@@ -1,0 +1,15 @@
+{
+    "id": "7zip",
+    "name": "7-Zip",
+    "description": "Archive manager handling 7z, zip, rar and most other formats.",
+    "icon": "_icons/apps/7zip.svg",
+    "website": "https://www.7-zip.org/",
+    "category": "utilities",
+    "recommended": true,
+    "sizeMb": 10,
+    "targets": {
+        "winget": {
+            "id": "7zip.7zip"
+        }
+    }
+}

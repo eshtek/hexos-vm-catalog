@@ -1,0 +1,15 @@
+{
+    "blueprintId": "haos",
+    "strategy": "image",
+    "options": {
+        "username": false,
+        "password": false,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": false,
+        "reboot": true,
+        "seed": null
+    },
+    "frameReview": "The Home Assistant CLI banner ('ha >') on the console = booted; readiness is mDNS-observed, so the frame alone does not decide."
+}

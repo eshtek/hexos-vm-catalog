@@ -1,0 +1,17 @@
+{
+    "id": "vscode",
+    "name": "Visual Studio Code",
+    "description": "Microsoft's code editor, with an extension marketplace.",
+    "icon": "_icons/apps/vscode.svg",
+    "website": "https://code.visualstudio.com/",
+    "category": "developer",
+    "sizeMb": 500,
+    "targets": {
+        "winget": {
+            "id": "Microsoft.VisualStudioCode"
+        },
+        "flatpak": {
+            "id": "com.visualstudio.code"
+        }
+    }
+}

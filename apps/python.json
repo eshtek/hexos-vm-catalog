@@ -1,0 +1,14 @@
+{
+    "id": "python",
+    "name": "Python",
+    "description": "The CPython 3.14 runtime and pip.",
+    "icon": "_icons/apps/python.svg",
+    "website": "https://www.python.org/",
+    "category": "developer",
+    "sizeMb": 150,
+    "targets": {
+        "winget": {
+            "id": "Python.Python.3.14"
+        }
+    }
+}

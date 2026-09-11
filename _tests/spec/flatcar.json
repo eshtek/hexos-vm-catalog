@@ -1,0 +1,18 @@
+{
+    "blueprintId": "flatcar",
+    "strategy": "machine-config",
+    "options": {
+        "username": false,
+        "password": true,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": true,
+        "reboot": true,
+        "seed": {
+            "dtype": "RAW",
+            "order": 2,
+            "label": "config-2"
+        }
+    }
+}

@@ -1,7 +1,7 @@
 {
     "id": "fedora-44",
     "name": "Fedora 44",
-    "description": "Fedora 44 from the official Cloud Base image — cutting-edge packages and a recent kernel, configured on first boot with your user account and SSH access.",
+    "description": "Fedora 44 from the official Cloud Base image, with cutting-edge packages and a recent kernel. Configured on first boot with your user account and SSH access.",
     "icon": "_icons/fedora.svg",
     "website": "https://fedoraproject.org/cloud/",
     "category": "server",

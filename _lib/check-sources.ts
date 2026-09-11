@@ -1,10 +1,12 @@
 // Check that every blueprint's source URL is still live, and optionally that
-// its digest still matches. Run from this directory:
+// its digest still matches. Also check that every app's package ids still
+// resolve — same failure, different registry. Run from this directory:
 //
 //   bun check-sources.ts              # HEAD only — fast, no downloads
 //   bun check-sources.ts --verify     # also download and verify every digest
 //   bun check-sources.ts --verify --id openwrt
-//   bun check-sources.ts --self-test  # prove the checker itself works, stall guard included
+//   bun check-sources.ts --apps       # only the app package ids
+//   bun check-sources.ts --self-test  # prove the checker itself works, guards and retries included
 //
 // Why this exists: the most common way a blueprint breaks is not a bad
 // install, it is upstream moving the file. Canonical deletes superseded point
@@ -13,15 +15,17 @@
 // 404s today and the first person to notice is a user whose install failed.
 // HEAD-ing every URL nightly catches that for the cost of a few dozen requests.
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { vmAppSchema } from './vm-app.schema';
 import { sourceDigests, vmBlueprintSchema } from './vm-blueprint.schema';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = new Set(process.argv.slice(2));
 const VERIFY = args.has('--verify');
+const APPS_ONLY = args.has('--apps');
 const idFlag = process.argv.indexOf('--id');
 const ONLY = idFlag !== -1 ? process.argv[idFlag + 1] : null;
 
@@ -80,14 +84,13 @@ function formatBytes(n: number): string {
 // checked at all. Neither number is arbitrary:
 //
 //  - HEAD is a metadata request that should answer in well under a second, so
-//    it gets a flat deadline.
+//    it gets a deadline (see the retry ladder below).
 //  - A verify legitimately runs for minutes (7 GiB files), so a deadline would
 //    be wrong; what it needs is a THROUGHPUT FLOOR. These are the same terms
 //    the install pipeline's curl already uses on the host (--speed-limit 10240
 //    --speed-time 120): under 10 KiB/s averaged over two minutes counts as
 //    stalled. Keeping the two in step matters — a mirror this tool accepts
 //    should be one an install can actually finish from.
-const HEAD_TIMEOUT_MS = 30_000;
 const STALL_MIN_BYTES_PER_SEC = 10 * 1024;
 // --self-test drops to a 3s window so proving the guard works takes three
 // seconds rather than two minutes. It exercises the same code path; only the
@@ -96,10 +99,45 @@ const STALL_WINDOW_MS = Number(
     process.env.CHECK_SOURCES_STALL_WINDOW_MS ?? (process.argv.includes('--self-test') ? 3_000 : 120_000),
 );
 
-async function head(url: string): Promise<{ ok: boolean; detail: string }> {
+// ── HEAD retry ladder ────────────────────────────────────────────────────────
+// A mirror that times out once is usually not a mirror that is gone. A single
+// attempt cannot tell "deleted" from "busy right now", and answering that
+// question wrong in the busy direction is expensive: it fails a run, and the
+// next person to look sees a URL that serves perfectly.
+//
+// So ask again — but only where asking again can change the answer:
+//
+//  - 404/410 is the exact signal this tool exists to raise. It reads the same
+//    on every attempt, so a retry buys nothing and delays a real report behind
+//    two backoffs. One request, then out.
+//  - Transport errors, timeouts, 408, 429 and 5xx are the transient class: the
+//    host exists and is declining to answer this second. Those get the ladder.
+//  - Every other 4xx is a durable statement about the URL, not the moment.
+//
+// The deadline GROWS per attempt rather than repeating flat. A healthy mirror
+// answers a HEAD in well under a second, so 10s is already ten times the
+// headroom the common case needs and keeps a whole-catalog run brisk; a mirror
+// that is merely slow then earns more patience each time, instead of being
+// retried under the deadline it just missed.
+const HEAD_ATTEMPT_TIMEOUTS_MS = [10_000, 20_000, 30_000];
+// Backing off matters more than the attempt count — an overloaded mirror is
+// not helped by a second request 5ms later. --self-test drops this to 50ms so
+// exercising the ladder costs milliseconds; it is the same code path.
+const HEAD_BACKOFF_MS = Number(
+    process.env.CHECK_SOURCES_RETRY_BACKOFF_MS ?? (process.argv.includes('--self-test') ? 50 : 2_000),
+);
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Transient by status: the host answered, just not with an answer about the URL. */
+function isTransientStatus(status: number): boolean {
+    return status === 408 || status === 429 || status >= 500;
+}
+
+async function headOnce(url: string, timeoutMs: number): Promise<{ ok: boolean; detail: string; retriable: boolean }> {
     try {
         // Some mirrors reject HEAD; fall back to a zero-length ranged GET.
-        const signal = AbortSignal.timeout(HEAD_TIMEOUT_MS);
+        const signal = AbortSignal.timeout(timeoutMs);
         let res = await fetch(url, { method: 'HEAD', redirect: 'follow', signal });
         if (res.status === 405 || res.status === 501) {
             res = await fetch(url, { headers: { Range: 'bytes=0-0' }, redirect: 'follow', signal });
@@ -107,13 +145,37 @@ async function head(url: string): Promise<{ ok: boolean; detail: string }> {
         const size = res.headers.get('content-length');
         const human = size ? formatBytes(Number(size)) : 'size unknown';
         if (res.status === 404 || res.status === 410) {
-            return { ok: false, detail: `${res.status} — upstream removed this file; the version almost certainly moved` };
+            return {
+                ok: false,
+                retriable: false,
+                detail: `${res.status} — upstream removed this file; the version almost certainly moved`,
+            };
         }
-        if (!res.ok && res.status !== 206) return { ok: false, detail: `HTTP ${res.status}` };
-        return { ok: true, detail: human };
+        if (!res.ok && res.status !== 206) {
+            return { ok: false, detail: `HTTP ${res.status}`, retriable: isTransientStatus(res.status) };
+        }
+        return { ok: true, detail: human, retriable: false };
     } catch (e) {
-        return { ok: false, detail: `unreachable: ${(e as Error).message}` };
+        // Timeouts and transport errors both land here, and both are the case
+        // the ladder exists for.
+        return { ok: false, detail: `unreachable: ${(e as Error).message}`, retriable: true };
     }
+}
+
+async function head(url: string): Promise<{ ok: boolean; detail: string }> {
+    let attempts = 0;
+    let last: { ok: boolean; detail: string; retriable: boolean } = { ok: false, detail: 'not attempted', retriable: true };
+    for (const timeoutMs of HEAD_ATTEMPT_TIMEOUTS_MS) {
+        last = await headOnce(url, timeoutMs);
+        attempts++;
+        // A retry that succeeds is still worth saying out loud. A mirror that
+        // needs two goes today is one to move off before it needs four, and a
+        // silently-swallowed retry hides that until the day it fails outright.
+        if (last.ok) return { ok: true, detail: attempts > 1 ? `${last.detail} (after ${attempts} attempts)` : last.detail };
+        if (!last.retriable) break;
+        if (attempts < HEAD_ATTEMPT_TIMEOUTS_MS.length) await sleep(HEAD_BACKOFF_MS * 2 ** (attempts - 1));
+    }
+    return { ok: false, detail: attempts > 1 ? `${last.detail} (${attempts} attempts)` : last.detail };
 }
 
 async function verify(url: string, digests: Target['digests']): Promise<{ ok: boolean; detail: string }> {
@@ -206,20 +268,119 @@ async function selfTest(): Promise<number> {
     console.log(`${stallPass ? '✓' : '✗'} self-test stalled mirror: ${stallCase.detail}`);
     if (!stallPass) failed++;
 
+    // The retry ladder, against the case that prompted it: a mirror that is
+    // busy rather than gone. Two 503s and then a 200 — one attempt would call
+    // this dead and fail the run over a URL that serves fine.
+    let busyHits = 0;
+    const busy = Bun.serve({
+        port: 0,
+        fetch: () => (++busyHits < 3 ? new Response('busy', { status: 503 }) : new Response(null, { status: 200 })),
+    });
+    const busyCase = await head(`http://localhost:${busy.port}/flaky.iso`);
+    busy.stop(true);
+    const busyPass = busyCase.ok && busyHits === 3;
+    console.log(`${busyPass ? '✓' : '✗'} self-test busy mirror: ${busyHits} attempt(s) — ${busyCase.detail}`);
+    if (!busyPass) failed++;
+
+    // ...and the other half of the ladder: a 404 must cost exactly one request.
+    // Retrying it would triple every genuine upstream-deleted report and push
+    // it out behind two backoffs, which is the opposite of what this tool is
+    // for.
+    let goneHits = 0;
+    const gone = Bun.serve({ port: 0, fetch: () => (goneHits++, new Response('gone', { status: 404 })) });
+    const goneCase = await head(`http://localhost:${gone.port}/deleted.iso`);
+    gone.stop(true);
+    const gonePass = !goneCase.ok && goneHits === 1;
+    console.log(`${gonePass ? '✓' : '✗'} self-test deleted file not retried: ${goneHits} attempt(s) — ${goneCase.detail}`);
+    if (!gonePass) failed++;
+
     return failed;
+}
+
+// ── App package ids ──────────────────────────────────────────────────────────
+// The app-catalog equivalent of a dead source URL. An app document carries no
+// URL and no digest — the package manager owns fetching and verification — so
+// what rots here is the IDENTIFIER: winget-pkgs removes a package outright
+// (FileZilla is gone from it over its bundled installer), publishers rename
+// across a major version (Python.Python.3.14 will one day be 3.15), and
+// Flathub app ids get retired when a project moves. Each of those turns a
+// perfectly valid document into a picker entry that installs nothing, silently,
+// for every user who ticks it.
+//
+// winget is checked through github.com's HTML tree rather than the REST API on
+// purpose: the API allows 60 unauthenticated requests an hour PER IP, and CI
+// runners share addresses, so a scheduled run would flake for reasons that have
+// nothing to do with the catalog.
+const WINGET_TREE = 'https://github.com/microsoft/winget-pkgs/tree/master/manifests';
+const FLATHUB_SUMMARY = 'https://flathub.org/api/v2/summary';
+
+interface AppTarget {
+    app: string;
+    label: string;
+    url: string;
+}
+
+function collectApps(): AppTarget[] {
+    const dir = join(ROOT, 'apps');
+    if (!existsSync(dir)) return [];
+    const targets: AppTarget[] = [];
+    for (const file of readdirSync(dir).filter((f) => f.endsWith('.json') && !f.startsWith('_')).sort()) {
+        const parsed = vmAppSchema.safeParse(JSON.parse(readFileSync(join(dir, file), 'utf8')));
+        if (!parsed.success) {
+            console.log(`⚠ apps/${file}: does not validate — run \`bun run validate\` first; skipping`);
+            continue;
+        }
+        const app = parsed.data;
+        if (ONLY && app.id !== ONLY) continue;
+        if (app.targets.winget) {
+            // "Publisher.Package.Variant" is the manifest directory path, with
+            // the publisher's first letter (lowercased) as the shard.
+            const [publisher, ...rest] = app.targets.winget.id.split('.');
+            targets.push({
+                app: app.id,
+                label: `winget:${app.targets.winget.id}`,
+                url: `${WINGET_TREE}/${publisher[0].toLowerCase()}/${publisher}/${rest.join('/')}`,
+            });
+        }
+        if (app.targets.flatpak) {
+            targets.push({
+                app: app.id,
+                label: `flatpak:${app.targets.flatpak.id}`,
+                url: `${FLATHUB_SUMMARY}/${app.targets.flatpak.id}`,
+            });
+        }
+    }
+    return targets;
 }
 
 const targets = collect();
 if (args.has('--self-test')) process.exit((await selfTest()) > 0 ? 1 : 0);
 
-console.log(`checking ${targets.length} source URL(s)${VERIFY ? ' with full digest verification' : ''}\n`);
+const appTargets = collectApps();
 let failures = 0;
-for (const t of targets) {
-    const r = VERIFY ? await verify(t.url, t.digests) : await head(t.url);
-    if (!r.ok) failures++;
-    console.log(`${r.ok ? '✓' : '✗'} ${t.blueprint} (${t.label}) — ${r.detail}`);
-    if (!r.ok) console.log(`    ${t.url}`);
+
+if (!APPS_ONLY) {
+    console.log(`checking ${targets.length} source URL(s)${VERIFY ? ' with full digest verification' : ''}\n`);
+    for (const t of targets) {
+        const r = VERIFY ? await verify(t.url, t.digests) : await head(t.url);
+        if (!r.ok) failures++;
+        console.log(`${r.ok ? '✓' : '✗'} ${t.blueprint} (${t.label}) — ${r.detail}`);
+        if (!r.ok) console.log(`    ${t.url}`);
+    }
 }
 
-console.log(`\n${targets.length} checked — ${failures} failure(s)`);
+if (appTargets.length > 0) {
+    // Always HEAD-only: there is no digest to verify, and --verify's throughput
+    // floor is meaningless against a metadata endpoint.
+    console.log(`${APPS_ONLY ? '' : '\n'}checking ${appTargets.length} app package id(s)\n`);
+    for (const t of appTargets) {
+        const r = await head(t.url);
+        if (!r.ok) failures++;
+        console.log(`${r.ok ? '✓' : '✗'} ${t.app} (${t.label})${r.ok ? '' : ` — ${r.detail}`}`);
+        if (!r.ok) console.log(`    ${t.url}`);
+    }
+}
+
+const checked = (APPS_ONLY ? 0 : targets.length) + appTargets.length;
+console.log(`\n${checked} checked — ${failures} failure(s)`);
 process.exit(failures > 0 ? 1 : 0);

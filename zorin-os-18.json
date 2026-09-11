@@ -1,7 +1,7 @@
 {
     "id": "zorin-os-18",
     "name": "Zorin OS 18.1 Core",
-    "description": "Zorin OS 18.1 Core, installed hands-free from the official ISO — a polished, Windows-familiar Linux desktop designed to feel instantly at home for people leaving Windows behind.",
+    "description": "A polished, Windows-familiar Linux desktop designed to feel instantly at home for people leaving Windows behind. Zorin OS 18.1 Core installs hands-free from the official ISO.",
     "icon": "_icons/zorin.svg",
     "website": "https://zorin.com/os/",
     "screenshots": [
@@ -9,13 +9,16 @@
     ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
+    "apps": {
+        "runtime": "flatpak"
+    },
     "provisioning": {
         "strategy": "installer-iso",
         "source": {
-            "url": "https://mirror.umd.edu/zorin/18/Zorin-OS-{version}-Core-64-bit.iso",
+            "url": "https://mirrors.edge.kernel.org/zorinos-isos/18/Zorin-OS-{version}-Core-64-bit.iso",
             "version": "18.1",
             "sha256": "44649b97bd307fc4c8529205d098ebbf98575a1e1ba2ee7d7005b697af1721d5",
-            "releasesUrl": "https://mirror.umd.edu/zorin/18/"
+            "releasesUrl": "https://mirrors.edge.kernel.org/zorinos-isos/18/"
         },
         "seed": {
             "template": "zorin-preseed"
@@ -37,6 +40,11 @@
         "secureBoot": false,
         "hypervEnlightenments": false,
         "autostart": false,
+        "passthrough": [
+            "gpu",
+            "usb",
+            "usb-controller"
+        ],
         "readiness": {
             "type": "phone-home"
         }

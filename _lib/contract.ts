@@ -11,6 +11,7 @@
 //   - installer-iso: hexos-platform  packages/backend/src/lib/installerSeed.ts   (INSTALLER_SEED_TEMPLATES)
 
 import { sourceDigests, type VMBlueprint } from "./vm-blueprint.schema";
+import type { VMApp } from "./vm-app.schema";
 
 // A backend that requires sha256 on every source rejects a sha512-only
 // document at sync time, which sets validationError and silently disables the
@@ -71,6 +72,44 @@ export const KNOWN_INSTALLER_IMAGE_TEMPLATES = new Set(["steamos-repair"]);
 // enum would auto-hide blueprints whenever the catalog adds a category before
 // the platform deploys. The UI groups these; unknown slugs land in "Other".
 export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
+
+// Mirror of HEXOS_VM_CAPABILITIES in the platform's vm-blueprints.ts — the
+// install-pipeline capabilities shipped backends can declare support for.
+// Extend ONLY after the platform change ships (same rule as the template
+// allowlists): a capability listed here before it exists upstream turns the
+// check into a rubber stamp. Values are exact-match (no case folding) — the
+// backend compares them verbatim.
+export const KNOWN_VM_CAPABILITIES = new Set(["firstBoot", "virtioSeed"]);
+
+// Passthrough class vocabulary, enforced here for the same reason as
+// KNOWN_CATEGORIES: the schema leaves `guest.passthrough` an open slug array so
+// a catalog naming a class before the platform deploys is ignored rather than
+// validation-hidden. The platform's blueprintPassthroughClasses drops unknown
+// names, so a typo here silently withholds a picker — hence a CI error.
+export const KNOWN_PASSTHROUGH_CLASSES = new Set(["gpu", "usb", "usb-controller"]);
+
+// App grouping vocabulary, enforced here for the same reason as
+// KNOWN_CATEGORIES: the schema leaves `category` an open slug so a catalog that
+// adds a group before the platform deploys buckets under "Other" rather than
+// validation-hiding every app in it. Extend deliberately — a typo'd slug is a
+// silently mis-grouped app, and the picker's section order is authored against
+// this list.
+export const KNOWN_APP_CATEGORIES = new Set([
+  "browsers",
+  "messaging",
+  "media",
+  "gaming",
+  "graphics",
+  "documents",
+  "developer",
+  "utilities",
+]);
+
+// Recommended apps arrive pre-checked, so the set is what a user who clicks
+// straight through actually installs. A ceiling rather than a rule of thumb:
+// past this the "just continue" path stops being a sensible default and starts
+// being a surprise download.
+export const MAX_RECOMMENDED_APPS = 6;
 
 // How many screenshots the detail-sheet gallery actually renders (the UI's
 // ScreenshotViewer is handed a 5-item slice). Extra images cost repo size and
@@ -217,9 +256,92 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
     );
   }
 
+  // The app runtime has to match what the guest actually is: a Windows
+  // blueprint declaring flatpak (or a Linux one declaring winget) offers the
+  // user a picker whose every pick then fails in the guest. The strategy is
+  // the honest discriminator — answer-file IS Windows.
+  if (bp.apps) {
+    const expected = p.strategy === "answer-file" ? "winget" : "flatpak";
+    if (bp.apps.runtime !== expected) {
+      errors.push(
+        `apps.runtime is "${bp.apps.runtime}" but this blueprint's provisioning strategy (${p.strategy}) means the guest is ${expected === "winget" ? "Windows" : "Linux"} — every app pick would fail in the guest`,
+      );
+    }
+    if (bp.category !== "desktop") {
+      warnings.push(
+        `apps.runtime is set on a "${bp.category ?? "(none)"}" blueprint — offering apps only makes sense where there is a desktop to put them on`,
+      );
+    }
+  } else if (bp.category === "desktop") {
+    // The inverse: a desktop that forgot to opt in. Not an error — a desktop
+    // may deliberately offer no apps — but silent omission is the likelier
+    // cause, and it costs the user the whole step with nothing to show why.
+    warnings.push(
+      `no apps.runtime on a desktop blueprint — it will offer no apps at all; set "winget" (Windows) or "flatpak" (Linux), or leave it off deliberately`,
+    );
+  }
+
   if (bp.category && !KNOWN_CATEGORIES.has(bp.category)) {
     errors.push(
       `unknown category "${bp.category}" — allowed values: ${[...KNOWN_CATEGORIES].join(", ")} (extend KNOWN_CATEGORIES deliberately when adding one)`,
+    );
+  }
+
+  // Passthrough declarations, cross-checked against category. These decide what
+  // the install dialog PROMOTES, not what the install permits, so a wrong value
+  // costs a click — but withholding is deliberate editorial fact (a headless
+  // server offered a GPU invites blacking out the host console for nothing),
+  // so the cross-checks keep the declarations honest.
+  const passthrough = new Set(bp.guest?.passthrough ?? []);
+  for (const name of passthrough) {
+    if (!KNOWN_PASSTHROUGH_CLASSES.has(name)) {
+      errors.push(
+        `unknown passthrough class "${name}" — allowed values: ${[...KNOWN_PASSTHROUGH_CLASSES].join(", ")} (the platform ignores unknown names, so this silently withholds a picker)`,
+      );
+    }
+  }
+  if (bp.guest?.gpuPassthrough || bp.guest?.usbPassthrough) {
+    warnings.push(
+      `legacy gpuPassthrough/usbPassthrough boolean — declare the class in guest.passthrough instead (the booleans still work but are deprecated)`,
+    );
+  }
+  if (bp.category === "server" && passthrough.size > 0) {
+    errors.push(
+      `guest.passthrough on a "server" blueprint — a headless guest has nothing to drive a GPU or USB picker with; drop the declaration or reclassify the blueprint`,
+    );
+  }
+  if (bp.category === "desktop" && !passthrough.has("gpu")) {
+    // Not an error — a desktop may deliberately withhold the GPU — but silent
+    // omission is the likelier cause, same reasoning as the apps.runtime nudge.
+    warnings.push(
+      `no "gpu" in guest.passthrough on a desktop blueprint — its install dialog will never offer GPU passthrough; declare it or withhold deliberately`,
+    );
+  }
+
+  // Capability declarations are a closed vocabulary this repo controls, unlike
+  // cpuFeatures' open kernel-flag namespace — an unknown value is either a typo
+  // (hides the blueprint on every up-to-date host) or a capability that hasn't
+  // shipped upstream yet, and both are errors.
+  for (const capability of bp.requiredCapabilities ?? []) {
+    if (!KNOWN_VM_CAPABILITIES.has(capability)) {
+      errors.push(
+        `requiredCapabilities value "${capability}" isn't a shipped capability — allowed values: ${[...KNOWN_VM_CAPABILITIES].join(", ")} (extend KNOWN_VM_CAPABILITIES only after the platform change ships)`,
+      );
+    }
+  }
+  // The declaration is the whole point of the gate: a blueprint using
+  // first-boot injection without declaring it installs "successfully" on
+  // backends that predate the feature — for OpenWRT that means booting a live
+  // DHCP server at 192.168.1.1 on the user's LAN.
+  const usesFirstBoot = p.strategy === "image" && p.firstBoot !== undefined;
+  const declaresFirstBoot = (bp.requiredCapabilities ?? []).includes("firstBoot");
+  if (usesFirstBoot && !declaresFirstBoot) {
+    errors.push(
+      `provisioning.firstBoot is set but requiredCapabilities doesn't declare "firstBoot" — backends without first-boot support would install this blueprint silently unconfigured`,
+    );
+  } else if (!usesFirstBoot && declaresFirstBoot) {
+    warnings.push(
+      `requiredCapabilities declares "firstBoot" but provisioning has no firstBoot profile — harmless over-gating that hides the blueprint from hosts that could run it`,
     );
   }
 
@@ -231,7 +353,11 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
     }
   }
 
-  if (bp.truenasVersion && !VERSION_RANGE_OP.test(bp.truenasVersion)) {
+  if (!bp.truenasVersion) {
+    warnings.push(
+      `no truenasVersion — the blueprint is offered on every TrueNAS release, including ones the VM feature doesn't support; every shipped blueprint gates with ">=25.04.2.6", so omit it only deliberately`,
+    );
+  } else if (!VERSION_RANGE_OP.test(bp.truenasVersion)) {
     warnings.push(
       `truenasVersion "${bp.truenasVersion}" has no comparison operator (>=, >, <=, <) — it will be treated as no version gate at all`,
     );
@@ -282,6 +408,79 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
 
   if (!bp.website) {
     warnings.push(`no website — the detail sheet renders without its "Website" button`);
+  }
+
+  return { errors, warnings };
+}
+
+/**
+ * Contract checks for an app document. Same division of labour as
+ * checkContract: everything expressible in Zod lives in the schema, and this
+ * covers what the schema cannot — the closed vocabularies this repo owns and
+ * the couplings that fail silently rather than loudly.
+ *
+ * `recommendedCount` is the whole catalog's count, passed in because the cap is
+ * a property of the SET, not of any one document; validate.ts reports it once
+ * against the last file rather than blaming an arbitrary app.
+ */
+export function checkAppContract(app: VMApp, filename: string): ContractResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  const stem = filename.replace(/\.json$/, "");
+  if (app.id !== stem) {
+    warnings.push(`id "${app.id}" differs from the filename stem "${stem}" — allowed, but keeping them equal is the convention`);
+  }
+
+  if (!app.category) {
+    warnings.push(`no category — the picker groups this app under "Other"`);
+  } else if (!KNOWN_APP_CATEGORIES.has(app.category)) {
+    errors.push(
+      `unknown category "${app.category}" — allowed values: ${[...KNOWN_APP_CATEGORIES].join(", ")} (extend KNOWN_APP_CATEGORIES deliberately when adding one)`,
+    );
+  }
+
+  // Deliberately NOT warned on: a single-runtime app. Nine of the starter set
+  // are one-runtime by nature (7-Zip and PowerToys are Windows software;
+  // FileZilla was pulled from winget), so flagging every one of them would put
+  // a warning on a quarter of the catalog and teach reviewers to skim past the
+  // warnings that mean something. The schema's "at least one target" rule is
+  // the real gate.
+
+  // A user-scope winget package cannot be installed by the stage's SYSTEM
+  // scheduled task; it has to be deferred to a logon-context run. Flagged so
+  // the cost of adding one is visible at review time rather than discovered as
+  // a failed install on a user's machine.
+  if (app.targets.winget?.scope === "user") {
+    warnings.push(
+      `winget package "${app.targets.winget.id}" is user-scope — it installs for the created account only, via the logon-context fallback rather than the SYSTEM stage`,
+    );
+  }
+
+  if (app.targets.flatpak && app.targets.flatpak.remote !== "flathub") {
+    warnings.push(
+      `flatpak remote "${app.targets.flatpak.remote}" is not flathub — the guest stage only adds the Flathub remote, so this app installs nothing unless the blueprint's guest already has that remote`,
+    );
+  }
+
+  if (app.sizeMb === undefined) {
+    warnings.push(`no sizeMb — this app contributes nothing to the wizard's disk-size estimate`);
+  }
+
+  if (!app.website) {
+    warnings.push(`no website — the picker renders without its "learn more" link`);
+  }
+
+  if (app.icon) {
+    if (/^https?:\/\//.test(app.icon)) {
+      warnings.push(
+        `icon "${app.icon}" is an absolute URL — catalog files carry repo-relative paths so the icon is mirrored here and cannot rot upstream`,
+      );
+    } else if (!MIRRORED_ICON_FILE.test(app.icon)) {
+      warnings.push(`icon "${app.icon}" has no image extension — the picker will fall back to a lettered tile`);
+    } else if (app.icon.startsWith("/") || app.icon.split("/").includes("..")) {
+      errors.push(`icon "${app.icon}" must be a path relative to the repo root, with no "/" prefix and no ".." segments`);
+    }
   }
 
   return { errors, warnings };

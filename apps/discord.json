@@ -1,0 +1,18 @@
+{
+    "id": "discord",
+    "name": "Discord",
+    "description": "Voice, video and text chat built around servers and channels.",
+    "icon": "_icons/apps/discord.svg",
+    "website": "https://discord.com/",
+    "category": "messaging",
+    "sizeMb": 400,
+    "targets": {
+        "winget": {
+            "id": "Discord.Discord",
+            "scope": "user"
+        },
+        "flatpak": {
+            "id": "com.discordapp.Discord"
+        }
+    }
+}

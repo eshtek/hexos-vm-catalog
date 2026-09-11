@@ -1,7 +1,7 @@
 {
     "id": "xubuntu-26.04",
     "name": "Xubuntu 26.04 LTS",
-    "description": "Ubuntu 26.04 LTS with the Xfce desktop, installed hands-free from Canonical's official installer — the same Ubuntu base and update schedule with a lightweight, conventional desktop that runs well on modest resources.",
+    "description": "Ubuntu 26.04 LTS with the Xfce desktop, installed hands-free from Canonical's official installer. It keeps the same Ubuntu base and update schedule, paired with a lightweight, conventional desktop that runs well on modest resources.",
     "icon": "_icons/xubuntu.svg",
     "website": "https://xubuntu.org/",
     "screenshots": [
@@ -14,12 +14,15 @@
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
     "internal": true,
+    "apps": {
+        "runtime": "flatpak"
+    },
     "provisioning": {
         "strategy": "installer-iso",
         "source": {
             "url": "https://cdimage.ubuntu.com/xubuntu/releases/{version}/release/xubuntu-{version}-desktop-amd64.iso",
-            "version": "26.04",
-            "sha256": "ae030dbd99426a4c7b2d1c96731e0f435ec9d18f6a28c9e76f077dd5f46364bc",
+            "version": "26.04.1",
+            "sha256": "0cd5160f72ae6b7a26be7a29248b60cbd579b9e6aa8fbd274e95264da0ade43d",
             "releasesUrl": "https://cdimage.ubuntu.com/xubuntu/releases/"
         },
         "seed": {
@@ -42,6 +45,11 @@
         "secureBoot": false,
         "hypervEnlightenments": false,
         "autostart": false,
+        "passthrough": [
+            "gpu",
+            "usb",
+            "usb-controller"
+        ],
         "readiness": {
             "type": "phone-home"
         }

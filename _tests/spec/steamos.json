@@ -1,0 +1,19 @@
+{
+    "blueprintId": "steamos",
+    "strategy": "installer-image",
+    "options": {
+        "username": false,
+        "password": true,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": true,
+        "reboot": true,
+        "seed": {
+            "dtype": "CDROM",
+            "order": 3
+        }
+    },
+    "knownIssue": "Needs the Steam Deck recovery image pre-staged on the box (installer-image); the preflight fails, not the install, when it is absent.",
+    "frameReview": "Steam's login or Big Picture screen = installed; the recovery image's desktop = the install never ran (broken)."
+}

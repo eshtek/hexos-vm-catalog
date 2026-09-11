@@ -1,0 +1,18 @@
+{
+    "id": "telegram",
+    "name": "Telegram",
+    "description": "Cloud-synced messaging with large group and file support.",
+    "icon": "_icons/apps/telegram.svg",
+    "website": "https://desktop.telegram.org/",
+    "category": "messaging",
+    "sizeMb": 300,
+    "targets": {
+        "winget": {
+            "id": "Telegram.TelegramDesktop",
+            "scope": "user"
+        },
+        "flatpak": {
+            "id": "org.telegram.desktop"
+        }
+    }
+}

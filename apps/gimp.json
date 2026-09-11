@@ -1,0 +1,17 @@
+{
+    "id": "gimp",
+    "name": "GIMP",
+    "description": "Raster image editor for photo retouching and composition.",
+    "icon": "_icons/apps/gimp.svg",
+    "website": "https://www.gimp.org/",
+    "category": "graphics",
+    "sizeMb": 800,
+    "targets": {
+        "winget": {
+            "id": "GIMP.GIMP"
+        },
+        "flatpak": {
+            "id": "org.gimp.GIMP"
+        }
+    }
+}

@@ -1,0 +1,17 @@
+{
+    "id": "steam",
+    "name": "Steam",
+    "description": "Valve's game store and library client. Games install on top of this.",
+    "icon": "_icons/apps/steam.svg",
+    "website": "https://store.steampowered.com/about/",
+    "category": "gaming",
+    "sizeMb": 2000,
+    "targets": {
+        "winget": {
+            "id": "Valve.Steam"
+        },
+        "flatpak": {
+            "id": "com.valvesoftware.Steam"
+        }
+    }
+}

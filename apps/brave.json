@@ -1,0 +1,17 @@
+{
+    "id": "brave",
+    "name": "Brave",
+    "description": "Chromium-based browser that blocks ads and trackers by default.",
+    "icon": "_icons/apps/brave.svg",
+    "website": "https://brave.com/",
+    "category": "browsers",
+    "sizeMb": 500,
+    "targets": {
+        "winget": {
+            "id": "Brave.Brave"
+        },
+        "flatpak": {
+            "id": "com.brave.Browser"
+        }
+    }
+}
