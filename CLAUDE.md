@@ -73,14 +73,30 @@ starts. It is editorial metadata: nothing fetches it and no client renders it
 weeks. Pin the dated filename. Bumping a version should be a visible commit
 changing both the version and the digest.
 
-**`_lib/vm-blueprint.schema.ts` and `_lib/vm-app.schema.ts` are vendored, not
-authored here.** They are copies of `packages/shared/eshtek/vm-blueprints.ts`
-and `packages/shared/eshtek/vm-apps.ts` in `hexos-platform`, refreshed together
-by `bun run sync-schema`. Never hand-edit one to preview a schema change: the next
+**`_lib/vm-blueprint.schema.ts`, `_lib/vm-app.schema.ts`,
+`_lib/vm-blueprint-tests.schema.ts`, `_lib/surface-grammar.ts` and
+`_lib/vm-surfaces.ts` are vendored, not authored here.** They are copies of
+the same-named files under `packages/shared/eshtek/` in `hexos-platform`
+(`vm-blueprints.ts`, `vm-apps.ts`, `vm-blueprint-tests.ts`, the surface
+grammar and its parser), refreshed together by `bun run sync-schema`. Never hand-edit one to preview a schema change: the next
 re-vendor silently reverts the edit, and because `_lib/validate.ts` runs the
 contract checks against Zod's *parsed* output, a field the vendored copy no
 longer knows is stripped before those checks see it — every blueprint then
 fails at once. Land the change upstream, then re-vendor.
+
+**A setup hook runs on a user's box against a guest it did not necessarily
+install.** Scripts under `_hooks/` reach the guest only through the context's
+`fetch`/`waitForApp` (the platform binds them to the paths it verified against
+the VM's MAC) and import nothing at runtime — `import type { VMHookContext }
+from "../_lib/hook_context"` and no more; `bun run validate` refuses a runtime
+import the way the sync does, `bun run typecheck` checks the script against
+the mirror, and `bun run test-hooks` runs its tests. A hook confirms and
+records; it never writes to a guest that may already be someone's, never
+creates an account the user did not ask for, and never puts a credential into
+a checkpoint message or a log line (`ctx.secrets` is for that). A hook that
+signs the user in anywhere declares `userOptional` with `"default": false`.
+`_lib/hook_context.ts` is a hand-maintained mirror of the platform's
+`VMHookContext`; update both when the contract grows. See README, "Setup hooks".
 
 **Underscore-prefixed paths are invisible to the sync.** `_lib/` and
 `_pending/` are ignored by both the catalog sync and the validator. That is

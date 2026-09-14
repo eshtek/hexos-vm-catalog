@@ -44,5 +44,24 @@
             "port": 8123
         },
         "postInstallUrl": "http://{ip}:8123"
-    }
+    },
+    "hooksSchema": 1,
+    "hooks": [
+        {
+            "id": "onboarding",
+            "title": "Onboarding check",
+            "description": "Confirms Home Assistant answers once it is up and records whether it has been onboarded. Nothing is written to it.",
+            "events": ["onAfterReady"],
+            "optional": true,
+            "userOptional": {
+                "description": "Lets HexOS confirm Home Assistant is reachable after install and note whether you still need to create its owner account. It reads one status page and changes nothing."
+            },
+            "guestPort": 8123,
+            "altPorts": [80],
+            "script": "_hooks/haos_setup.ts",
+            "entrypoint": "run",
+            "timeout": 600,
+            "retries": 1
+        }
+    ]
 }

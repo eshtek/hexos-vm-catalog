@@ -413,6 +413,22 @@ export const vmBlueprintSchema = z.object({
     provisioning: vmProvisioningSchema,
     resources: vmBlueprintResourcesSchema,
     guest: vmBlueprintGuestSchema,
+    /**
+     * Surface declarations: setup hooks and dashboard widgets the guest's
+     * blueprint ships (parsed by vm-surfaces.ts), and a reserved key for the
+     * folder-attachment contract that consumer defines. Deliberately loose at
+     * the root: every stored document re-validates on every sync, so a
+     * declaration the catalog authors before the platform understands it
+     * must not validationError-hide the blueprint. Envelope and item rules
+     * (schema version, list shape, caps, per-entry drops) are enforced at
+     * read time by the parsers, which report errors instead of hiding rows;
+     * unknown extensions are inert.
+     */
+    hooksSchema: z.unknown().optional(),
+    hooks: z.unknown().optional(),
+    widgetsSchema: z.unknown().optional(),
+    widgets: z.unknown().optional(),
+    attachments: z.unknown().optional(),
 });
 
 export type VMImageSource = z.infer<typeof vmImageSourceSchema>;
@@ -546,6 +562,21 @@ export const blueprintAppRuntime = (blueprint: Pick<VMBlueprint, 'apps'>): 'wing
  */
 export const blueprintSourceVersion = (provisioning: VMProvisioningDoc): string | undefined =>
     'source' in provisioning && 'version' in provisioning.source ? provisioning.source.version : undefined;
+
+/**
+ * The host the pinned image or ISO downloads from ("cloud.debian.org"), for
+ * copy that says where an install comes from; undefined for user-supplied
+ * media (Windows) or an unparsable URL.
+ */
+export const blueprintSourceHost = (provisioning: VMProvisioningDoc): string | undefined => {
+    const url = 'source' in provisioning && 'url' in provisioning.source ? provisioning.source.url : undefined;
+    if (!url) return undefined;
+    try {
+        return new URL(url).hostname;
+    } catch {
+        return undefined;
+    }
+};
 
 /**
  * Completed installs per blueprint over a window — what orders the "Most

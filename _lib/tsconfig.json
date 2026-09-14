@@ -13,5 +13,8 @@
     // global fail to resolve. @types/bun pulls in @types/node transitively.
     "types": ["bun"]
   },
-  "include": ["."]
+  // The hook scripts under _hooks/ are typechecked against the context mirror
+  // in this directory, so a script that drifts from the platform's contract
+  // fails CI here rather than at run time on a user's box.
+  "include": [".", "../_hooks"]
 }

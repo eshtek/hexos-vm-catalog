@@ -11,6 +11,7 @@
     "releases": "bun releases.ts",
     "tests": "bun tests.ts",
     "generate-tests": "bun tests.ts --generate",
+    "test-hooks": "bun test ../_hooks contract.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

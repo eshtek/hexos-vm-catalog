@@ -12,6 +12,7 @@
 
 import { sourceDigests, type VMBlueprint } from "./vm-blueprint.schema";
 import type { VMApp } from "./vm-app.schema";
+import { parseVMHooks, parseVMWidgets } from "./vm-surfaces";
 
 // A backend that requires sha256 on every source rejects a sha512-only
 // document at sync time, which sets validationError and silently disables the
@@ -167,6 +168,40 @@ export interface ContractResult {
   warnings: string[];
 }
 
+/** A script a blueprint's surface declarations name, as authored: a path under _hooks/ or _widgets/. */
+export interface DeclaredScript {
+  kind: "hook" | "widget";
+  id: string;
+  script: string;
+  /** A required setup hook: the sync withholds the whole blueprint when its script is missing or fails the lint. */
+  required: boolean;
+}
+
+/**
+ * The scripts a blueprint declares, read the way the sync reads them (the
+ * authoring form, where each declaration names `script`). Declarations the
+ * parser drops name nothing here; their errors come from `checkContract`.
+ */
+export function declaredScripts(bp: VMBlueprint): DeclaredScript[] {
+  const scripts: DeclaredScript[] = [];
+  const hooks = parseVMHooks(bp, { form: "authoring" }).hooks;
+  for (const hook of hooks) {
+    if (hook.script) {
+      scripts.push({
+        kind: "hook",
+        id: hook.id,
+        script: hook.script,
+        required: hook.events.includes("onAfterReady") && !hook.optional,
+      });
+    }
+  }
+  // Widgets are parsed against the hooks: a button naming an unknown verb is dropped.
+  for (const widget of parseVMWidgets(bp, { form: "authoring", hooks }).widgets) {
+    if (widget.script) scripts.push({ kind: "widget", id: widget.id, script: widget.script, required: false });
+  }
+  return scripts;
+}
+
 export function checkContract(bp: VMBlueprint, filename: string): ContractResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -317,6 +352,17 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
       `no "gpu" in guest.passthrough on a desktop blueprint — its install dialog will never offer GPU passthrough; declare it or withhold deliberately`,
     );
   }
+
+  // Surface declarations (setup hooks, widgets) are parsed here exactly as the
+  // sync parses them in the authoring form, so every rule the parser reports
+  // (an unsupported schema version, a hook with no port, a consent object on a
+  // user-fired verb, a script path outside _hooks/) fails the PR rather than
+  // the sync, where a dropped declaration is only a logged error and a
+  // withheld blueprint keeps its last good document. A blueprint that declares
+  // no surfaces has nothing to report.
+  const surfaceHooks = parseVMHooks(bp, { form: "authoring" });
+  for (const error of surfaceHooks.errors) errors.push(`hooks: ${error}`);
+  for (const error of parseVMWidgets(bp, { form: "authoring", hooks: surfaceHooks.hooks }).errors) errors.push(`widgets: ${error}`);
 
   // Capability declarations are a closed vocabulary this repo controls, unlike
   // cpuFeatures' open kernel-flag namespace — an unknown value is either a typo

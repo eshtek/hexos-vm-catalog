@@ -210,7 +210,9 @@ Icons live under `_icons/apps/`, one per app, mirrored here exactly like the blu
         "tpm": false, "secureBoot": false, "hypervEnlightenments": false,
         "readiness": { "type": "mdns", "hostname": "homeassistant.local", "port": 8123 },
         "postInstallUrl": "http://{ip}:8123"
-    }
+    },
+    "hooksSchema": 1,                      // optional: setup hooks the platform runs after the guest
+    "hooks": [ /* see "Setup hooks" below */ ] // is ready, from scripts under _hooks/ in this repo
 }
 ```
 
@@ -354,6 +356,38 @@ Version bumps are a two-field change: `source.version` and its digest. `source.r
 > artifact rather than the vendor's docs — repeatedly this year, published media
 > has lagged the documented automation it is supposed to provide.
 
+### Setup hooks
+
+A blueprint may declare **setup hooks**: scripts in this repo that the HexOS box runs once the guest is ready, after the platform has confirmed that the guest's address answers ARP with the VM's own MAC on the network path a request will take. The hook reaches the guest only through the context it is handed (`ctx.fetch`, `ctx.waitForApp`, bound to those verified paths); there is no guest execution channel of any kind, and a script that tries to load a module is refused at sync. The user consents per hook in the install dialog when the hook declares `userOptional`, and can rerun, skip or dismiss a setup step from the activity feed afterwards.
+
+```jsonc
+    "hooksSchema": 1,
+    "hooks": [
+        {
+            "id": "onboarding",                 // unique within the blueprint, lowercase slug
+            "title": "Onboarding check",        // the consent row's label and the task's name
+            "description": "…",                 // the consent row's body unless userOptional has its own
+            "events": ["onAfterReady"],         // the one lifecycle firing (user-fired verbs come later)
+            "optional": true,                   // a failure skips the hook; absent = a failure parks the
+                                                // setup until the user retries, skips or dismisses it
+            "userOptional": {                   // present = a consent switch in the installer, on by
+                "description": "…",             // default. A hook that signs the user in anywhere MUST
+                "default": false                // declare "default": false (the parser refuses otherwise)
+            },
+            "guestPort": 8123,                  // where the guest answers; defaults from postInstallUrl
+            "altPorts": [80],                   // other declared ports a redirect may land on (max 4)
+            "script": "_hooks/haos_setup.ts",   // a path under _hooks/; the sync inlines the file at
+            "entrypoint": "run",                // one pinned commit, so a box never fetches a script
+            "inputs": [],                       // questions or an OAuth flow the user answers first
+            "timeout": 600, "retries": 1
+        }
+    ]
+```
+
+Scripts live under [`_hooks/`](_hooks/) (invisible to the sync as a directory; reachable only through a declaration's `script`). They import **types only** — `import type { VMHookContext } from "../_lib/hook_context"` — and nothing at runtime: the sync refuses any runtime `import`, `require` or re-export, and so does `bun run validate`. [`_lib/hook_context.ts`](_lib/hook_context.ts) is a hand-maintained mirror of the platform's `VMHookContext`; CI typechecks `_hooks/` against it and runs each script's own tests (`bun run test-hooks`, `_hooks/*.test.ts`). A required setup hook (`onAfterReady`, not `optional`) whose script is missing or fails the lint makes the sync **withhold the whole blueprint** (its last good document stays published); an optional hook is dropped with a logged error and the blueprint publishes without it. Either failure is silent to a user, so the validator treats both as errors.
+
+Two rules for authors. A setup hook must never write to a guest it did not install, and must tolerate a guest the user has already set up by hand: confirm state, record what the guest actually establishes (a status page that is not served is "unknown", never proof of anything), and leave account creation to the user (or to a migration that carries that intent). And never put a credential into a checkpoint message or a log line; `ctx.secrets` keeps what a hook collects, bound to the VM instance and removed with it. The platform snapshots a blueprint's declarations at install and runs from that snapshot, including on a rerun; adopting a later catalog edit is a separate, explicit action, not part of "Run setup".
+
 ### Screenshots
 
 The detail sheet renders a gallery of up to **5** screenshots of the desktop (or web UI) the
@@ -419,7 +453,7 @@ bun install
 bun run validate
 ```
 
-The validator checks each root `*.json` against the vendored blueprint schema and each `apps/*.json` against the vendored app schema, then applies a few contract checks the schema can't express ([`_lib/contract.ts`](_lib/contract.ts)):
+The validator checks each root `*.json` against the vendored blueprint schema and each `apps/*.json` against the vendored app schema, parses any setup-hook and widget declarations with the platform's own parser (vendored as [`_lib/vm-surfaces.ts`](_lib/vm-surfaces.ts)), checks that every declared script exists and imports nothing at runtime, then applies a few contract checks the schema can't express ([`_lib/contract.ts`](_lib/contract.ts)):
 
 - `cloudInit.userDataTemplate` / `answerFile.template` / `seed.template` must name a template the backend actually ships (`linux-default`, `win11-pro`, `win10-pro`, `ubuntu-desktop-autoinstall`, `fedora-workstation-kickstart`, `fedora-kde-kickstart`, `opensuse-agama-profile`, `bazzite-kickstart`, `mint-preseed`, `zorin-preseed`, `pop-live-exec`, `omarchy-autoinstall`, `cachyos-headless`, `steamos-repair`, plus the machine-config pair `fcos-ignition` / `flatcar-ignition` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
 - a duplicate `id` across two files is an error (the sync skips the duplicate)
@@ -438,7 +472,7 @@ Errors fail the run; warnings don't.
 
 ### Keeping the schema copies current
 
-The vendored schemas are copies, so they can drift as the platform schemas evolve. `sync-schema` re-vendors both (blueprints and apps) from a local platform checkout, which defaults to a `../hexos-platform` sibling; override with `HEXOS_PLATFORM`:
+The vendored schemas are copies, so they can drift as the platform schemas evolve. `sync-schema` re-vendors all of them (blueprints, apps, test specs, and the surface grammar with its parser) from a local platform checkout, which defaults to a `../hexos-platform` sibling; override with `HEXOS_PLATFORM`:
 
 ```bash
 cd _lib
