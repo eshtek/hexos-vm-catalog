@@ -28,6 +28,13 @@ export const MIN_SHA512_TRUENAS_VERSION = "";
 
 export const KNOWN_CLOUD_INIT_TEMPLATES = new Set(["linux-default"]);
 
+// First-boot profiles the backend ships for image-strategy blueprints (see
+// the platform's lib/vmFirstBoot.ts). Named by the blueprint, shipped by the
+// backend, and an unknown name fails the install loudly rather than booting a
+// guest that was promised configuration it never got — so it is checked here
+// instead, where a PR can see it.
+export const KNOWN_FIRST_BOOT_PROFILES = new Set(["openwrt-lan-dhcp", "plex-appliance"]);
+
 // Machine-config templates, and the delivery mechanism each one requires. A
 // mismatch is silent at runtime: the guest simply never sees the document and
 // boots unconfigured, so it is checked here rather than left to an install test.
@@ -80,7 +87,7 @@ export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
 // allowlists): a capability listed here before it exists upstream turns the
 // check into a rubber stamp. Values are exact-match (no case folding) — the
 // backend compares them verbatim.
-export const KNOWN_VM_CAPABILITIES = new Set(["firstBoot", "virtioSeed"]);
+export const KNOWN_VM_CAPABILITIES = new Set(["firstBoot", "virtioSeed", "plexAppliance"]);
 
 // Passthrough class vocabulary, enforced here for the same reason as
 // KNOWN_CATEGORIES: the schema leaves `guest.passthrough` an open slug array so
@@ -218,6 +225,11 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
   if (p.strategy === "cloud-init" && !KNOWN_CLOUD_INIT_TEMPLATES.has(p.cloudInit.userDataTemplate)) {
     errors.push(
       `unknown cloud-init template "${p.cloudInit.userDataTemplate}" — the backend ships only: ${[...KNOWN_CLOUD_INIT_TEMPLATES].join(", ")}`,
+    );
+  }
+  if (p.strategy === "image" && p.firstBoot && !KNOWN_FIRST_BOOT_PROFILES.has(p.firstBoot.profile)) {
+    errors.push(
+      `unknown first-boot profile "${p.firstBoot.profile}" — the backend ships only: ${[...KNOWN_FIRST_BOOT_PROFILES].join(", ")}`,
     );
   }
   if (p.strategy === "answer-file") {

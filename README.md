@@ -53,6 +53,7 @@ package runtime that guest has, which is what decides which apps are offered on 
 |-----------|-------------|
 | [Home Assistant OS](home-assistant-os.json) | Official Home Assistant appliance OS |
 | [OpenWrt 25.12](openwrt.json) | Official OpenWrt x86-64 router/firewall image, managed from LuCI |
+| [Plex Media Server](plex-server.json) | Plex on Ubuntu's cloud image, started at first boot; open it and you are in Plex |
 
 Drafts that aren't ready to ship live in a gitignored `_pending/` directory on
 the maintainer's machine — a draft carries `TODO` digests and URLs nobody has

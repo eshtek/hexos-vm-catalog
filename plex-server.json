@@ -1,0 +1,43 @@
+{
+  "id": "plex-server",
+  "name": "Plex Media Server",
+  "description": "Plex Media Server as a dedicated virtual machine, installed from Ubuntu's official cloud image and configured to start Plex on first boot. Open it and you land in Plex's own web interface: there is no operating system to set up and no account to create. Media libraries are added from inside Plex.",
+  "website": "https://www.plex.tv",
+  "category": "appliance",
+  "truenasVersion": ">=25.04.2.6",
+  "requiredCapabilities": ["firstBoot", "plexAppliance"],
+  "provisioning": {
+    "strategy": "image",
+    "source": {
+      "url": "https://cloud-images.ubuntu.com/releases/noble/{version}/ubuntu-24.04-server-cloudimg-amd64.img",
+      "version": "release-20260826",
+      "format": "qcow2",
+      "compression": "none",
+      "sha256": "d0fe84bb5f80853425fa6be28e2c106f30104c3cfe8611933f2e65c9b63f0e30",
+      "releasesUrl": "https://cloud-images.ubuntu.com/releases/noble/"
+    },
+    "firstBoot": {
+      "profile": "plex-appliance"
+    }
+  },
+  "resources": {
+    "minMemoryMb": 2048,
+    "recMemoryMb": 4096,
+    "minVcpus": 2,
+    "recVcpus": 2,
+    "diskGb": 32
+  },
+  "guest": {
+    "firmware": "UEFI",
+    "diskBus": "VIRTIO",
+    "nicModel": "VIRTIO",
+    "tpm": false,
+    "secureBoot": false,
+    "hypervEnlightenments": false,
+    "autostart": true,
+    "readiness": {
+      "type": "phone-home"
+    },
+    "postInstallUrl": "http://{ip}:32400/web"
+  }
+}
