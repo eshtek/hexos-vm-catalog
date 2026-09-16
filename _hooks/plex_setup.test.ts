@@ -3,7 +3,6 @@ import type { VMHookContext, VMHookFetchInit, VMHookResponse, WaitForAppOptions 
 import {
   CLAIM_ATTEMPTS,
   LIBRARY_ATTEMPTS,
-  MEDIA_PATH,
   type PlexTvFetch,
   RESOURCES_ATTEMPTS,
   SERVER_TOKEN_SECRET,
@@ -24,7 +23,7 @@ import {
 // to a server that answers already claimed unless plex.tv lists it as owned by
 // the signed-in account (on a fresh server the claim precedes that lookup, and
 // a failure afterwards says so), names an owned server and keeps its own
-// token, creates one library on the media mount if none covers it, turns
+// token, creates the five app-compatible libraries if their paths are not covered, turns
 // Plex's trash emptying off, asks for a scan, verifies each write against what
 // the guest then reports, and keeps tokens out of what it logs and records.
 // The fakes are a scripted guest and a scripted plex.tv: they establish the
@@ -204,8 +203,21 @@ const CLAIM_PATH = `/myplex/claim?token=${CLAIM_TOKEN}`;
 
 // ── The library stage's answers ─────────────────────────────────────────────
 
+const MEDIA_PATH = "/mnt/movies";
 const SECTION_KEY = "7";
-const CREATE_PATH = "/library/sections?name=Media&type=movie&agent=com.plexapp.agents.none&scanner=Plex+Video+Files+Scanner&language=xn&location=%2Fmnt%2Fmedia";
+// Independent expectations copied from the app contract, not the VM implementation.
+const expectedLibraries = [
+  { name: "Movies", type: "movie", agent: "tv.plex.agents.movie", scanner: "Plex Movie", language: "en-US", location: "/mnt/movies", checkpointId: "lib_movies" },
+  { name: "TV Shows", type: "show", agent: "tv.plex.agents.series", scanner: "Plex TV Series", language: "en-US", location: "/mnt/shows", checkpointId: "lib_tv" },
+  { name: "Music", type: "artist", agent: "tv.plex.agents.music", scanner: "Plex Music", language: "en-US", location: "/mnt/music", checkpointId: "lib_music" },
+  { name: "Photos", type: "photo", agent: "com.plexapp.agents.none", scanner: "Plex Photo Scanner", language: "xn", location: "/mnt/photos", checkpointId: "lib_photos" },
+  { name: "Videos", type: "movie", agent: "com.plexapp.agents.none", scanner: "Plex Video Files Scanner", language: "xn", location: "/mnt/videos", checkpointId: "lib_videos" },
+];
+const createPaths = expectedLibraries.map(({ checkpointId: _, ...query }) => `/library/sections?${new URLSearchParams(query)}`);
+const sectionEntries = expectedLibraries.map((lib, i) => ({ key: String(7 + i), type: lib.type, title: lib.name, Location: [{ path: lib.location }] }));
+const sectionsCount = (n: number) => response({ MediaContainer: { size: n, Directory: sectionEntries.slice(0, n) } });
+const sectionsAll = () => sectionsCount(5);
+const CREATE_PATH = createPaths[0];
 const TRASH_OFF_PATH = "/:/prefs?autoEmptyTrash=0";
 const REFRESH_PATH = `/library/sections/${SECTION_KEY}/refresh`;
 
@@ -214,7 +226,7 @@ const sectionsMedia = () =>
   response({
     MediaContainer: {
       size: 1,
-      Directory: [{ key: SECTION_KEY, type: "movie", title: "Media", refreshing: false, Location: [{ id: 3, path: MEDIA_PATH }] }],
+      Directory: [{ key: SECTION_KEY, type: "movie", title: "Movies", refreshing: false, Location: [{ id: 3, path: MEDIA_PATH }] }],
     },
   });
 const sectionsOther = () =>
@@ -229,22 +241,18 @@ const prefsTrash = (value: unknown) => response({ MediaContainer: { size: 1, Set
 /** The guest's answers for the library stage; fresh objects each call because sequences are consumed. */
 function libraryAnswers(opts: { existing?: boolean } = {}): Record<string, Answers> {
   return {
-    "GET /library/sections": opts.existing ? sectionsMedia() : [sectionsNone(), sectionsMedia()],
-    [`POST ${CREATE_PATH}`]: response(""),
+    "GET /library/sections": opts.existing ? sectionsAll() : expectedLibraries.flatMap((_, i) => [sectionsCount(i), sectionsCount(i + 1)]),
+    ...Object.fromEntries(createPaths.map((path) => [`POST ${path}`, response("", 201)])),
     [`PUT ${TRASH_OFF_PATH}`]: response(""),
     "GET /:/prefs": prefsTrash(false),
-    [`GET ${REFRESH_PATH}`]: response(""),
+    ...Object.fromEntries(sectionEntries.map((section) => [`GET /library/sections/${section.key}/refresh`, response("")])),
   };
 }
 
-/** The requests the library stage makes on a server with no library yet, in order. */
 const LIBRARY_REQUESTS = [
-  "GET /library/sections",
-  `POST ${CREATE_PATH}`,
-  "GET /library/sections",
-  `PUT ${TRASH_OFF_PATH}`,
-  "GET /:/prefs",
-  `GET ${REFRESH_PATH}`,
+  `PUT ${TRASH_OFF_PATH}`, "GET /:/prefs",
+  ...createPaths.flatMap((path) => ["GET /library/sections", `POST ${path}`, "GET /library/sections"]),
+  ...sectionEntries.map((section) => `GET /library/sections/${section.key}/refresh`),
 ];
 
 /** A server that answers claimed, listed on the account as owned, with no library yet; the shape of a rerun on a server this hook set up. */
@@ -255,10 +263,10 @@ const ownedClaimedGuest = (): Record<string, Answers> => ({
   ...libraryAnswers(),
 });
 
-const ALL_CHECKPOINTS = ["ready", "claimed", "named", "token", "library", "scan"];
+const ALL_CHECKPOINTS = ["ready", "claimed", "named", "token", ...expectedLibraries.map((lib) => lib.checkpointId), "scan"];
 
 describe("run: a fresh server", () => {
-  test("claims it, names it after the VM, keeps the server's own token rather than the account's, creates the library, turns trash emptying off and asks for a scan", async () => {
+  test("claims it, names it after the VM, keeps the server's own token rather than the account's, creates all five libraries after disabling trash emptying and asks for their scans", async () => {
     const { ctx, recorded } = fakeContext({
       guest: {
         "GET /identity": [identity(false), identity(true)],
@@ -300,8 +308,8 @@ describe("run: a fresh server", () => {
       { id: "claimed", message: "Claimed on your Plex account" },
       { id: "named", message: "Named Plex_Test3" },
       { id: "token", message: "Kept the server's access token for HexOS" },
-      { id: "library", message: "Media library at /mnt/media (created)" },
-      { id: "scan", message: "Scan requested for Media" },
+      ...expectedLibraries.map((lib) => ({ id: lib.checkpointId, message: `${lib.name} at ${lib.location} (created)` })),
+      { id: "scan", message: "Scans requested for Movies, TV Shows, Music, Photos and Videos" },
     ]);
     expect(recorded.skipped).toEqual([]);
     expect(recorded.failed).toBeUndefined();
@@ -552,7 +560,77 @@ describe("run: every write is verified, and a failed or unverified one stops the
   });
 });
 
-describe("run: the library on the media mount", () => {
+describe("run: the five default media libraries", () => {
+  const startingUp = () => response("<html><body>the server is still starting up. Please retry later<br>'agent' is missing or invalid</body></html>", 400);
+
+  test("a partial setup rerun preserves existing libraries and creates only the missing ones", async () => {
+    const guest = ownedClaimedGuest();
+    const oldMedia = { key: "42", type: "movie", title: "Old Media", Location: [{ path: "/mnt/media" }] };
+    const listing = (count: number) => response({ MediaContainer: { Directory: [...sectionEntries.slice(0, count), oldMedia] } });
+    guest["GET /library/sections"] = [listing(2), listing(2), listing(2), listing(3), listing(3), listing(4), listing(4), listing(5)];
+    const { ctx, recorded } = fakeContext({ guest });
+    await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
+    expect(recorded.requests.filter((r) => r.method === "POST").map((r) => r.path)).toEqual(createPaths.slice(2));
+    expect(recorded.requests.some((r) => r.method === "DELETE")).toBe(false);
+    expect(recorded.requests.filter((r) => r.path.endsWith("/refresh"))).toHaveLength(5);
+    expect(recorded.emitted.filter((cp) => cp.message?.includes("already existed"))).toHaveLength(2);
+  });
+
+  test("a later library failure preserves completed checkpoints and does not claim all scans ran", async () => {
+    const guest = ownedClaimedGuest();
+    guest[`POST ${createPaths[2]}`] = response("refused", 400);
+    const { ctx, recorded } = fakeContext({ guest });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("/mnt/music");
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token", "lib_movies", "lib_tv"]);
+    expect(recorded.requests.some((r) => r.path.endsWith("/refresh"))).toBe(false);
+    expect(recorded.requests.some((r) => r.path === createPaths[3])).toBe(false);
+  });
+
+  test("a successful section listing does not mean agents are ready: an explicit startup refusal is retried", async () => {
+    const guest = ownedClaimedGuest();
+    guest["GET /library/sections"] = [sectionsNone(), sectionsNone(), ...(libraryAnswers()["GET /library/sections"] as Answer[]).slice(1)];
+    guest[`POST ${CREATE_PATH}`] = [startingUp(), response("", 201)];
+    const { ctx, recorded } = fakeContext({ guest });
+    await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
+    expect(recorded.sleeps).toEqual([5000]);
+    expect(recorded.requests.filter((request) => request.path.startsWith("/library/sections")).map((request) => `${request.method} ${request.path}`))
+      .toEqual(["GET /library/sections", `POST ${CREATE_PATH}`, ...LIBRARY_REQUESTS.slice(2)]);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(ALL_CHECKPOINTS);
+  });
+
+  test("a library appearing during the startup wait is reused without a second creation", async () => {
+    const guest = ownedClaimedGuest();
+    guest[`POST ${CREATE_PATH}`] = startingUp();
+    const { ctx, recorded } = fakeContext({ guest });
+    await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
+    expect(recorded.requests.filter((request) => request.method === "POST" && request.path === CREATE_PATH)).toHaveLength(1);
+    expect(recorded.emitted.find((cp) => cp.id === "lib_movies")?.message).toContain("already existed");
+  });
+
+  test("startup refusals have a bounded retry budget and never claim the media mount failed", async () => {
+    const guest = ownedClaimedGuest();
+    guest["GET /library/sections"] = sectionsNone();
+    guest[`POST ${CREATE_PATH}`] = startingUp();
+    const { ctx, recorded } = fakeContext({ guest });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("still starting up");
+    expect(recorded.requests.filter((request) => request.method === "POST" && request.path === CREATE_PATH)).toHaveLength(LIBRARY_ATTEMPTS);
+    expect(recorded.sleeps).toEqual(Array(LIBRARY_ATTEMPTS - 1).fill(5000));
+    expect(recorded.failed?.message).not.toContain("mount");
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token"]);
+  });
+
+  test("ordinary refusals and ambiguous transport failures are never replayed or exposed as response bodies", async () => {
+    for (const refusal of [response(`'agent' is missing or invalid ${ACCOUNT_TOKEN}`, 400), response("the server is still starting up. Please retry later", 403), new Error("request outcome ambiguous")]) {
+      const guest = ownedClaimedGuest();
+      guest[`POST ${CREATE_PATH}`] = refusal;
+      const { ctx, recorded } = fakeContext({ guest });
+      await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow();
+      expect(recorded.requests.filter((request) => request.method === "POST" && request.path === CREATE_PATH)).toHaveLength(1);
+      expect(recorded.sleeps).toEqual([]);
+      expect(JSON.stringify({ logs: recorded.logs, failure: recorded.failed })).not.toContain(ACCOUNT_TOKEN);
+    }
+  });
+
   test("a library already covering the mount is left alone: no creation, trash emptying still turned off, the scan still requested", async () => {
     const { ctx, recorded } = fakeContext({
       guest: {
@@ -568,22 +646,22 @@ describe("run: the library on the media mount", () => {
     expect(paths.some((path) => path.startsWith("POST /library/sections"))).toBe(false);
     expect(paths).toContain(`PUT ${TRASH_OFF_PATH}`);
     expect(paths).toContain(`GET ${REFRESH_PATH}`);
-    expect(recorded.emitted.find((cp) => cp.id === "library")?.message).toBe("Media library at /mnt/media (already existed)");
+    expect(recorded.emitted.find((cp) => cp.id === "lib_movies")?.message).toBe("Movies at /mnt/movies (already existed)");
     expect(recorded.logs.some((line) => line.includes("already covers"))).toBe(true);
   });
 
   test("another library elsewhere does not count: the mount gets its own", async () => {
     const guest = ownedClaimedGuest();
-    guest["GET /library/sections"] = [sectionsOther(), sectionsMedia()];
+    guest["GET /library/sections"] = [sectionsOther(), ...(libraryAnswers()["GET /library/sections"] as Answer[]).slice(1)];
     const { ctx, recorded } = fakeContext({ guest });
     await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
     expect(recorded.requests.some((request) => request.path === CREATE_PATH && request.method === "POST")).toBe(true);
-    expect(recorded.emitted.find((cp) => cp.id === "library")?.message).toContain("(created)");
+    expect(recorded.emitted.find((cp) => cp.id === "lib_movies")?.message).toContain("(created)");
   });
 
   test("a library subsystem that is still starting is waited for", async () => {
     const guest = ownedClaimedGuest();
-    guest["GET /library/sections"] = [response("still starting up", 500), response("still starting up", 500), sectionsNone(), sectionsMedia()];
+    guest["GET /library/sections"] = [response("still starting up", 500), response("still starting up", 500), ...(libraryAnswers()["GET /library/sections"] as Answer[])];
     const { ctx, recorded } = fakeContext({ guest });
     await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
     expect(recorded.sleeps).toEqual([5000, 5000]);
@@ -601,13 +679,13 @@ describe("run: the library on the media mount", () => {
     expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token"]);
   });
 
-  test("a library Plex refuses to create, which is what a missing mount looks like, fails and says so", async () => {
+  test("a library Plex refuses to create fails without assuming a cause or starting a scan", async () => {
     const guest = ownedClaimedGuest();
     guest[`POST ${CREATE_PATH}`] = response("The location does not exist", 400);
     const { ctx, recorded } = fakeContext({ guest });
-    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("may not be mounted");
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("refused to create");
     expect(recorded.failed?.context).toContainEqual({ label: "Status", value: "400" });
-    expect(recorded.requests.some((request) => request.path === TRASH_OFF_PATH)).toBe(false);
+    expect(recorded.requests.some((request) => request.path === TRASH_OFF_PATH)).toBe(true);
     expect(recorded.requests.some((request) => request.path === REFRESH_PATH)).toBe(false);
     expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token"]);
   });
@@ -642,8 +720,8 @@ describe("run: the library on the media mount", () => {
     guest[`GET ${REFRESH_PATH}`] = response("busy", 500);
     const { ctx, recorded } = fakeContext({ guest });
     await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("did not start the library scan");
-    expect(recorded.failed?.context).toContainEqual({ label: "Library", value: "Media" });
-    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token", "library"]);
+    expect(recorded.failed?.context).toContainEqual({ label: "Library", value: "Movies" });
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token", ...expectedLibraries.map((lib) => lib.checkpointId)]);
   });
 });
 
@@ -846,7 +924,7 @@ describe("readers", () => {
   });
 
   test("readSections reads Plex's sections document, an empty one, and nothing else", () => {
-    expect(readSections(sectionsMedia().text())).toEqual([{ key: "7", title: "Media", type: "movie", locations: ["/mnt/media"] }]);
+    expect(readSections(sectionsMedia().text())).toEqual([{ key: "7", title: "Movies", type: "movie", locations: ["/mnt/movies"] }]);
     expect(readSections(sectionsNone().text())).toEqual([]);
     expect(readSections(JSON.stringify({ MediaContainer: { Directory: [{ key: "1", title: "No locations", type: "show" }] } }))).toEqual([
       { key: "1", title: "No locations", type: "show", locations: [] },

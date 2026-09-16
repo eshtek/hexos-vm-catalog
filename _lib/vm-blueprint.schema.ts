@@ -148,9 +148,9 @@ const provisioningImageSchema = z.object({
         .object({
             profile: z.string().min(1).max(64),
             /**
-             * The profile mounts one of this NAS's SMB shares in the guest,
-             * read-only, from share name and credentials the installer
-             * collects (`mediaShare`, `mediaUsername`, `mediaPassword` in the
+             * The profile mounts the default HexOS media folders in the guest,
+             * read-only, using the credentials the installer
+             * collects (`mediaUsername`, `mediaPassword` in the
              * install options). The values are rendered by the backend's own
              * profile; the catalog still supplies no guest-executed content.
              */
@@ -737,6 +737,8 @@ export const HEXOS_VM_CAPABILITIES = [
      * library; the blueprint declares the capability rather than risk that.
      */
     'firstBootMedia',
+    /** Plex mounts all six resolved HexOS media locations and configures the app-compatible libraries. */
+    'plexDefaultMedia',
 ] as const;
 
 /**

@@ -234,9 +234,16 @@ whenever the pipeline gains or loses a step.
 5. Configure the domain (firmware, disk bus, NIC, CPU, memory) and boot.
 6. Wait for the guest to come online using the blueprint's readiness probe.
 
-Nothing is injected — no account is collected because the appliance ships with
-its own (HAOS-style). The blueprint supplies a bootable `source` image and a
-`readiness` probe that can see the appliance's own UI (e.g. mDNS + port).
+By default nothing is injected — no account is collected because the appliance
+ships with its own (HAOS-style). The blueprint supplies a bootable `source`
+image and a `readiness` probe that can see the appliance's own UI (e.g. mDNS +
+port). A blueprint may instead name a first-boot profile the backend ships
+(`firstBoot.profile`, one of the names in `_lib/contract.ts`), which the backend
+injects on the first boot the way the installer seeds are: the Plex appliance
+names `plex-appliance` and sets `firstBoot.mediaShare: true`, which makes the
+install ask for an SMB username and password so the guest can mount the default
+HexOS media folders read-only. The profile's content lives in the platform; the
+catalog only names it.
 
 #### `cloud-init` — vendor image, configured on first boot
 
@@ -389,6 +396,8 @@ Scripts live under [`_hooks/`](_hooks/) (invisible to the sync as a directory; r
 
 Two rules for authors. A setup hook must never write to a guest it did not install, and must tolerate a guest the user has already set up by hand: confirm state, record what the guest actually establishes (a status page that is not served is "unknown", never proof of anything), and leave account creation to the user (or to a migration that carries that intent). And never put a credential into a checkpoint message or a log line; `ctx.secrets` keeps what a hook collects, bound to the VM instance and removed with it. The platform snapshots a blueprint's declarations at install and runs from that snapshot, including on a rerun; adopting a later catalog edit is a separate, explicit action, not part of "Run setup".
 
+The Plex appliance mounts the configured HexOS Media, Movies, Shows, Music, Photos and Videos folders read-only using the installation's SMB account. The hook matches the Plex app: Movies (`/mnt/movies`), TV Shows (`/mnt/shows`), Music (`/mnt/music`), Photos (`/mnt/photos`) and Videos (`/mnt/videos`), with the same agents, scanners and languages. Media is mounted at `/mnt/media` for manual use; it is not an extra library. Before creating libraries the hook disables automatic trash emptying, reuses each existing library by its exact location, and then requests a scan of all five. Existing libraries are never deleted or repointed. A successful section listing does not establish that Plex's agents have finished starting: library creation retries only Plex's explicit HTTP 400 startup refusal, up to eight attempts five seconds apart, checking for an existing library before each attempt. Other refusals and transport exceptions stop setup; an accepted creation is verified by listing the sections again.
+
 ### Screenshots
 
 The detail sheet renders a gallery of up to **5** screenshots of the desktop (or web UI) the
@@ -457,6 +466,7 @@ bun run validate
 The validator checks each root `*.json` against the vendored blueprint schema and each `apps/*.json` against the vendored app schema, parses any setup-hook and widget declarations with the platform's own parser (vendored as [`_lib/vm-surfaces.ts`](_lib/vm-surfaces.ts)), checks that every declared script exists and imports nothing at runtime, then applies a few contract checks the schema can't express ([`_lib/contract.ts`](_lib/contract.ts)):
 
 - `cloudInit.userDataTemplate` / `answerFile.template` / `seed.template` must name a template the backend actually ships (`linux-default`, `win11-pro`, `win10-pro`, `ubuntu-desktop-autoinstall`, `fedora-workstation-kickstart`, `fedora-kde-kickstart`, `opensuse-agama-profile`, `bazzite-kickstart`, `mint-preseed`, `zorin-preseed`, `pop-live-exec`, `omarchy-autoinstall`, `cachyos-headless`, `steamos-repair`, plus the machine-config pair `fcos-ignition` / `flatcar-ignition` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
+- `firstBoot.profile` must name a first-boot profile the backend actually ships (`openwrt-lan-dhcp`, `plex-appliance`); an unknown name would fail the install loudly, so it is caught here instead
 - a duplicate `id` across two files is an error (the sync skips the duplicate)
 - every blueprint must have a row in the README tables above — this is the step that has actually been skipped in practice, so it is an error rather than a convention
 - `apps.runtime` must match the guest the provisioning strategy implies (answer-file is Windows, so `winget`); a desktop with no `apps.runtime` warns, since it will offer no apps at all
@@ -480,7 +490,7 @@ cd _lib
 bun run sync-schema
 ```
 
-When the backend adds a new provisioning template, also update the allowlists in [`_lib/contract.ts`](_lib/contract.ts).
+When the backend adds a new provisioning template or first-boot profile, also update the allowlists in [`_lib/contract.ts`](_lib/contract.ts).
 
 ## Checking for new versions
 

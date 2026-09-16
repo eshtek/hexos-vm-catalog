@@ -1,11 +1,11 @@
 {
   "id": "plex-server",
   "name": "Plex Media Server",
-  "description": "Plex Media Server as a dedicated virtual machine, installed from Ubuntu's official cloud image and configured to start Plex on first boot. Open it and you land in Plex's own web interface: there is no operating system to set up and no account to create. Sign in to Plex during the install and HexOS claims the server on your account and names it; otherwise claim it yourself from Plex's own setup page. Media libraries are added from inside Plex.",
+  "description": "Plex Media Server as a dedicated virtual machine, installed from Ubuntu's official cloud image and configured to start Plex on first boot. Open it and you land in Plex's own web interface: there is no operating system to set up and no account to create. Sign in to Plex during the install and HexOS claims the server on your account and names it; otherwise claim it yourself from Plex's own setup page. HexOS mounts its default media folders read-only; signing in also configures Movies, TV Shows, Music, Photos and Videos libraries.",
   "website": "https://www.plex.tv",
   "category": "appliance",
   "truenasVersion": ">=25.04.2.6",
-  "requiredCapabilities": ["firstBoot", "plexAppliance", "firstBootMedia"],
+  "requiredCapabilities": ["firstBoot", "plexAppliance", "firstBootMedia", "plexDefaultMedia"],
   "provisioning": {
     "strategy": "image",
     "source": {
@@ -46,11 +46,11 @@
     {
       "id": "plex-account",
       "title": "Sign in to Plex",
-      "description": "Claims the new server on your Plex account, names it, and creates one Media library on the share the appliance mounts, so it opens signed in with your videos. An existing claim is kept as it is: a server you already own is still named and its token kept, and a server your account does not own is not touched. A library that already covers the mount is left alone.",
+      "description": "Claims the new server on your Plex account, names it, and configures Movies, TV Shows, Music, Photos and Videos libraries from the default HexOS folders. An existing claim is kept as it is: a server you already own is still named and its token kept, and a server your account does not own is not touched. Existing libraries at those locations are left alone.",
       "events": ["onAfterReady"],
       "optional": true,
       "userOptional": {
-        "description": "Sign in to your Plex account once the server is running and HexOS claims it for you and names it after this VM. Leave this off to claim it yourself from Plex's own setup page. By enabling this, you agree that HexOS claims the server on your behalf under the Plex Terms of Service.",
+        "description": "Sign in to your Plex account once the server is running and HexOS claims it for you, names it after this VM, and configures the five default media libraries. Leave this off to claim it yourself from Plex's own setup page. By enabling this, you agree that HexOS claims the server on your behalf under the Plex Terms of Service.",
         "default": false,
         "link": {
           "url": "https://www.plex.tv/about/privacy-legal/plex-terms-of-service/",

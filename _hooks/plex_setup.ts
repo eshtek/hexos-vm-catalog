@@ -12,9 +12,8 @@ import type { VMHookContext } from "../_lib/hook_context";
  * the account owns it, and the hook stops before any write if the account
  * does not own it or plex.tv does not list it — a shared server, or someone
  * else's. An identity that does not say whether the server is claimed is not
- * proof that it is unclaimed, and stops the hook too. Libraries are not
- * created here: the appliance mounts no media of its own, so a library would
- * only point at an empty folder.
+ * proof that it is unclaimed, and stops the hook too. The five libraries use
+ * the appliance's default HexOS mounts, with trash emptying disabled and scans requested.
  *
  * Two tokens are involved and they are not interchangeable. The pin flow
  * yields the account token, which authorises the claim. The credential kept
@@ -51,12 +50,16 @@ const CLAIM_RETRY_MS = 5000;
 /** plex.tv lists a freshly claimed server once it has published itself: twelve looks, ten seconds apart. */
 export const RESOURCES_ATTEMPTS = 12;
 const RESOURCES_RETRY_MS = 10000;
-/** Where the appliance mounts the user's media share; the platform's first-boot profile owns the mount. */
-export const MEDIA_PATH = "/mnt/media";
-export const LIBRARY_NAME = "Media";
-/** One library of any video files, with no metadata agent: the appliance mounts one folder and reads what is in it. */
-const LIBRARY_KIND = { type: "movie", agent: "com.plexapp.agents.none", scanner: "Plex Video Files Scanner", language: "xn" };
-/** Plex's library subsystem answers a little after Plex itself does: eight looks, five seconds apart. */
+/** Matches the app hook's library types; the first-boot profile mounts each HexOS location here. */
+export const LIBRARIES = [
+  { name: "Movies", location: "/mnt/movies", type: "movie", agent: "tv.plex.agents.movie", scanner: "Plex Movie", language: "en-US", checkpointId: "lib_movies" },
+  { name: "TV Shows", location: "/mnt/shows", type: "show", agent: "tv.plex.agents.series", scanner: "Plex TV Series", language: "en-US", checkpointId: "lib_tv" },
+  { name: "Music", location: "/mnt/music", type: "artist", agent: "tv.plex.agents.music", scanner: "Plex Music", language: "en-US", checkpointId: "lib_music" },
+  { name: "Photos", location: "/mnt/photos", type: "photo", agent: "com.plexapp.agents.none", scanner: "Plex Photo Scanner", language: "xn", checkpointId: "lib_photos" },
+  { name: "Videos", location: "/mnt/videos", type: "movie", agent: "com.plexapp.agents.none", scanner: "Plex Video Files Scanner", language: "xn", checkpointId: "lib_videos" },
+] as const;
+type Library = (typeof LIBRARIES)[number];
+/** Plex's section listing and library creation can become ready separately: eight looks, five seconds apart. */
 export const LIBRARY_ATTEMPTS = 8;
 const LIBRARY_RETRY_MS = 5000;
 /** Plex's preference that removes library items whose files went missing at the next scan; off, so an absent share loses nothing. */
@@ -315,8 +318,8 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
     { id: "claimed", message: "Claiming the server on your Plex account" },
     { id: "named", message: "Naming the server" },
     { id: "token", message: "Keeping the server's access token" },
-    { id: "library", message: `Creating the ${LIBRARY_NAME} library on the media share` },
-    { id: "scan", message: "Asking Plex to scan it" },
+    ...LIBRARIES.map((library) => ({ id: library.checkpointId, message: `Creating library: ${library.name}` })),
+    { id: "scan", message: "Asking Plex to scan the libraries" },
   ]);
 
   const authToken = readAccountToken(ctx.getInput(SIGN_IN_INPUT));
@@ -393,21 +396,24 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
   }
   await ctx.emitCheckpoint("token", "Kept the server's access token for HexOS");
 
-  // The library on the mounted share, created once and left alone after; a
-  // path Plex cannot see is what a missing mount looks like from here, and
-  // that fails rather than quietly leaving the appliance with no library.
-  const { section, created } = await ensureLibrary(ctx, authToken);
+  // Disable trash removal before creating a section: creation can trigger a scan.
   await disableTrashEmptying(ctx, authToken);
-  await ctx.emitCheckpoint("library", `${LIBRARY_NAME} library at ${MEDIA_PATH} (${created ? "created" : "already existed"})`);
-
-  const scan = await ctx.fetch(`/library/sections/${encodeURIComponent(section.key)}/refresh`, { headers: withToken(authToken) });
-  if (scan.status !== 200) {
-    ctx.fail("Plex did not start the library scan", [
-      { label: "Library", value: section.title },
-      { label: "Status", value: String(scan.status) },
-    ]);
+  const sections: PlexSection[] = [];
+  for (const library of LIBRARIES) {
+    const { section, created } = await ensureLibrary(ctx, authToken, library);
+    sections.push(section);
+    await ctx.emitCheckpoint(library.checkpointId, `${library.name} at ${library.location} (${created ? "created" : "already existed"})`);
   }
-  await ctx.emitCheckpoint("scan", `Scan requested for ${section.title}`);
+  for (const section of sections) {
+    const scan = await ctx.fetch(`/library/sections/${encodeURIComponent(section.key)}/refresh`, { headers: withToken(authToken) });
+    if (scan.status !== 200) {
+      ctx.fail("Plex did not start the library scan", [
+        { label: "Library", value: section.title },
+        { label: "Status", value: String(scan.status) },
+      ]);
+    }
+  }
+  await ctx.emitCheckpoint("scan", "Scans requested for Movies, TV Shows, Music, Photos and Videos");
 }
 
 /** The sections Plex lists, once its library subsystem answers; fails after the declared attempts. */
@@ -432,25 +438,41 @@ async function listSections(ctx: VMHookContext, authToken: string): Promise<Plex
  * mount, or one created for it and then read back. Creation is verified by
  * listing, never trusted from the creation answer.
  */
-async function ensureLibrary(ctx: VMHookContext, authToken: string): Promise<{ section: PlexSection; created: boolean }> {
-  const existing = (await listSections(ctx, authToken)).find((section) => section.locations.includes(MEDIA_PATH));
-  if (existing) {
-    ctx.log(`library "${existing.title}" already covers ${MEDIA_PATH}; leaving it alone`);
-    return { section: existing, created: false };
+async function ensureLibrary(ctx: VMHookContext, authToken: string, library: Library): Promise<{ section: PlexSection; created: boolean }> {
+  const { name, type, agent, scanner, language, location } = library;
+  const query = new URLSearchParams({ name, type, agent, scanner, language, location });
+  for (let attempt = 1; attempt <= LIBRARY_ATTEMPTS; attempt++) {
+    // Recheck after a wait: another setup may have created the library.
+    const existing = (await listSections(ctx, authToken)).find((section) => section.locations.includes(library.location));
+    if (existing) {
+      ctx.log(`library "${existing.title}" already covers ${library.location}; leaving it alone`);
+      return { section: existing, created: false };
+    }
+    const creation = await ctx.fetch(`/library/sections?${query.toString()}`, { method: "POST", headers: withToken(authToken) });
+    // Only Plex's explicit startup refusal is safe to retry. A transport
+    // exception may follow a successful write and must propagate unchanged.
+    // Do not log the response body: it is untrusted and may carry secrets.
+    if (creation.status === 400 && creation.text().includes("the server is still starting up. Please retry later")) {
+      ctx.log(`library creation attempt ${attempt}/${LIBRARY_ATTEMPTS}: Plex is still starting up`);
+      if (attempt < LIBRARY_ATTEMPTS) await ctx.sleep(LIBRARY_RETRY_MS);
+      continue;
+    }
+    if (creation.status < 200 || creation.status >= 300) {
+      return ctx.fail(`Plex refused to create a library at ${library.location}`, [
+        { label: "Status", value: String(creation.status) },
+        { label: "Next step", value: "Check Plex's library settings and media access, then run setup again" },
+      ]);
+    }
+    const section = (await listSections(ctx, authToken)).find((entry) => entry.locations.includes(library.location));
+    if (!section) {
+      return ctx.fail("Plex accepted the library but does not list it", [{ label: "Location", value: library.location }]);
+    }
+    return { section, created: true };
   }
-  const query = new URLSearchParams({ name: LIBRARY_NAME, ...LIBRARY_KIND, location: MEDIA_PATH });
-  const creation = await ctx.fetch(`/library/sections?${query.toString()}`, { method: "POST", headers: withToken(authToken) });
-  if (creation.status < 200 || creation.status >= 300) {
-    ctx.fail(`Plex could not create a library at ${MEDIA_PATH}; the media share may not be mounted`, [
-      { label: "Status", value: String(creation.status) },
-      { label: "Next step", value: "Check the share and its credentials, then restart the VM and run setup again" },
-    ]);
-  }
-  const section = (await listSections(ctx, authToken)).find((entry) => entry.locations.includes(MEDIA_PATH));
-  if (!section) {
-    return ctx.fail("Plex accepted the library but does not list it", [{ label: "Location", value: MEDIA_PATH }]);
-  }
-  return { section, created: true };
+  return ctx.fail(`Plex is still starting up and could not create ${library.name}`, [
+    { label: "Attempts", value: String(LIBRARY_ATTEMPTS) },
+    { label: "Next step", value: "Allow Plex to finish starting, then run setup again" },
+  ]);
 }
 
 /** Plex must not drop library items whose files are missing at a scan: an absent share is temporary, the records are not. */
