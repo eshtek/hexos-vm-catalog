@@ -147,9 +147,27 @@ const provisioningImageSchema = z.object({
     firstBoot: z
         .object({
             profile: z.string().min(1).max(64),
+            /**
+             * The profile mounts one of this NAS's SMB shares in the guest,
+             * read-only, from share name and credentials the installer
+             * collects (`mediaShare`, `mediaUsername`, `mediaPassword` in the
+             * install options). The values are rendered by the backend's own
+             * profile; the catalog still supplies no guest-executed content.
+             */
+            mediaShare: z.boolean().optional(),
         })
         .optional(),
 });
+
+/** An SMB share name as TrueNAS allows it, without the characters a mount unit or a shell would read. */
+export const VM_MEDIA_SHARE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ._-]{0,79}$/;
+/** An SMB account name, the charset TrueNAS's own user names use. */
+export const VM_MEDIA_USERNAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+/**
+ * Printable ASCII with no leading or trailing space: the value lands on a
+ * `password=` line that mount.cifs reads to the end of the line.
+ */
+export const VM_MEDIA_PASSWORD_PATTERN = /^[\x21-\x7e](?:[\x20-\x7e]{0,126}[\x21-\x7e])?$/;
 
 const provisioningCloudInitSchema = z.object({
     strategy: z.literal('cloud-init'),
@@ -702,6 +720,23 @@ export const HEXOS_VM_CAPABILITIES = [
      * unusable without it — on the CDROM path they boot with no account.
      */
     'virtioSeed',
+    /**
+     * The `plex-appliance` first-boot profile: a stock Ubuntu cloud image
+     * seeded to install Plex and report ready only once Plex answers, so the
+     * guest is an appliance with no account and no operating system to meet.
+     * A box with `firstBoot` but an older backend has the mechanism and not
+     * this profile, and would fail the install on an unknown profile name,
+     * so the blueprint declares the profile itself rather than the mechanism.
+     */
+    'plexAppliance',
+    /**
+     * A first-boot profile can mount one of the NAS's SMB shares in the guest
+     * from install-time inputs (`firstBoot.mediaShare` on the blueprint, the
+     * `media*` install options). A box without this ignores those options,
+     * so the guest would boot with no share and its setup would fail at the
+     * library; the blueprint declares the capability rather than risk that.
+     */
+    'firstBootMedia',
 ] as const;
 
 /**

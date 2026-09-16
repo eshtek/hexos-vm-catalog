@@ -51,6 +51,23 @@ const CLAIM_RETRY_MS = 5000;
 /** plex.tv lists a freshly claimed server once it has published itself: twelve looks, ten seconds apart. */
 export const RESOURCES_ATTEMPTS = 12;
 const RESOURCES_RETRY_MS = 10000;
+/** Where the appliance mounts the user's media share; the platform's first-boot profile owns the mount. */
+export const MEDIA_PATH = "/mnt/media";
+export const LIBRARY_NAME = "Media";
+/** One library of any video files, with no metadata agent: the appliance mounts one folder and reads what is in it. */
+const LIBRARY_KIND = { type: "movie", agent: "com.plexapp.agents.none", scanner: "Plex Video Files Scanner", language: "xn" };
+/** Plex's library subsystem answers a little after Plex itself does: eight looks, five seconds apart. */
+export const LIBRARY_ATTEMPTS = 8;
+const LIBRARY_RETRY_MS = 5000;
+/** Plex's preference that removes library items whose files went missing at the next scan; off, so an absent share loses nothing. */
+const TRASH_PREFERENCE = "autoEmptyTrash";
+
+export interface PlexSection {
+  key: string;
+  title: string;
+  type: string;
+  locations: string[];
+}
 
 export interface PlexSignIn {
   authToken: string;
@@ -209,6 +226,44 @@ export function readServerToken(text: string, machineIdentifier: string): PlexLi
   };
 }
 
+/**
+ * The library sections `/library/sections` reports, as JSON: a `Directory`
+ * per section with its `key`, `type`, `title` and `Location` list. No
+ * `Directory` means no sections. Anything that is not that document reads as
+ * undefined, so a subsystem that is still starting is told apart from a
+ * server with no libraries.
+ */
+export function readSections(text: string): PlexSection[] | undefined {
+  const parsed = parseJson(text) as { MediaContainer?: { Directory?: unknown } } | undefined;
+  const container = parsed?.MediaContainer;
+  if (!container || typeof container !== "object") return undefined;
+  const directories = container.Directory;
+  if (directories === undefined) return [];
+  if (!Array.isArray(directories)) return undefined;
+  const sections: PlexSection[] = [];
+  for (const entry of directories) {
+    if (typeof entry !== "object" || entry === null) return undefined;
+    const { key, title, type, Location } = entry as { key?: unknown; title?: unknown; type?: unknown; Location?: unknown };
+    if (typeof key !== "string" || typeof title !== "string" || typeof type !== "string") return undefined;
+    const locations: string[] = [];
+    for (const location of Array.isArray(Location) ? Location : []) {
+      const path = typeof location === "object" && location !== null ? (location as { path?: unknown }).path : undefined;
+      if (typeof path === "string") locations.push(path);
+    }
+    sections.push({ key, title, type, locations });
+  }
+  return sections;
+}
+
+/** One preference's value from `/:/prefs` as JSON (`MediaContainer.Setting[]`), or undefined when it is not listed. */
+export function readPreference(text: string, id: string): unknown {
+  const parsed = parseJson(text) as { MediaContainer?: { Setting?: unknown } } | undefined;
+  const settings = parsed?.MediaContainer?.Setting;
+  if (!Array.isArray(settings)) return undefined;
+  const setting = settings.find((entry) => typeof entry === "object" && entry !== null && (entry as { id?: unknown }).id === id);
+  return setting ? (setting as { value?: unknown }).value : undefined;
+}
+
 /** The answered server name, or the VM's own name when the question was left blank. */
 export function chooseServerName(ctx: Pick<VMHookContext, "inputs" | "vm">): string {
   const answered = ctx.inputs[SERVER_NAME_INPUT];
@@ -260,6 +315,8 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
     { id: "claimed", message: "Claiming the server on your Plex account" },
     { id: "named", message: "Naming the server" },
     { id: "token", message: "Keeping the server's access token" },
+    { id: "library", message: `Creating the ${LIBRARY_NAME} library on the media share` },
+    { id: "scan", message: "Asking Plex to scan it" },
   ]);
 
   const authToken = readAccountToken(ctx.getInput(SIGN_IN_INPUT));
@@ -335,6 +392,80 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
     ctx.fail("The server's access token could not be read back from the platform's store");
   }
   await ctx.emitCheckpoint("token", "Kept the server's access token for HexOS");
+
+  // The library on the mounted share, created once and left alone after; a
+  // path Plex cannot see is what a missing mount looks like from here, and
+  // that fails rather than quietly leaving the appliance with no library.
+  const { section, created } = await ensureLibrary(ctx, authToken);
+  await disableTrashEmptying(ctx, authToken);
+  await ctx.emitCheckpoint("library", `${LIBRARY_NAME} library at ${MEDIA_PATH} (${created ? "created" : "already existed"})`);
+
+  const scan = await ctx.fetch(`/library/sections/${encodeURIComponent(section.key)}/refresh`, { headers: withToken(authToken) });
+  if (scan.status !== 200) {
+    ctx.fail("Plex did not start the library scan", [
+      { label: "Library", value: section.title },
+      { label: "Status", value: String(scan.status) },
+    ]);
+  }
+  await ctx.emitCheckpoint("scan", `Scan requested for ${section.title}`);
+}
+
+/** The sections Plex lists, once its library subsystem answers; fails after the declared attempts. */
+async function listSections(ctx: VMHookContext, authToken: string): Promise<PlexSection[]> {
+  let lastStatus: number | undefined;
+  for (let attempt = 1; attempt <= LIBRARY_ATTEMPTS; attempt++) {
+    const response = await ctx.fetch("/library/sections", { headers: withToken(authToken) });
+    lastStatus = response.status;
+    const sections = response.status === 200 ? readSections(response.text()) : undefined;
+    if (sections) return sections;
+    ctx.log(`library attempt ${attempt}/${LIBRARY_ATTEMPTS}: sections answered ${response.status}`);
+    if (attempt < LIBRARY_ATTEMPTS) await ctx.sleep(LIBRARY_RETRY_MS);
+  }
+  return ctx.fail("Plex's library subsystem did not answer", [
+    { label: "Attempts", value: String(LIBRARY_ATTEMPTS) },
+    { label: "Last status", value: lastStatus === undefined ? "no answer" : String(lastStatus) },
+  ]);
+}
+
+/**
+ * The library on the media mount: the existing section whose location is the
+ * mount, or one created for it and then read back. Creation is verified by
+ * listing, never trusted from the creation answer.
+ */
+async function ensureLibrary(ctx: VMHookContext, authToken: string): Promise<{ section: PlexSection; created: boolean }> {
+  const existing = (await listSections(ctx, authToken)).find((section) => section.locations.includes(MEDIA_PATH));
+  if (existing) {
+    ctx.log(`library "${existing.title}" already covers ${MEDIA_PATH}; leaving it alone`);
+    return { section: existing, created: false };
+  }
+  const query = new URLSearchParams({ name: LIBRARY_NAME, ...LIBRARY_KIND, location: MEDIA_PATH });
+  const creation = await ctx.fetch(`/library/sections?${query.toString()}`, { method: "POST", headers: withToken(authToken) });
+  if (creation.status < 200 || creation.status >= 300) {
+    ctx.fail(`Plex could not create a library at ${MEDIA_PATH}; the media share may not be mounted`, [
+      { label: "Status", value: String(creation.status) },
+      { label: "Next step", value: "Check the share and its credentials, then restart the VM and run setup again" },
+    ]);
+  }
+  const section = (await listSections(ctx, authToken)).find((entry) => entry.locations.includes(MEDIA_PATH));
+  if (!section) {
+    return ctx.fail("Plex accepted the library but does not list it", [{ label: "Location", value: MEDIA_PATH }]);
+  }
+  return { section, created: true };
+}
+
+/** Plex must not drop library items whose files are missing at a scan: an absent share is temporary, the records are not. */
+async function disableTrashEmptying(ctx: VMHookContext, authToken: string): Promise<void> {
+  const set = await ctx.fetch(`/:/prefs?${TRASH_PREFERENCE}=0`, { method: "PUT", headers: withToken(authToken) });
+  if (set.status !== 200) {
+    ctx.fail("Plex refused the trash-emptying setting", [{ label: "Status", value: String(set.status) }]);
+  }
+  const value = readPreference((await ctx.fetch("/:/prefs", { headers: withToken(authToken) })).text(), TRASH_PREFERENCE);
+  if (readClaimed(value) !== false) {
+    ctx.fail("Plex did not take the trash-emptying setting", [
+      { label: "Preference", value: TRASH_PREFERENCE },
+      { label: "Reported", value: value === undefined ? "(not listed)" : String(value) },
+    ]);
+  }
 }
 
 async function fetchClaimToken(plexTv: PlexTvFetch, authToken: string, ctx: VMHookContext): Promise<string> {

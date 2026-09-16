@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import type { VMHookContext, VMHookFetchInit, VMHookResponse, WaitForAppOptions } from "../_lib/hook_context";
 import {
   CLAIM_ATTEMPTS,
+  LIBRARY_ATTEMPTS,
+  MEDIA_PATH,
   type PlexTvFetch,
   RESOURCES_ATTEMPTS,
   SERVER_TOKEN_SECRET,
@@ -11,6 +13,8 @@ import {
   readClaimed,
   readFriendlyName,
   readIdentity,
+  readPreference,
+  readSections,
   readServerToken,
   runWith,
 } from "./plex_setup";
@@ -20,11 +24,13 @@ import {
 // to a server that answers already claimed unless plex.tv lists it as owned by
 // the signed-in account (on a fresh server the claim precedes that lookup, and
 // a failure afterwards says so), names an owned server and keeps its own
-// token, verifies each write against what the guest then reports, and keeps
-// tokens out of what it logs and records. The fakes are a scripted guest and a
-// scripted plex.tv: they establish the hook's behaviour for the answers
-// scripted here, not how a real Plex or plex.tv answers a shared or Home-user
-// token, and not the platform's identity-bound secret store.
+// token, creates one library on the media mount if none covers it, turns
+// Plex's trash emptying off, asks for a scan, verifies each write against what
+// the guest then reports, and keeps tokens out of what it logs and records.
+// The fakes are a scripted guest and a scripted plex.tv: they establish the
+// hook's behaviour for the answers scripted here, not how a real Plex or
+// plex.tv answers a shared or Home-user token, and not the platform's
+// identity-bound secret store.
 
 const ACCOUNT_TOKEN = "acct-token-1";
 const CLAIM_TOKEN = "claim-token-1";
@@ -196,38 +202,88 @@ function recordedSurfaces(recorded: Recorded): string {
 
 const CLAIM_PATH = `/myplex/claim?token=${CLAIM_TOKEN}`;
 
-/** A server that answers claimed, listed on the account as owned; the shape of a rerun on a server this hook set up. */
-const OWNED_CLAIMED_GUEST = {
+// ── The library stage's answers ─────────────────────────────────────────────
+
+const SECTION_KEY = "7";
+const CREATE_PATH = "/library/sections?name=Media&type=movie&agent=com.plexapp.agents.none&scanner=Plex+Video+Files+Scanner&language=xn&location=%2Fmnt%2Fmedia";
+const TRASH_OFF_PATH = "/:/prefs?autoEmptyTrash=0";
+const REFRESH_PATH = `/library/sections/${SECTION_KEY}/refresh`;
+
+const sectionsNone = () => response({ MediaContainer: { size: 0 } });
+const sectionsMedia = () =>
+  response({
+    MediaContainer: {
+      size: 1,
+      Directory: [{ key: SECTION_KEY, type: "movie", title: "Media", refreshing: false, Location: [{ id: 3, path: MEDIA_PATH }] }],
+    },
+  });
+const sectionsOther = () =>
+  response({
+    MediaContainer: {
+      size: 1,
+      Directory: [{ key: "2", type: "movie", title: "Movies", refreshing: false, Location: [{ id: 1, path: "/data/movies" }] }],
+    },
+  });
+const prefsTrash = (value: unknown) => response({ MediaContainer: { size: 1, Setting: [{ id: "autoEmptyTrash", type: "bool", value }] } });
+
+/** The guest's answers for the library stage; fresh objects each call because sequences are consumed. */
+function libraryAnswers(opts: { existing?: boolean } = {}): Record<string, Answers> {
+  return {
+    "GET /library/sections": opts.existing ? sectionsMedia() : [sectionsNone(), sectionsMedia()],
+    [`POST ${CREATE_PATH}`]: response(""),
+    [`PUT ${TRASH_OFF_PATH}`]: response(""),
+    "GET /:/prefs": prefsTrash(false),
+    [`GET ${REFRESH_PATH}`]: response(""),
+  };
+}
+
+/** The requests the library stage makes on a server with no library yet, in order. */
+const LIBRARY_REQUESTS = [
+  "GET /library/sections",
+  `POST ${CREATE_PATH}`,
+  "GET /library/sections",
+  `PUT ${TRASH_OFF_PATH}`,
+  "GET /:/prefs",
+  `GET ${REFRESH_PATH}`,
+];
+
+/** A server that answers claimed, listed on the account as owned, with no library yet; the shape of a rerun on a server this hook set up. */
+const ownedClaimedGuest = (): Record<string, Answers> => ({
   "GET /identity": identity(true),
   "PUT /:/prefs?FriendlyName=Plex_Test3": response(""),
   "GET /": root("Plex_Test3"),
-};
+  ...libraryAnswers(),
+});
+
+const ALL_CHECKPOINTS = ["ready", "claimed", "named", "token", "library", "scan"];
 
 describe("run: a fresh server", () => {
-  test("claims it, names it after the VM, and keeps the server's own token rather than the account's", async () => {
+  test("claims it, names it after the VM, keeps the server's own token rather than the account's, creates the library, turns trash emptying off and asks for a scan", async () => {
     const { ctx, recorded } = fakeContext({
       guest: {
         "GET /identity": [identity(false), identity(true)],
         [`POST ${CLAIM_PATH}`]: response('<MyPlex signInState="ok"/>'),
         "PUT /:/prefs?FriendlyName=Plex_Test3": response(""),
         "GET /": root("Plex_Test3"),
+        ...libraryAnswers(),
       },
     });
     const plexTv = fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer });
     await runWith(ctx, plexTv);
 
-    expect(recorded.registered).toEqual(["ready", "claimed", "named", "token"]);
+    expect(recorded.registered).toEqual(ALL_CHECKPOINTS);
     expect(recorded.waits).toEqual([{ path: "/identity", opts: { maxAttempts: 24, headers: { Accept: "application/json" } } }]);
     expect(recorded.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
       `POST ${CLAIM_PATH}`,
       "GET /identity",
       "PUT /:/prefs?FriendlyName=Plex_Test3",
       "GET /",
+      ...LIBRARY_REQUESTS,
     ]);
-    // The account token authorises the claim, the name and the root read, as a
-    // header; the identity re-read after the claim carries none; no path carries it.
+    // The account token authorises everything after the claim as a header;
+    // the identity re-read after the claim carries none; no path carries it.
     const authorised = recorded.requests.filter((request) => request.path !== "/identity");
-    expect(authorised).toHaveLength(3);
+    expect(authorised).toHaveLength(3 + LIBRARY_REQUESTS.length);
     for (const request of authorised) expect(request.headers["X-Plex-Token"]).toBe(ACCOUNT_TOKEN);
     expect(recorded.requests.find((request) => request.path === "/identity")?.headers).toEqual({ Accept: "application/json" });
     for (const request of recorded.requests) expect(request.path).not.toContain(ACCOUNT_TOKEN);
@@ -244,6 +300,8 @@ describe("run: a fresh server", () => {
       { id: "claimed", message: "Claimed on your Plex account" },
       { id: "named", message: "Named Plex_Test3" },
       { id: "token", message: "Kept the server's access token for HexOS" },
+      { id: "library", message: "Media library at /mnt/media (created)" },
+      { id: "scan", message: "Scan requested for Media" },
     ]);
     expect(recorded.skipped).toEqual([]);
     expect(recorded.failed).toBeUndefined();
@@ -256,6 +314,7 @@ describe("run: a fresh server", () => {
         [`POST ${CLAIM_PATH}`]: response(""),
         "PUT /:/prefs?FriendlyName=Plex_Test3": response(""),
         "GET /": root("Plex_Test3"),
+        ...libraryAnswers(),
       },
     });
     await runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer }));
@@ -273,6 +332,7 @@ describe("run: a fresh server", () => {
         [`POST ${CLAIM_PATH}`]: response(""),
         "PUT /:/prefs?FriendlyName=Family%20Plex": response(""),
         "GET /": root("Family Plex"),
+        ...libraryAnswers(),
       },
     });
     await runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer }));
@@ -290,6 +350,7 @@ describe("run: a fresh server", () => {
         [`POST ${CLAIM_PATH}`]: response(""),
         "PUT /:/prefs?FriendlyName=Media_Box": response(""),
         "GET /": root("Media_Box"),
+        ...libraryAnswers(),
       },
     });
     await runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer }));
@@ -298,15 +359,16 @@ describe("run: a fresh server", () => {
 });
 
 describe("run: a server that answers claimed", () => {
-  test("listed on the account as owned: the claim is left alone, no claim token is requested, the server is named and its token kept", async () => {
-    const { ctx, recorded } = fakeContext({ guest: { ...OWNED_CLAIMED_GUEST } });
+  test("listed on the account as owned: the claim is left alone, no claim token is requested, the server is named, its token kept, the library made", async () => {
+    const { ctx, recorded } = fakeContext({ guest: ownedClaimedGuest() });
     await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
     expect(recorded.plexTv.map((call) => call.url)).toEqual([RESOURCES_URL]);
     expect(recorded.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
       "PUT /:/prefs?FriendlyName=Plex_Test3",
       "GET /",
+      ...LIBRARY_REQUESTS,
     ]);
-    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token"]);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(ALL_CHECKPOINTS);
     expect(recorded.emitted.find((cp) => cp.id === "claimed")?.message).toBe("Already claimed on your Plex account");
     expect(recorded.secrets[SERVER_TOKEN_SECRET]).toBe(SERVER_TOKEN);
   });
@@ -440,6 +502,7 @@ describe("run: every write is verified, and a failed or unverified one stops the
         "GET /identity": identity(true),
         "PUT /:/prefs?FriendlyName=A%20%26%20B": response(""),
         "GET /": response(`<MediaContainer size="24" friendlyName="A &amp; B" machineIdentifier="${MID}"/>`),
+        ...libraryAnswers(),
       },
     });
     await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
@@ -448,7 +511,7 @@ describe("run: every write is verified, and a failed or unverified one stops the
   });
 
   test("a listing that catches up late is waited for", async () => {
-    const { ctx, recorded } = fakeContext({ guest: { ...OWNED_CLAIMED_GUEST } });
+    const { ctx, recorded } = fakeContext({ guest: ownedClaimedGuest() });
     await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: [response([]), response("busy", 503), resourcesAnswer] }));
     expect(recorded.plexTv).toHaveLength(3);
     expect(recorded.sleeps).toEqual([10000, 10000]);
@@ -465,7 +528,7 @@ describe("run: every write is verified, and a failed or unverified one stops the
   });
 
   test("a token the store does not read back fails the hook after the write, with no token checkpoint", async () => {
-    const { ctx, recorded } = fakeContext({ readBack: () => undefined, guest: { ...OWNED_CLAIMED_GUEST } });
+    const { ctx, recorded } = fakeContext({ readBack: () => undefined, guest: ownedClaimedGuest() });
     await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("read back");
     expect(recorded.secretWrites).toBe(1);
     expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named"]);
@@ -486,6 +549,101 @@ describe("run: every write is verified, and a failed or unverified one stops the
     await expect(runWith(ctx, fakePlexTv(recorded, {}))).rejects.toThrow("not reachable");
     expect(recorded.emitted).toEqual([]);
     expect(recorded.requests).toEqual([]);
+  });
+});
+
+describe("run: the library on the media mount", () => {
+  test("a library already covering the mount is left alone: no creation, trash emptying still turned off, the scan still requested", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: {
+        "GET /identity": identity(true),
+        "PUT /:/prefs?FriendlyName=Plex_Test3": response(""),
+        "GET /": root("Plex_Test3"),
+        ...libraryAnswers({ existing: true }),
+      },
+    });
+    await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
+    const paths = recorded.requests.map((request) => `${request.method} ${request.path}`);
+    expect(paths).toContain("GET /library/sections");
+    expect(paths.some((path) => path.startsWith("POST /library/sections"))).toBe(false);
+    expect(paths).toContain(`PUT ${TRASH_OFF_PATH}`);
+    expect(paths).toContain(`GET ${REFRESH_PATH}`);
+    expect(recorded.emitted.find((cp) => cp.id === "library")?.message).toBe("Media library at /mnt/media (already existed)");
+    expect(recorded.logs.some((line) => line.includes("already covers"))).toBe(true);
+  });
+
+  test("another library elsewhere does not count: the mount gets its own", async () => {
+    const guest = ownedClaimedGuest();
+    guest["GET /library/sections"] = [sectionsOther(), sectionsMedia()];
+    const { ctx, recorded } = fakeContext({ guest });
+    await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
+    expect(recorded.requests.some((request) => request.path === CREATE_PATH && request.method === "POST")).toBe(true);
+    expect(recorded.emitted.find((cp) => cp.id === "library")?.message).toContain("(created)");
+  });
+
+  test("a library subsystem that is still starting is waited for", async () => {
+    const guest = ownedClaimedGuest();
+    guest["GET /library/sections"] = [response("still starting up", 500), response("still starting up", 500), sectionsNone(), sectionsMedia()];
+    const { ctx, recorded } = fakeContext({ guest });
+    await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
+    expect(recorded.sleeps).toEqual([5000, 5000]);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(ALL_CHECKPOINTS);
+  });
+
+  test("a library subsystem that never answers fails after the declared attempts, with the token already kept", async () => {
+    const guest = ownedClaimedGuest();
+    guest["GET /library/sections"] = response("still starting up", 500);
+    const { ctx, recorded } = fakeContext({ guest });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("library subsystem did not answer");
+    expect(recorded.requests.filter((request) => request.path === "/library/sections")).toHaveLength(LIBRARY_ATTEMPTS);
+    expect(recorded.sleeps).toEqual(Array(LIBRARY_ATTEMPTS - 1).fill(5000));
+    expect(recorded.secretWrites).toBe(1);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token"]);
+  });
+
+  test("a library Plex refuses to create, which is what a missing mount looks like, fails and says so", async () => {
+    const guest = ownedClaimedGuest();
+    guest[`POST ${CREATE_PATH}`] = response("The location does not exist", 400);
+    const { ctx, recorded } = fakeContext({ guest });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("may not be mounted");
+    expect(recorded.failed?.context).toContainEqual({ label: "Status", value: "400" });
+    expect(recorded.requests.some((request) => request.path === TRASH_OFF_PATH)).toBe(false);
+    expect(recorded.requests.some((request) => request.path === REFRESH_PATH)).toBe(false);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token"]);
+  });
+
+  test("a library Plex accepts but does not list fails", async () => {
+    const guest = ownedClaimedGuest();
+    guest["GET /library/sections"] = sectionsNone();
+    const { ctx, recorded } = fakeContext({ guest });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("does not list it");
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token"]);
+  });
+
+  test("a trash-emptying setting Plex refuses, or does not take, fails before the scan", async () => {
+    const refused = ownedClaimedGuest();
+    refused[`PUT ${TRASH_OFF_PATH}`] = response("", 401);
+    const a = fakeContext({ guest: refused });
+    await expect(runWith(a.ctx, fakePlexTv(a.recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("refused the trash-emptying setting");
+
+    const ignored = ownedClaimedGuest();
+    ignored["GET /:/prefs"] = prefsTrash(true);
+    const b = fakeContext({ guest: ignored });
+    await expect(runWith(b.ctx, fakePlexTv(b.recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("did not take the trash-emptying setting");
+    expect(b.recorded.failed?.context).toContainEqual({ label: "Reported", value: "true" });
+    for (const run of [a, b]) {
+      expect(run.recorded.requests.some((request) => request.path === REFRESH_PATH)).toBe(false);
+      expect(run.recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token"]);
+    }
+  });
+
+  test("a scan Plex does not start fails, after the library checkpoint", async () => {
+    const guest = ownedClaimedGuest();
+    guest[`GET ${REFRESH_PATH}`] = response("busy", 500);
+    const { ctx, recorded } = fakeContext({ guest });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("did not start the library scan");
+    expect(recorded.failed?.context).toContainEqual({ label: "Library", value: "Media" });
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token", "library"]);
   });
 });
 
@@ -575,6 +733,7 @@ describe("run: what a failure after a fresh claim says, and what the decoder mus
           "GET /identity": identity(true),
           [`PUT /:/prefs?FriendlyName=${encodeURIComponent(requested)}`]: response(""),
           "GET /": response(`<MediaContainer friendlyName="${raw}" machineIdentifier="${MID}"/>`),
+          ...libraryAnswers(),
         },
       });
       await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
@@ -684,6 +843,25 @@ describe("readers", () => {
       accessToken: SERVER_TOKEN,
     });
     expect(readServerToken("<html>", MID)).toEqual({ listed: false });
+  });
+
+  test("readSections reads Plex's sections document, an empty one, and nothing else", () => {
+    expect(readSections(sectionsMedia().text())).toEqual([{ key: "7", title: "Media", type: "movie", locations: ["/mnt/media"] }]);
+    expect(readSections(sectionsNone().text())).toEqual([]);
+    expect(readSections(JSON.stringify({ MediaContainer: { Directory: [{ key: "1", title: "No locations", type: "show" }] } }))).toEqual([
+      { key: "1", title: "No locations", type: "show", locations: [] },
+    ]);
+    expect(readSections(JSON.stringify({ MediaContainer: { Directory: [{ key: 1, title: "bad key" }] } }))).toBeUndefined();
+    expect(readSections(JSON.stringify({ MediaContainer: { Directory: "nope" } }))).toBeUndefined();
+    expect(readSections("still starting up")).toBeUndefined();
+    expect(readSections("<html>")).toBeUndefined();
+  });
+
+  test("readPreference finds one setting's value in Plex's preferences document", () => {
+    expect(readPreference(prefsTrash(false).text(), "autoEmptyTrash")).toBe(false);
+    expect(readPreference(prefsTrash("0").text(), "autoEmptyTrash")).toBe("0");
+    expect(readPreference(prefsTrash(true).text(), "FriendlyName")).toBeUndefined();
+    expect(readPreference("Unauthorized", "autoEmptyTrash")).toBeUndefined();
   });
 
   test("classifyGuestError reports a transport error's kind from the allowlist, and 'error' for anything else", () => {

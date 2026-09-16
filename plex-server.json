@@ -5,7 +5,7 @@
   "website": "https://www.plex.tv",
   "category": "appliance",
   "truenasVersion": ">=25.04.2.6",
-  "requiredCapabilities": ["firstBoot", "plexAppliance"],
+  "requiredCapabilities": ["firstBoot", "plexAppliance", "firstBootMedia"],
   "provisioning": {
     "strategy": "image",
     "source": {
@@ -17,7 +17,8 @@
       "releasesUrl": "https://cloud-images.ubuntu.com/releases/noble/"
     },
     "firstBoot": {
-      "profile": "plex-appliance"
+      "profile": "plex-appliance",
+      "mediaShare": true
     }
   },
   "resources": {
@@ -45,7 +46,7 @@
     {
       "id": "plex-account",
       "title": "Sign in to Plex",
-      "description": "Claims the new server on your Plex account and names it, so it opens signed in. Nothing else on the server is changed. An existing claim is kept as it is: a server you already own is still named and its token kept, and a server your account does not own is not touched. Media libraries are still added from inside Plex.",
+      "description": "Claims the new server on your Plex account, names it, and creates one Media library on the share the appliance mounts, so it opens signed in with your videos. An existing claim is kept as it is: a server you already own is still named and its token kept, and a server your account does not own is not touched. A library that already covers the mount is left alone.",
       "events": ["onAfterReady"],
       "optional": true,
       "userOptional": {
