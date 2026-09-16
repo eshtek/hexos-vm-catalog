@@ -1,0 +1,706 @@
+import { describe, expect, test } from "bun:test";
+import type { VMHookContext, VMHookFetchInit, VMHookResponse, WaitForAppOptions } from "../_lib/hook_context";
+import {
+  CLAIM_ATTEMPTS,
+  type PlexTvFetch,
+  RESOURCES_ATTEMPTS,
+  SERVER_TOKEN_SECRET,
+  classifyGuestError,
+  decodeXmlAttribute,
+  readAccountToken,
+  readClaimed,
+  readFriendlyName,
+  readIdentity,
+  readServerToken,
+  runWith,
+} from "./plex_setup";
+
+// The hook's contract as these tests pin it: it confirms Plex answers, claims a
+// server whose identity says it is unclaimed (and only that), writes nothing
+// to a server that answers already claimed unless plex.tv lists it as owned by
+// the signed-in account (on a fresh server the claim precedes that lookup, and
+// a failure afterwards says so), names an owned server and keeps its own
+// token, verifies each write against what the guest then reports, and keeps
+// tokens out of what it logs and records. The fakes are a scripted guest and a
+// scripted plex.tv: they establish the hook's behaviour for the answers
+// scripted here, not how a real Plex or plex.tv answers a shared or Home-user
+// token, and not the platform's identity-bound secret store.
+
+const ACCOUNT_TOKEN = "acct-token-1";
+const CLAIM_TOKEN = "claim-token-1";
+const SERVER_TOKEN = "server-token-1";
+const MID = "mid-a";
+
+function response(payload: unknown, status = 200, url = "http://192.0.2.240:32400/identity"): VMHookResponse {
+  const text = typeof payload === "string" ? payload : JSON.stringify(payload);
+  return {
+    status,
+    headers: {},
+    body: new TextEncoder().encode(text),
+    text: () => text,
+    json: () => JSON.parse(text),
+    url,
+    hops: 0,
+  };
+}
+
+const identity = (claimed: boolean, machineIdentifier = MID) =>
+  response({ MediaContainer: { size: 0, apiVersion: "1.2.3", claimed, machineIdentifier, version: "1.43.4.10903-e5521bd8c" } });
+const root = (friendlyName: string) => response({ MediaContainer: { size: 24, friendlyName, machineIdentifier: MID } });
+
+type Answer = VMHookResponse | Error;
+/** One answer, or a sequence consumed in order (the last one repeats). */
+type Answers = Answer | Answer[];
+
+interface Recorded {
+  registered: string[];
+  emitted: Array<{ id: string; message?: string }>;
+  skipped: string[];
+  waits: Array<{ path: string; opts?: WaitForAppOptions }>;
+  requests: Array<{ method: string; path: string; headers: Record<string, string> }>;
+  plexTv: Array<{ url: string; headers: Record<string, string> }>;
+  sleeps: number[];
+  logs: string[];
+  secrets: Record<string, string>;
+  secretWrites: number;
+  failed?: { message: string; context?: Array<{ label: string; value: string }> };
+}
+
+function next(answers: Answers | undefined, key: string): Answer {
+  if (answers === undefined) throw new Error(`unexpected request: ${key}`);
+  if (!Array.isArray(answers)) return answers;
+  if (answers.length === 0) throw new Error(`no answers left for ${key}`);
+  return answers.length === 1 ? answers[0] : (answers.shift() as Answer);
+}
+
+function fakeContext(opts: {
+  guest: Record<string, Answers>;
+  inputs?: Record<string, unknown>;
+  vmName?: string;
+  readBack?: (key: string, stored: Record<string, string>) => string | undefined;
+}): { ctx: VMHookContext; recorded: Recorded } {
+  const recorded: Recorded = {
+    registered: [],
+    emitted: [],
+    skipped: [],
+    waits: [],
+    requests: [],
+    plexTv: [],
+    sleeps: [],
+    logs: [],
+    secrets: {},
+    secretWrites: 0,
+  };
+  const inputs = opts.inputs ?? { plex_login: { authToken: ACCOUNT_TOKEN } };
+  const answer = (method: string, path: string): VMHookResponse => {
+    const key = `${method} ${path}`;
+    const chosen = next(opts.guest[key], key);
+    if (chosen instanceof Error) throw chosen;
+    return chosen;
+  };
+  const ctx = {
+    resourceType: "vm",
+    resourceId: "instance-a",
+    vm: { instanceId: "instance-a", vmUuid: "uuid-a", name: opts.vmName ?? "Plex_Test3", blueprintId: "plex-server" },
+    event: "onAfterReady",
+    host: "192.0.2.240",
+    port: 32400,
+    baseUrl: "http://192.0.2.240:32400",
+    inputs,
+    mounts: [],
+    secrets: {
+      get: async (key: string) => (opts.readBack ? opts.readBack(key, recorded.secrets) : recorded.secrets[key]),
+      set: async (key: string, value: string) => {
+        recorded.secretWrites++;
+        recorded.secrets[key] = value;
+      },
+      delete: async () => {
+        recorded.secretWrites++;
+      },
+      list: async () => ({ ...recorded.secrets }),
+    },
+    fetch: async (path: string, init?: VMHookFetchInit) => {
+      const method = init?.method ?? "GET";
+      recorded.requests.push({ method, path, headers: init?.headers ?? {} });
+      return answer(method, path);
+    },
+    getInstalledAppUrl: async () => null,
+    getInput: (id: string) => {
+      const value = inputs[id];
+      if (value === undefined) throw new Error(`Missing required input: ${id}`);
+      return value;
+    },
+    log: (message: string) => {
+      recorded.logs.push(message);
+    },
+    sleep: async (ms: number) => {
+      recorded.sleeps.push(ms);
+    },
+    fail: (message: string, context?: Array<{ label: string; value: string }>) => {
+      recorded.failed = { message, context };
+      throw new Error(message);
+    },
+    registerCheckpoints: async (checkpoints: Array<{ id: string; message: string }>) => {
+      recorded.registered.push(...checkpoints.map((cp) => cp.id));
+    },
+    emitCheckpoint: async (id: string, message?: string) => {
+      recorded.emitted.push({ id, message });
+    },
+    updateCheckpointMessage: async () => {},
+    setProgress: async () => {},
+    skipCheckpoint: async (id: string) => {
+      recorded.skipped.push(id);
+    },
+    getFailedAtCheckpoint: () => undefined,
+    awaitCheckpointRetry: async () => "skip" as const,
+    waitForApp: async (path: string, waitOpts?: WaitForAppOptions) => {
+      recorded.waits.push({ path, opts: waitOpts });
+      return answer("GET", path);
+    },
+  } as unknown as VMHookContext;
+  return { ctx, recorded };
+}
+
+const CLAIM_URL = "https://plex.tv/api/claim/token.json";
+const RESOURCES_URL = "https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1";
+
+function fakePlexTv(recorded: Recorded, answers: Record<string, Answers>): PlexTvFetch {
+  return async (url, init) => {
+    recorded.plexTv.push({ url, headers: init.headers });
+    const chosen = next(answers[url], url);
+    if (chosen instanceof Error) throw chosen;
+    return { status: chosen.status, text: async () => chosen.text() };
+  };
+}
+
+const claimTokenAnswer = response({ token: CLAIM_TOKEN });
+/** The account's listing: someone else's shared server, then ours, owned, with a token that differs from the account's. */
+const resourcesAnswer = response([
+  { name: "Someone else's", clientIdentifier: "mid-other", provides: "server", owned: false, accessToken: "not-ours" },
+  { name: "ubuntu", clientIdentifier: MID, provides: "server", owned: true, accessToken: SERVER_TOKEN },
+]);
+
+/**
+ * What the run wrote where a person or a log could read it: log lines,
+ * checkpoint messages, the failure and every request path except the claim's
+ * own, whose query string is where Plex reads the claim token.
+ */
+function recordedSurfaces(recorded: Recorded): string {
+  return JSON.stringify({
+    logs: recorded.logs,
+    emitted: recorded.emitted,
+    failed: recorded.failed,
+    requestPaths: recorded.requests.map((request) => request.path).filter((path) => !path.startsWith("/myplex/claim?")),
+  });
+}
+
+const CLAIM_PATH = `/myplex/claim?token=${CLAIM_TOKEN}`;
+
+/** A server that answers claimed, listed on the account as owned; the shape of a rerun on a server this hook set up. */
+const OWNED_CLAIMED_GUEST = {
+  "GET /identity": identity(true),
+  "PUT /:/prefs?FriendlyName=Plex_Test3": response(""),
+  "GET /": root("Plex_Test3"),
+};
+
+describe("run: a fresh server", () => {
+  test("claims it, names it after the VM, and keeps the server's own token rather than the account's", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: {
+        "GET /identity": [identity(false), identity(true)],
+        [`POST ${CLAIM_PATH}`]: response('<MyPlex signInState="ok"/>'),
+        "PUT /:/prefs?FriendlyName=Plex_Test3": response(""),
+        "GET /": root("Plex_Test3"),
+      },
+    });
+    const plexTv = fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer });
+    await runWith(ctx, plexTv);
+
+    expect(recorded.registered).toEqual(["ready", "claimed", "named", "token"]);
+    expect(recorded.waits).toEqual([{ path: "/identity", opts: { maxAttempts: 24, headers: { Accept: "application/json" } } }]);
+    expect(recorded.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
+      `POST ${CLAIM_PATH}`,
+      "GET /identity",
+      "PUT /:/prefs?FriendlyName=Plex_Test3",
+      "GET /",
+    ]);
+    // The account token authorises the claim, the name and the root read, as a
+    // header; the identity re-read after the claim carries none; no path carries it.
+    const authorised = recorded.requests.filter((request) => request.path !== "/identity");
+    expect(authorised).toHaveLength(3);
+    for (const request of authorised) expect(request.headers["X-Plex-Token"]).toBe(ACCOUNT_TOKEN);
+    expect(recorded.requests.find((request) => request.path === "/identity")?.headers).toEqual({ Accept: "application/json" });
+    for (const request of recorded.requests) expect(request.path).not.toContain(ACCOUNT_TOKEN);
+    // plex.tv: the claim token first, then the listing, before anything is named.
+    expect(recorded.plexTv.map((call) => call.url)).toEqual([CLAIM_URL, RESOURCES_URL]);
+    for (const call of recorded.plexTv) {
+      expect(call.headers["X-Plex-Token"]).toBe(ACCOUNT_TOKEN);
+      expect(call.headers["X-Plex-Client-Identifier"]).toBe("hexos-platform");
+    }
+    expect(recorded.secretWrites).toBe(1);
+    expect(recorded.secrets).toEqual({ [SERVER_TOKEN_SECRET]: SERVER_TOKEN });
+    expect(recorded.emitted).toEqual([
+      { id: "ready", message: "Plex answered at http://192.0.2.240:32400/identity" },
+      { id: "claimed", message: "Claimed on your Plex account" },
+      { id: "named", message: "Named Plex_Test3" },
+      { id: "token", message: "Kept the server's access token for HexOS" },
+    ]);
+    expect(recorded.skipped).toEqual([]);
+    expect(recorded.failed).toBeUndefined();
+  });
+
+  test("keeps every token out of its logs, its checkpoints and every request path but the claim's own query", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: {
+        "GET /identity": [identity(false), identity(true)],
+        [`POST ${CLAIM_PATH}`]: response(""),
+        "PUT /:/prefs?FriendlyName=Plex_Test3": response(""),
+        "GET /": root("Plex_Test3"),
+      },
+    });
+    await runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer }));
+    expect(recorded.logs.length).toBeGreaterThan(0);
+    for (const secret of [ACCOUNT_TOKEN, CLAIM_TOKEN, SERVER_TOKEN, "not-ours"]) {
+      expect(recordedSurfaces(recorded)).not.toContain(secret);
+    }
+  });
+
+  test("uses the answered server name over the VM's, and accepts a bare token as the sign-in", async () => {
+    const { ctx, recorded } = fakeContext({
+      inputs: { plex_login: ACCOUNT_TOKEN, server_name: " Family Plex " },
+      guest: {
+        "GET /identity": [identity(false), identity(true)],
+        [`POST ${CLAIM_PATH}`]: response(""),
+        "PUT /:/prefs?FriendlyName=Family%20Plex": response(""),
+        "GET /": root("Family Plex"),
+      },
+    });
+    await runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer }));
+    expect(recorded.requests.map((request) => request.path)).toContain("/:/prefs?FriendlyName=Family%20Plex");
+    expect(recorded.emitted.find((cp) => cp.id === "named")?.message).toBe("Named Family Plex");
+    expect(recorded.secrets[SERVER_TOKEN_SECRET]).toBe(SERVER_TOKEN);
+  });
+
+  test("a blank server name answer falls back to the VM's name", async () => {
+    const { ctx, recorded } = fakeContext({
+      inputs: { plex_login: { authToken: ACCOUNT_TOKEN }, server_name: "" },
+      vmName: "Media_Box",
+      guest: {
+        "GET /identity": [identity(false), identity(true)],
+        [`POST ${CLAIM_PATH}`]: response(""),
+        "PUT /:/prefs?FriendlyName=Media_Box": response(""),
+        "GET /": root("Media_Box"),
+      },
+    });
+    await runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer }));
+    expect(recorded.emitted.find((cp) => cp.id === "named")?.message).toBe("Named Media_Box");
+  });
+});
+
+describe("run: a server that answers claimed", () => {
+  test("listed on the account as owned: the claim is left alone, no claim token is requested, the server is named and its token kept", async () => {
+    const { ctx, recorded } = fakeContext({ guest: { ...OWNED_CLAIMED_GUEST } });
+    await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
+    expect(recorded.plexTv.map((call) => call.url)).toEqual([RESOURCES_URL]);
+    expect(recorded.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
+      "PUT /:/prefs?FriendlyName=Plex_Test3",
+      "GET /",
+    ]);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token"]);
+    expect(recorded.emitted.find((cp) => cp.id === "claimed")?.message).toBe("Already claimed on your Plex account");
+    expect(recorded.secrets[SERVER_TOKEN_SECRET]).toBe(SERVER_TOKEN);
+  });
+
+  test("listed on the account but not owned by it (a shared server): the hook stops before any write, with the listed token unrecorded", async () => {
+    const { ctx, recorded } = fakeContext({ guest: { "GET /identity": identity(true) } });
+    const shared = response([{ name: "Theirs", clientIdentifier: MID, provides: "server", owned: false, accessToken: "shared-token" }]);
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: shared }))).rejects.toThrow("not owned");
+    expect(recorded.failed?.context).toContainEqual({ label: "Claimed in this run", value: "no" });
+    expect(recorded.requests).toEqual([]);
+    expect(recorded.plexTv).toHaveLength(1);
+    expect(recorded.secretWrites).toBe(0);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready"]);
+    expect(recordedSurfaces(recorded)).not.toContain("shared-token");
+  });
+
+  test("listed with an owned flag that is not exactly true is not owned", async () => {
+    const { ctx, recorded } = fakeContext({ guest: { "GET /identity": identity(true) } });
+    const vague = response([{ clientIdentifier: MID, provides: "server", owned: "true", accessToken: SERVER_TOKEN }]);
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: vague }))).rejects.toThrow("not owned");
+    expect(recorded.requests).toEqual([]);
+    expect(recorded.secretWrites).toBe(0);
+  });
+
+  test("not listed on the account at all: the hook waits out the listing, then stops before any write", async () => {
+    const { ctx, recorded } = fakeContext({ guest: { "GET /identity": identity(true) } });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: response([]) }))).rejects.toThrow("does not list this server");
+    expect(recorded.plexTv).toHaveLength(RESOURCES_ATTEMPTS);
+    expect(recorded.sleeps).toEqual(Array(RESOURCES_ATTEMPTS - 1).fill(10000));
+    expect(recorded.requests).toEqual([]);
+    expect(recorded.secretWrites).toBe(0);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready"]);
+  });
+});
+
+describe("run: every write is verified, and a failed or unverified one stops the hook", () => {
+  test("a claim Plex refuses is retried the declared number of times, then fails with nothing named or stored", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: {
+        "GET /identity": identity(false),
+        [`POST ${CLAIM_PATH}`]: response("nope", 403),
+      },
+    });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer }))).rejects.toThrow("did not accept");
+    expect(recorded.requests.filter((request) => request.method === "POST")).toHaveLength(CLAIM_ATTEMPTS);
+    expect(recorded.sleeps).toEqual(Array(CLAIM_ATTEMPTS - 1).fill(5000));
+    expect(recorded.failed?.context).toContainEqual({ label: "Last status", value: "403" });
+    expect(recorded.requests.some((request) => request.method === "PUT")).toBe(false);
+    expect(recorded.secretWrites).toBe(0);
+  });
+
+  test("a claim whose transport fails is logged by the error's kind, never by its message", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: {
+        "GET /identity": identity(false),
+        [`POST ${CLAIM_PATH}`]: Object.assign(new Error(`http://192.0.2.240:32400${CLAIM_PATH} unreachable on redirect`), {
+          kind: "unreachable",
+        }),
+      },
+    });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer }))).rejects.toThrow("did not accept");
+    expect(recorded.logs.filter((line) => line.startsWith("claim attempt"))).toEqual([
+      "claim attempt 1/3 failed: unreachable",
+      "claim attempt 2/3 failed: unreachable",
+      "claim attempt 3/3 failed: unreachable",
+    ]);
+    expect(recordedSurfaces(recorded)).not.toContain(CLAIM_TOKEN);
+    expect(recorded.failed?.context).toContainEqual({ label: "Last status", value: "no answer" });
+  });
+
+  test("a claim Plex accepts but does not report fails rather than continuing", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: {
+        "GET /identity": [identity(false), identity(false)],
+        [`POST ${CLAIM_PATH}`]: response(""),
+      },
+    });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer }))).rejects.toThrow("still reports itself unclaimed");
+    expect(recorded.plexTv.map((call) => call.url)).toEqual([CLAIM_URL]);
+    expect(recorded.requests.some((request) => request.method === "PUT")).toBe(false);
+    expect(recorded.secretWrites).toBe(0);
+  });
+
+  test("a different server answering after the claim fails", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: {
+        "GET /identity": [identity(false), identity(true, "mid-b")],
+        [`POST ${CLAIM_PATH}`]: response(""),
+      },
+    });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer }))).rejects.toThrow("not the one that was claimed");
+    expect(recorded.secretWrites).toBe(0);
+  });
+
+  test("plex.tv refusing a claim token fails before any write reaches the guest", async () => {
+    const { ctx, recorded } = fakeContext({ guest: { "GET /identity": identity(false) } });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: response("Unauthorized", 401) }))).rejects.toThrow("did not issue a claim token");
+    expect(recorded.waits).toHaveLength(1);
+    expect(recorded.requests).toEqual([]);
+    expect(recorded.secretWrites).toBe(0);
+  });
+
+  test("a name Plex refuses, or does not take, fails before any token is stored", async () => {
+    const refused = fakeContext({
+      guest: {
+        "GET /identity": identity(true),
+        "PUT /:/prefs?FriendlyName=Plex_Test3": response("", 401),
+      },
+    });
+    await expect(runWith(refused.ctx, fakePlexTv(refused.recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("refused the server name");
+    expect(refused.recorded.secretWrites).toBe(0);
+
+    const ignored = fakeContext({
+      guest: {
+        "GET /identity": identity(true),
+        "PUT /:/prefs?FriendlyName=Plex_Test3": response(""),
+        "GET /": root("ubuntu"),
+      },
+    });
+    await expect(runWith(ignored.ctx, fakePlexTv(ignored.recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("did not take the server name");
+    expect(ignored.recorded.failed?.context).toContainEqual({ label: "Reported", value: "ubuntu" });
+    expect(ignored.recorded.plexTv).toHaveLength(1);
+    expect(ignored.recorded.secretWrites).toBe(0);
+    expect(ignored.recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed"]);
+  });
+
+  test("a name Plex reports back with XML escaping verifies", async () => {
+    const { ctx, recorded } = fakeContext({
+      inputs: { plex_login: { authToken: ACCOUNT_TOKEN }, server_name: "A & B" },
+      guest: {
+        "GET /identity": identity(true),
+        "PUT /:/prefs?FriendlyName=A%20%26%20B": response(""),
+        "GET /": response(`<MediaContainer size="24" friendlyName="A &amp; B" machineIdentifier="${MID}"/>`),
+      },
+    });
+    await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
+    expect(recorded.emitted.find((cp) => cp.id === "named")?.message).toBe("Named A & B");
+    expect(recorded.secrets[SERVER_TOKEN_SECRET]).toBe(SERVER_TOKEN);
+  });
+
+  test("a listing that catches up late is waited for", async () => {
+    const { ctx, recorded } = fakeContext({ guest: { ...OWNED_CLAIMED_GUEST } });
+    await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: [response([]), response("busy", 503), resourcesAnswer] }));
+    expect(recorded.plexTv).toHaveLength(3);
+    expect(recorded.sleeps).toEqual([10000, 10000]);
+    expect(recorded.secrets[SERVER_TOKEN_SECRET]).toBe(SERVER_TOKEN);
+  });
+
+  test("a listed, owned server without a usable token fails at once, before any write", async () => {
+    const { ctx, recorded } = fakeContext({ guest: { "GET /identity": identity(true) } });
+    const listing = response([{ clientIdentifier: MID, provides: "server", owned: true }]);
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: listing }))).rejects.toThrow("without an access token");
+    expect(recorded.plexTv).toHaveLength(1);
+    expect(recorded.requests).toEqual([]);
+    expect(recorded.secretWrites).toBe(0);
+  });
+
+  test("a token the store does not read back fails the hook after the write, with no token checkpoint", async () => {
+    const { ctx, recorded } = fakeContext({ readBack: () => undefined, guest: { ...OWNED_CLAIMED_GUEST } });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("read back");
+    expect(recorded.secretWrites).toBe(1);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named"]);
+  });
+
+  test("a sign-in without a token fails before the guest is asked anything, with no checkpoint completed", async () => {
+    const { ctx, recorded } = fakeContext({ inputs: { plex_login: {} }, guest: {} });
+    await expect(runWith(ctx, fakePlexTv(recorded, {}))).rejects.toThrow("carried no token");
+    expect(recorded.waits).toEqual([]);
+    expect(recorded.requests).toEqual([]);
+    expect(recorded.emitted).toEqual([]);
+  });
+
+  test("a guest that never answers fails before any checkpoint is completed", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: { "GET /identity": new Error("Guest not reachable at http://192.0.2.240:32400/identity after 24 attempts") },
+    });
+    await expect(runWith(ctx, fakePlexTv(recorded, {}))).rejects.toThrow("not reachable");
+    expect(recorded.emitted).toEqual([]);
+    expect(recorded.requests).toEqual([]);
+  });
+});
+
+describe("run: what a failure after a fresh claim says, and what the decoder must not invent", () => {
+  test("a listing failure after a successful claim does not claim that nothing was changed", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: {
+        "GET /identity": [identity(false), identity(true)],
+        [`POST ${CLAIM_PATH}`]: response(""),
+      },
+    });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: response([]) }))).rejects.toThrow(
+      "does not list this server",
+    );
+    expect(recorded.requests.filter((request) => request.method === "POST")).toHaveLength(1);
+    expect(recorded.requests.some((request) => request.method === "PUT")).toBe(false);
+    expect(recorded.secretWrites).toBe(0);
+    expect(JSON.stringify(recorded.failed)).not.toContain("nothing was changed");
+    expect(recorded.failed?.context).toContainEqual({ label: "Claimed in this run", value: "yes" });
+  });
+
+  test("a not-owned listing on an already-claimed server says nothing was written, and one after a fresh claim says the claim happened", async () => {
+    const shared = response([{ clientIdentifier: MID, provides: "server", owned: false, accessToken: "shared-token" }]);
+    const before = fakeContext({ guest: { "GET /identity": identity(true) } });
+    await expect(runWith(before.ctx, fakePlexTv(before.recorded, { [RESOURCES_URL]: shared }))).rejects.toThrow("not owned");
+    expect(before.recorded.failed?.context).toContainEqual({ label: "Claimed in this run", value: "no" });
+    const after = fakeContext({
+      guest: {
+        "GET /identity": [identity(false), identity(true)],
+        [`POST ${CLAIM_PATH}`]: response(""),
+      },
+    });
+    await expect(runWith(after.ctx, fakePlexTv(after.recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: shared }))).rejects.toThrow("not owned");
+    expect(JSON.stringify(after.recorded.failed)).not.toContain("nothing was changed");
+    expect(after.recorded.failed?.context).toContainEqual({ label: "Claimed in this run", value: "yes" });
+    expect(after.recorded.requests.some((request) => request.method === "PUT")).toBe(false);
+  });
+
+  test("a claim transport error without a kind, whose message carries the claim token in another encoding, reaches no recorded surface", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: {
+        "GET /identity": identity(false),
+        [`POST ${CLAIM_PATH}`]: new Error("http://192.0.2.240:32400/claim-redirect?token=%63laim-token-1 unreachable on redirect"),
+      },
+    });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer }))).rejects.toThrow("did not accept");
+    expect(recorded.logs.filter((line) => line.startsWith("claim attempt"))).toEqual([
+      "claim attempt 1/3 failed: error",
+      "claim attempt 2/3 failed: error",
+      "claim attempt 3/3 failed: error",
+    ]);
+    expect(recordedSurfaces(recorded)).not.toContain("laim-token-1");
+    expect(recordedSurfaces(recorded)).not.toContain("claim-redirect");
+  });
+
+  test("a read-back whose XML is malformed (a raw `<`, a bare or unterminated ampersand) is not Plex's answer, and does not verify a name that reads the same", async () => {
+    for (const [requested, raw] of [
+      ["A & B", "A & B"],
+      ["A &amp", "A &amp"],
+      ["A &#xD800; B", "A &#xD800; B"],
+      ["A < B", "A < B"],
+    ]) {
+      const { ctx, recorded } = fakeContext({
+        inputs: { plex_login: { authToken: ACCOUNT_TOKEN }, server_name: requested },
+        guest: {
+          "GET /identity": identity(true),
+          [`PUT /:/prefs?FriendlyName=${encodeURIComponent(requested)}`]: response(""),
+          "GET /": response(`<MediaContainer friendlyName="${raw}" machineIdentifier="${MID}"/>`),
+        },
+      });
+      await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("did not take the server name");
+      expect(recorded.failed?.context).toContainEqual({ label: "Reported", value: "(none)" });
+      expect(recorded.secretWrites).toBe(0);
+    }
+  });
+
+  test("a well-formed read-back whose decoded text contains an ampersand or a reference verifies", async () => {
+    for (const [requested, raw] of [
+      ["A & B", "A &amp; B"],
+      ["A &amp", "A &amp;amp"],
+      ["Tom & Jerry's", "Tom &amp; Jerry&apos;s"],
+      ["A < B", "A &lt; B"],
+    ]) {
+      const { ctx, recorded } = fakeContext({
+        inputs: { plex_login: { authToken: ACCOUNT_TOKEN }, server_name: requested },
+        guest: {
+          "GET /identity": identity(true),
+          [`PUT /:/prefs?FriendlyName=${encodeURIComponent(requested)}`]: response(""),
+          "GET /": response(`<MediaContainer friendlyName="${raw}" machineIdentifier="${MID}"/>`),
+        },
+      });
+      await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
+      expect(recorded.emitted.find((cp) => cp.id === "named")?.message).toBe(`Named ${requested}`);
+    }
+  });
+
+  test("a read-back built from surrogate references does not verify a name that is the joined character", async () => {
+    const { ctx, recorded } = fakeContext({
+      inputs: { plex_login: { authToken: ACCOUNT_TOKEN }, server_name: "😀" },
+      guest: {
+        "GET /identity": identity(true),
+        "PUT /:/prefs?FriendlyName=%F0%9F%98%80": response(""),
+        "GET /": response(`<MediaContainer friendlyName="&#xD83D;&#xDE00;" machineIdentifier="${MID}"/>`),
+      },
+    });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("did not take the server name");
+    expect(recorded.secretWrites).toBe(0);
+  });
+});
+
+describe("run: an identity without a claim state", () => {
+  test("is not proof of an unclaimed server: no claim token is requested and nothing is posted or written", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: { "GET /identity": response({ MediaContainer: { machineIdentifier: MID, version: "1.43.4.10903-e5521bd8c" } }) },
+    });
+    await expect(runWith(ctx, fakePlexTv(recorded, {}))).rejects.toThrow("not with its identity");
+    expect(recorded.plexTv).toEqual([]);
+    expect(recorded.requests).toEqual([]);
+    expect(recorded.emitted).toEqual([]);
+  });
+
+  test("in XML, the same", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: { "GET /identity": response(`<MediaContainer size="0" machineIdentifier="${MID}" version="1.43.4.10903-e5521bd8c"/>`) },
+    });
+    await expect(runWith(ctx, fakePlexTv(recorded, {}))).rejects.toThrow("not with its identity");
+    expect(recorded.plexTv).toEqual([]);
+    expect(recorded.requests).toEqual([]);
+  });
+});
+
+describe("readers", () => {
+  test("readClaimed takes Plex's representations of the flag and nothing else", () => {
+    for (const value of [true, 1, "1", "true"]) expect(readClaimed(value)).toBe(true);
+    for (const value of [false, 0, "0", "false"]) expect(readClaimed(value)).toBe(false);
+    for (const value of [undefined, null, "", "yes", 2, {}, []]) expect(readClaimed(value)).toBeUndefined();
+  });
+
+  test("readIdentity takes Plex's JSON and XML shapes with an explicit claim state, and nothing else", () => {
+    expect(readIdentity(identity(false).text())).toEqual({ machineIdentifier: MID, claimed: false, version: "1.43.4.10903-e5521bd8c" });
+    expect(readIdentity(`<MediaContainer size="0" claimed="1" machineIdentifier="${MID}" version="1.43.4.10903-e5521bd8c"></MediaContainer>`)).toEqual({
+      machineIdentifier: MID,
+      claimed: true,
+      version: "1.43.4.10903-e5521bd8c",
+    });
+    expect(readIdentity(`<MediaContainer claimed="0" machineIdentifier="${MID}"/>`)?.claimed).toBe(false);
+    expect(readIdentity(JSON.stringify({ MediaContainer: { claimed: "1", machineIdentifier: MID } }))?.claimed).toBe(true);
+    expect(readIdentity(JSON.stringify({ MediaContainer: { machineIdentifier: MID } }))).toBeUndefined();
+    expect(readIdentity(JSON.stringify({ MediaContainer: { claimed: "maybe", machineIdentifier: MID } }))).toBeUndefined();
+    expect(readIdentity(`<MediaContainer machineIdentifier="${MID}"/>`)).toBeUndefined();
+    expect(readIdentity("<html>captive</html>")).toBeUndefined();
+    expect(readIdentity(JSON.stringify({ MediaContainer: { claimed: true } }))).toBeUndefined();
+  });
+
+  test("decodeXmlAttribute decodes the five named references and the numeric ones XML permits, and leaves everything else as written", () => {
+    expect(decodeXmlAttribute("A &amp; B &lt;3&gt; &quot;q&quot; &apos;a&apos;")).toBe(`A & B <3> "q" 'a'`);
+    expect(decodeXmlAttribute("caf&#233; &#x1F600; &#x9;&#xA;&#xD; &unknown; &#0;")).toBe("café 😀 \t\n\r &unknown; &#0;");
+    expect(decodeXmlAttribute("plain & bare &amp")).toBe("plain & bare &amp");
+    // Characters XML forbids stay as references: surrogates (singly or paired), controls, the two non-characters, out of range.
+    for (const forbidden of ["&#xD800;", "&#xDFFF;", "&#xD83D;&#xDE00;", "&#1;", "&#x1F;", "&#xFFFE;", "&#xFFFF;", "&#x110000;", "&#0;"]) {
+      expect(decodeXmlAttribute(forbidden)).toBe(forbidden);
+    }
+    // Only the five named entities, by own property: nothing inherited from Object.
+    for (const inherited of ["&constructor;", "&toString;", "&__proto__;", "&hasOwnProperty;"]) {
+      expect(decodeXmlAttribute(inherited)).toBe(inherited);
+    }
+  });
+
+  test("readFriendlyName reads the root document in either shape, decoding XML escapes", () => {
+    expect(readFriendlyName(root("Plex_Test3").text())).toBe("Plex_Test3");
+    expect(readFriendlyName(`<MediaContainer friendlyName="ubuntu" machineIdentifier="${MID}"/>`)).toBe("ubuntu");
+    expect(readFriendlyName(`<MediaContainer friendlyName="A &amp; B" machineIdentifier="${MID}"/>`)).toBe("A & B");
+    expect(readFriendlyName(`<MediaContainer friendlyName="A &amp;amp" machineIdentifier="${MID}"/>`)).toBe("A &amp");
+    expect(readFriendlyName(root("A & B").text())).toBe("A & B");
+    expect(readFriendlyName("Unauthorized")).toBeUndefined();
+  });
+
+  test("an XML attribute with a raw `<`, or whose ampersands do not all begin a complete, permitted reference, is not read at all", () => {
+    for (const raw of ["A & B", "A &amp", "A &amp B", "&#xD800;", "&#1;", "&#x110000;", "&constructor;", "&unknown;", "&#;", "&", "A < B", "<"]) {
+      expect(readFriendlyName(`<MediaContainer friendlyName="${raw}" machineIdentifier="${MID}"/>`)).toBeUndefined();
+      expect(readIdentity(`<MediaContainer claimed="1" machineIdentifier="${raw}"/>`)).toBeUndefined();
+    }
+    for (const raw of ["plain", "A &amp; B", "caf&#233;", "&#x1F600;", "&lt;&gt;&quot;&apos;", "&#x9;&#xA;&#xD;"]) {
+      expect(readFriendlyName(`<MediaContainer friendlyName="${raw}" machineIdentifier="${MID}"/>`)).toBeDefined();
+    }
+  });
+
+  test("readServerToken picks the server by machine identifier and tells unlisted, shared and tokenless apart", () => {
+    expect(readServerToken(resourcesAnswer.text(), MID)).toEqual({ listed: true, owned: true, accessToken: SERVER_TOKEN });
+    expect(readServerToken(resourcesAnswer.text(), "mid-other")).toEqual({ listed: true, owned: false, accessToken: "not-ours" });
+    expect(readServerToken(resourcesAnswer.text(), "mid-unknown")).toEqual({ listed: false });
+    expect(readServerToken(JSON.stringify([{ clientIdentifier: MID, owned: true }]), MID)).toEqual({ listed: true, owned: true, accessToken: undefined });
+    expect(readServerToken(JSON.stringify([{ clientIdentifier: MID, accessToken: SERVER_TOKEN }]), MID)).toEqual({
+      listed: true,
+      owned: false,
+      accessToken: SERVER_TOKEN,
+    });
+    expect(readServerToken("<html>", MID)).toEqual({ listed: false });
+  });
+
+  test("classifyGuestError reports a transport error's kind from the allowlist, and 'error' for anything else", () => {
+    expect(classifyGuestError(Object.assign(new Error("x"), { kind: "unreachable" }))).toBe("unreachable");
+    expect(classifyGuestError(Object.assign(new Error("x"), { kind: "timeout" }))).toBe("timeout");
+    expect(classifyGuestError(Object.assign(new Error("http://host/claim?token=%63laim-token-1"), { kind: "http://host/claim?token=%63laim-token-1" }))).toBe("error");
+    expect(classifyGuestError(new Error("http://host/claim?token=%63laim-token-1 unreachable on redirect"))).toBe("error");
+    expect(classifyGuestError("string")).toBe("error");
+    expect(classifyGuestError(undefined)).toBe("error");
+  });
+
+  test("readAccountToken takes the dialog's result object or a bare token", () => {
+    expect(readAccountToken({ authToken: ACCOUNT_TOKEN })).toBe(ACCOUNT_TOKEN);
+    expect(readAccountToken(ACCOUNT_TOKEN)).toBe(ACCOUNT_TOKEN);
+    expect(readAccountToken({ authToken: "" })).toBeUndefined();
+    expect(readAccountToken("")).toBeUndefined();
+    expect(readAccountToken(undefined)).toBeUndefined();
+    expect(readAccountToken(42)).toBeUndefined();
+  });
+});

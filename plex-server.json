@@ -1,7 +1,7 @@
 {
   "id": "plex-server",
   "name": "Plex Media Server",
-  "description": "Plex Media Server as a dedicated virtual machine, installed from Ubuntu's official cloud image and configured to start Plex on first boot. Open it and you land in Plex's own web interface: there is no operating system to set up and no account to create. Media libraries are added from inside Plex.",
+  "description": "Plex Media Server as a dedicated virtual machine, installed from Ubuntu's official cloud image and configured to start Plex on first boot. Open it and you land in Plex's own web interface: there is no operating system to set up and no account to create. Sign in to Plex during the install and HexOS claims the server on your account and names it; otherwise claim it yourself from Plex's own setup page. Media libraries are added from inside Plex.",
   "website": "https://www.plex.tv",
   "category": "appliance",
   "truenasVersion": ">=25.04.2.6",
@@ -39,5 +39,61 @@
       "type": "phone-home"
     },
     "postInstallUrl": "http://{ip}:32400/web"
-  }
+  },
+  "hooksSchema": 1,
+  "hooks": [
+    {
+      "id": "plex-account",
+      "title": "Sign in to Plex",
+      "description": "Claims the new server on your Plex account and names it, so it opens signed in. Nothing else on the server is changed. An existing claim is kept as it is: a server you already own is still named and its token kept, and a server your account does not own is not touched. Media libraries are still added from inside Plex.",
+      "events": ["onAfterReady"],
+      "optional": true,
+      "userOptional": {
+        "description": "Sign in to your Plex account once the server is running and HexOS claims it for you and names it after this VM. Leave this off to claim it yourself from Plex's own setup page. By enabling this, you agree that HexOS claims the server on your behalf under the Plex Terms of Service.",
+        "default": false,
+        "link": {
+          "url": "https://www.plex.tv/about/privacy-legal/plex-terms-of-service/",
+          "label": "Plex Terms of Service"
+        }
+      },
+      "guestPort": 32400,
+      "inputs": [
+        {
+          "type": "oauth",
+          "id": "plex_login",
+          "name": "Sign in to Plex",
+          "description": "Link this server to your Plex account.",
+          "provider": "plex",
+          "flow": {
+            "type": "pin",
+            "pinUrl": "https://plex.tv/api/v2/pins",
+            "authUrl": "https://app.plex.tv/auth#?clientID={clientId}&code={code}",
+            "pollUrl": "https://plex.tv/api/v2/pins/{pinId}",
+            "clientId": "hexos-platform",
+            "tokenField": "authToken",
+            "headers": {
+              "X-Plex-Client-Identifier": "{clientId}",
+              "X-Plex-Product": "HexOS"
+            }
+          }
+        },
+        {
+          "type": "question",
+          "id": "server_name",
+          "question": {
+            "question": "Server name",
+            "type": "text",
+            "key": "server_name",
+            "required": false,
+            "description": "How the server appears on your Plex account. Leave it blank to use this VM's name.",
+            "placeholder": "Leave blank to use the VM's name"
+          }
+        }
+      ],
+      "script": "_hooks/plex_setup.ts",
+      "entrypoint": "run",
+      "timeout": 600,
+      "retries": 0
+    }
+  ]
 }
