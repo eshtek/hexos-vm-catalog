@@ -410,17 +410,16 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
   ctx.log(`Plex ${identity.version ?? "(version unknown)"} answered; claimed=${identity.claimed}`);
   await ctx.emitCheckpoint("ready", `Plex answered at ${first.url}`);
 
+  // How the server came to be claimed: before this run, by this run's acknowledged
+  // claim, or reconciled — a refused claim after which the same server reports
+  // itself claimed (an attempt may have landed without its answer reaching the
+  // hook). The account's listing below decides ownership in every case.
+  let claimedHow: "already" | "now" | "reconciled" = identity.claimed ? "already" : "now";
   if (identity.claimed) {
     ctx.log("Plex is already claimed; the account's listing decides whether it is the signed-in account's");
   } else {
     const claimToken = await fetchClaimToken(plexTv, authToken, ctx);
     const lastStatus = await claimServer(ctx, authToken, claimToken);
-    if (lastStatus !== 200) {
-      ctx.fail("Plex did not accept the claim", [
-        { label: "Endpoint", value: "POST /myplex/claim" },
-        { label: "Last status", value: lastStatus === undefined ? "no answer" : String(lastStatus) },
-      ]);
-    }
     const after = readIdentity((await ctx.fetch("/identity", { headers: JSON_ACCEPT })).text());
     if (!after || after.machineIdentifier !== identity.machineIdentifier) {
       ctx.fail("The server answering after the claim is not the one that was claimed", [
@@ -428,7 +427,18 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
         { label: "Answering", value: after?.machineIdentifier ?? "(no identity)" },
       ]);
     }
-    if (!after.claimed) {
+    if (lastStatus !== 200) {
+      if (!after.claimed) {
+        ctx.fail("Plex did not accept the claim", [
+          { label: "Endpoint", value: "POST /myplex/claim" },
+          { label: "Last status", value: lastStatus === undefined ? "no answer" : String(lastStatus) },
+        ]);
+      }
+      claimedHow = "reconciled";
+      ctx.log(
+        `the claim answered ${lastStatus === undefined ? "nothing" : lastStatus}, but the same server now reports itself claimed; ownership is decided by the account's listing`,
+      );
+    } else if (!after.claimed) {
       ctx.fail("Plex accepted the claim but still reports itself unclaimed", [
         { label: "Server", value: identity.machineIdentifier },
       ]);
@@ -439,8 +449,15 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
   // server this hook did not just claim, and the same lookup carries the
   // server's own token. A failure here says whether a claim was made in this
   // run, because on a fresh server the claim has already changed the guest.
-  const accessToken = await findOwnedServerToken(plexTv, authToken, identity.machineIdentifier, !identity.claimed, ctx);
-  await ctx.emitCheckpoint("claimed", identity.claimed ? "Already claimed on your Plex account" : "Claimed on your Plex account");
+  const accessToken = await findOwnedServerToken(plexTv, authToken, identity.machineIdentifier, claimedHow, ctx);
+  await ctx.emitCheckpoint(
+    "claimed",
+    claimedHow === "already"
+      ? "Already claimed on your Plex account"
+      : claimedHow === "now"
+        ? "Claimed on your Plex account"
+        : "Claimed on your Plex account (the claim was reconciled from the server, not acknowledged)",
+  );
 
   const name = chooseServerName(ctx);
   const named = await ctx.fetch(`/:/prefs?FriendlyName=${encodeURIComponent(name)}`, {
@@ -617,10 +634,13 @@ async function findOwnedServerToken(
   plexTv: PlexTvFetch,
   authToken: string,
   machineIdentifier: string,
-  claimedInThisRun: boolean,
+  claimedHow: "already" | "now" | "reconciled",
   ctx: VMHookContext,
 ): Promise<string> {
-  const claimedContext = { label: "Claimed in this run", value: claimedInThisRun ? "yes" : "no" };
+  const claimedContext = {
+    label: "Claimed in this run",
+    value: claimedHow === "now" ? "yes" : claimedHow === "reconciled" ? "reconciled from the server, not acknowledged" : "no",
+  };
   let lastStatus: number | undefined;
   for (let attempt = 1; attempt <= RESOURCES_ATTEMPTS; attempt++) {
     // Only the request is guarded: a decision made inside the guard would be

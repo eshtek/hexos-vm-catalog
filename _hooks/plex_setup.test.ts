@@ -966,6 +966,46 @@ describe("readers", () => {
   });
 });
 
+describe("a refused claim on a server that then reports itself claimed", () => {
+  test("is reconciled from the identity, ownership decided by the account's listing, and the checkpoint says so; a server still unclaimed fails as before", async () => {
+    const refused = [response("", 401), response("", 401), response("", 401)];
+    const { ctx, recorded } = fakeContext({
+      guest: {
+        "GET /identity": [identity(false), identity(true)],
+        [`POST ${CLAIM_PATH}`]: refused,
+        "PUT /:/prefs?FriendlyName=Plex_Test3": response(""),
+        "GET /": root("Plex_Test3"),
+        ...libraryAnswers(),
+      },
+    });
+    const plexTv = fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer });
+    await runWith(ctx, plexTv);
+    expect(recorded.failed).toBeUndefined();
+    expect(recorded.emitted.find((cp) => cp.id === "claimed")?.message).toContain("reconciled from the server, not acknowledged");
+    expect(recorded.secrets[SERVER_TOKEN_SECRET]).toBe(SERVER_TOKEN);
+    expect(recorded.logs.some((line) => line.includes("now reports itself claimed"))).toBe(true);
+
+    // Reconciled, then not owned by the signed-in account: no token is stored, and the diagnostic keeps the distinction.
+    const notOwned = fakeContext({
+      guest: { "GET /identity": [identity(false), identity(true)], [`POST ${CLAIM_PATH}`]: [response("", 401), response("", 401), response("", 401)] },
+    });
+    const otherAccount = fakePlexTv(notOwned.recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: response([]) });
+    await expect(runWith(notOwned.ctx, otherAccount)).rejects.toThrow();
+    expect(notOwned.recorded.secrets[SERVER_TOKEN_SECRET]).toBeUndefined();
+    expect(notOwned.recorded.failed?.context?.find((entry) => entry.label === "Claimed in this run")?.value).toBe("reconciled from the server, not acknowledged");
+
+    const stillUnclaimed = fakeContext({
+      guest: { "GET /identity": [identity(false), identity(false)], [`POST ${CLAIM_PATH}`]: [response("", 401), response("", 401), response("", 401)] },
+    });
+    const tv = fakePlexTv(stillUnclaimed.recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer });
+    await expect(runWith(stillUnclaimed.ctx, tv)).rejects.toThrow("Plex did not accept the claim");
+    expect(stillUnclaimed.recorded.failed?.context).toEqual([
+      { label: "Endpoint", value: "POST /myplex/claim" },
+      { label: "Last status", value: "401" },
+    ]);
+  });
+});
+
 describe("onMediaReconnected", () => {
   const allSections = () => response({ MediaContainer: { size: 5, Directory: sectionEntries } });
   const recovery = (guest: Record<string, Answers>, opts: { secrets?: Record<string, string>; folders?: unknown } = {}) =>
