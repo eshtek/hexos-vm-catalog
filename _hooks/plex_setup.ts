@@ -308,6 +308,79 @@ export function classifyGuestError(error: unknown): string {
   return typeof kind === "string" && GUEST_ERROR_KINDS.has(kind) ? kind : "error";
 }
 
+/** The folders a media-reconnect firing names, as the platform sends them (`{ folders: string[] }`); undefined when malformed. */
+export function readReconnectedFolders(eventData: Record<string, unknown>): string[] | undefined {
+  const folders = eventData.folders;
+  if (!Array.isArray(folders) || folders.some((folder) => typeof folder !== "string" || folder.length === 0)) return undefined;
+  return folders as string[];
+}
+
+/** The library this hook configures for a HexOS folder, by the folder's mount path in the guest; `Media` has none. */
+export function libraryForFolder(folder: string): Library | undefined {
+  const location = `/mnt/${folder.toLowerCase()}`;
+  return LIBRARIES.find((library) => library.location === location);
+}
+
+/** The checkpoint id the platform reads per folder: completed means a scan was accepted, skipped means nothing to scan. */
+export const mediaCheckpoint = (folder: string): string => `media:${folder}`;
+/** Plex is expected up when the platform fires the event; three looks, not the install's twenty-four. */
+export const RECOVERY_READY_ATTEMPTS = 3;
+
+/**
+ * The platform saw default media folders connected again after an outage
+ * (`onMediaReconnected`, `ctx.eventData.folders`). A scan of each folder's
+ * library makes Plex read it again: anything a scan during the outage marked
+ * unavailable is available again, and anything added is indexed. Never while
+ * a folder is disconnected — the platform fires only after the reconnect.
+ * One checkpoint per folder, by id: completed means Plex accepted the scan,
+ * skipped means there was nothing to scan (no library for the folder, no
+ * such library on this server, or no server token because the sign-in was
+ * not used); the platform reads the ids, never the text. A refused token or
+ * a refused scan fails the run, so the folders not yet handled stay with the
+ * platform.
+ */
+export async function onMediaReconnected(ctx: VMHookContext): Promise<void> {
+  const folders = readReconnectedFolders(ctx.eventData);
+  if (!folders || folders.length === 0) ctx.fail("The event named no folders", [{ label: "Event", value: ctx.event }]);
+  await ctx.registerCheckpoints(folders.map((folder) => ({ id: mediaCheckpoint(folder), message: `Scan for ${folder}` })));
+  const serverToken = await ctx.secrets.get(SERVER_TOKEN_SECRET);
+  if (!serverToken) {
+    for (const folder of folders) {
+      await ctx.skipCheckpoint(mediaCheckpoint(folder), "Not signed in to Plex during setup; no server token, nothing to scan");
+    }
+    ctx.log("no server token: the sign-in setup did not run, so no library here is ours to scan");
+    return;
+  }
+  const first = await ctx.waitForApp("/identity", { maxAttempts: RECOVERY_READY_ATTEMPTS, headers: JSON_ACCEPT });
+  if (!readIdentity(first.text())) {
+    ctx.fail("Plex answered, but not with its identity", [{ label: "Status", value: String(first.status) }]);
+  }
+  const listing = await ctx.fetch("/library/sections", { headers: withToken(serverToken) });
+  if (listing.status === 401) ctx.fail("Plex refused the server token", [{ label: "Status", value: "401" }]);
+  const sections = listing.status === 200 ? readSections(listing.text()) : undefined;
+  if (!sections) ctx.fail("Plex did not list its libraries", [{ label: "Status", value: String(listing.status) }]);
+  for (const folder of folders) {
+    const library = libraryForFolder(folder);
+    if (!library) {
+      await ctx.skipCheckpoint(mediaCheckpoint(folder), `${folder} has no library; nothing to scan`);
+      continue;
+    }
+    const section = sections.find((candidate) => candidate.locations.includes(library.location));
+    if (!section) {
+      await ctx.skipCheckpoint(mediaCheckpoint(folder), `No ${library.name} library at ${library.location} on this server`);
+      continue;
+    }
+    const scan = await ctx.fetch(`/library/sections/${encodeURIComponent(section.key)}/refresh`, { headers: withToken(serverToken) });
+    if (scan.status !== 200) {
+      ctx.fail(`Plex refused the scan of ${library.name}`, [
+        { label: "Status", value: String(scan.status) },
+        { label: "Section", value: section.key },
+      ]);
+    }
+    await ctx.emitCheckpoint(mediaCheckpoint(folder), `Scan requested for ${folder}`);
+  }
+}
+
 export async function run(ctx: VMHookContext): Promise<void> {
   await runWith(ctx, (url, init) => fetch(url, { headers: init.headers, signal: AbortSignal.timeout(PLEX_TV_TIMEOUT_MS) }));
 }

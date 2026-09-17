@@ -15,8 +15,7 @@ import {
   readPreference,
   readSections,
   readServerToken,
-  runWith,
-} from "./plex_setup";
+  runWith, onMediaReconnected, readReconnectedFolders, libraryForFolder } from "./plex_setup";
 
 // The hook's contract as these tests pin it: it confirms Plex answers, claims a
 // server whose identity says it is unclaimed (and only that), writes nothing
@@ -83,6 +82,11 @@ function fakeContext(opts: {
   inputs?: Record<string, unknown>;
   vmName?: string;
   readBack?: (key: string, stored: Record<string, string>) => string | undefined;
+  /** The event this run is fired for; setup by default. */
+  event?: VMHookContext["event"];
+  eventData?: Record<string, unknown>;
+  /** Secrets the instance already holds (a server token kept by an earlier setup). */
+  secrets?: Record<string, string>;
 }): { ctx: VMHookContext; recorded: Recorded } {
   const recorded: Recorded = {
     registered: [],
@@ -93,7 +97,7 @@ function fakeContext(opts: {
     plexTv: [],
     sleeps: [],
     logs: [],
-    secrets: {},
+    secrets: { ...(opts.secrets ?? {}) },
     secretWrites: 0,
   };
   const inputs = opts.inputs ?? { plex_login: { authToken: ACCOUNT_TOKEN } };
@@ -107,7 +111,8 @@ function fakeContext(opts: {
     resourceType: "vm",
     resourceId: "instance-a",
     vm: { instanceId: "instance-a", vmUuid: "uuid-a", name: opts.vmName ?? "Plex_Test3", blueprintId: "plex-server" },
-    event: "onAfterReady",
+    event: opts.event ?? "onAfterReady",
+    eventData: opts.eventData ?? {},
     host: "192.0.2.240",
     port: 32400,
     baseUrl: "http://192.0.2.240:32400",
@@ -958,5 +963,82 @@ describe("readers", () => {
     expect(readAccountToken("")).toBeUndefined();
     expect(readAccountToken(undefined)).toBeUndefined();
     expect(readAccountToken(42)).toBeUndefined();
+  });
+});
+
+describe("onMediaReconnected", () => {
+  const allSections = () => response({ MediaContainer: { size: 5, Directory: sectionEntries } });
+  const recovery = (guest: Record<string, Answers>, opts: { secrets?: Record<string, string>; folders?: unknown } = {}) =>
+    fakeContext({
+      guest,
+      event: "onMediaReconnected",
+      eventData: { folders: opts.folders ?? ["Photos", "Media"] },
+      secrets: opts.secrets ?? { [SERVER_TOKEN_SECRET]: SERVER_TOKEN },
+    });
+
+  test("reads the folders the platform names and maps a folder to its library by mount path", () => {
+    expect(readReconnectedFolders({ folders: ["Photos", "Videos"] })).toEqual(["Photos", "Videos"]);
+    expect(readReconnectedFolders({ folders: ["Photos", 7] })).toBeUndefined();
+    expect(readReconnectedFolders({})).toBeUndefined();
+    expect(libraryForFolder("Shows")?.name).toBe("TV Shows");
+    expect(libraryForFolder("Media")).toBeUndefined();
+  });
+
+  test("requests a scan for each reconnected folder's library with the server token, and skips a folder without a library, each by checkpoint id", async () => {
+    const { ctx, recorded } = recovery({
+      "GET /identity": [identity(true)],
+      "GET /library/sections": [allSections()],
+      "GET /library/sections/10/refresh": [response({}, 200)],
+    });
+    await onMediaReconnected(ctx);
+    expect(recorded.registered).toEqual(["media:Photos", "media:Media"]);
+    expect(recorded.emitted).toEqual([{ id: "media:Photos", message: "Scan requested for Photos" }]);
+    expect(recorded.skipped).toEqual(["media:Media"]);
+    expect(recorded.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
+      "GET /library/sections",
+      "GET /library/sections/10/refresh",
+    ]);
+    expect(recorded.requests[1]?.headers["X-Plex-Token"]).toBe(SERVER_TOKEN);
+    expect(recorded.failed).toBeUndefined();
+    expect(recorded.secretWrites).toBe(0);
+  });
+
+  test("without a server token every folder is skipped and the guest is not asked; a library missing on the server is skipped by name", async () => {
+    const { ctx, recorded } = recovery({}, { secrets: {} });
+    await onMediaReconnected(ctx);
+    expect(recorded.skipped).toEqual(["media:Photos", "media:Media"]);
+    expect(recorded.requests).toEqual([]);
+    expect(recorded.waits).toEqual([]);
+    const missing = recovery(
+      { "GET /identity": [identity(true)], "GET /library/sections": [response({ MediaContainer: { size: 0, Directory: [] } })] },
+      { folders: ["Photos"] },
+    );
+    await onMediaReconnected(missing.ctx);
+    expect(missing.recorded.skipped).toEqual(["media:Photos"]);
+    expect(missing.recorded.emitted).toEqual([]);
+  });
+
+  test("a refused token fails by name; a refused scan fails after the folders before it were handled; an event naming no folders fails", async () => {
+    const refused = recovery({ "GET /identity": [identity(true)], "GET /library/sections": [response({}, 401)] });
+    await expect(onMediaReconnected(refused.ctx)).rejects.toThrow("Plex refused the server token");
+    const partial = recovery(
+      {
+        "GET /identity": [identity(true)],
+        "GET /library/sections": [allSections()],
+        "GET /library/sections/10/refresh": [response({}, 200)],
+        "GET /library/sections/11/refresh": [response({}, 500)],
+      },
+      { folders: ["Photos", "Videos"] },
+    );
+    await expect(onMediaReconnected(partial.ctx)).rejects.toThrow("Plex refused the scan of Videos");
+    expect(partial.recorded.emitted).toEqual([{ id: "media:Photos", message: "Scan requested for Photos" }]);
+    expect(partial.recorded.failed?.context).toEqual([
+      { label: "Status", value: "500" },
+      { label: "Section", value: "11" },
+    ]);
+    const empty = recovery({}, { folders: [] });
+    await expect(onMediaReconnected(empty.ctx)).rejects.toThrow("The event named no folders");
+    const malformed = recovery({}, { folders: "Photos" });
+    await expect(onMediaReconnected(malformed.ctx)).rejects.toThrow("The event named no folders");
   });
 });

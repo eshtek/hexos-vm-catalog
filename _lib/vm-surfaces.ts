@@ -49,10 +49,13 @@ import {
 //              reserved vmUserHooks capability, which no build does.
 //
 // Events are `onAfterReady` (readiness confirmed the guest; the app install
-// events would fire with no address to talk to) and `userAction` (a verb on
-// the card or a widget button). Each is a plain string: the app grammar's
-// object form and any unknown entry are dropped per entry, and a declaration
-// with no surviving event is dropped rather than defaulted to a verb.
+// events would fire with no address to talk to), `userAction` (a verb on
+// the card or a widget button) and `onMediaReconnected` (the platform saw a
+// mounted media folder connected again after an outage; fired by the
+// platform, never by a user, with the folders as event data). Each is a
+// plain string: the app grammar's object form and any unknown entry are
+// dropped per entry, and a declaration with no surviving event is dropped
+// rather than defaulted to a verb.
 //
 // Zod and ./surface-grammar only: the VM catalog vendors both files.
 
@@ -75,7 +78,7 @@ export const SUPPORTED_VM_WIDGETS_SCHEMA = 2;
 export const VM_SURFACE_LIST_CAP = 16;
 /** ':' and ',' are delimiters in widget keys, so an id is a plain slug. */
 export const VM_SURFACE_ID_PATTERN = /^[a-z0-9_-]{1,64}$/;
-export const VM_HOOK_EVENTS = ['onAfterReady', 'userAction'] as const;
+export const VM_HOOK_EVENTS = ['onAfterReady', 'userAction', 'onMediaReconnected'] as const;
 export type VMHookEvent = (typeof VM_HOOK_EVENTS)[number];
 export const VM_HOOK_SURFACES = ['card', 'widget'] as const;
 export type VMHookSurface = (typeof VM_HOOK_SURFACES)[number];
@@ -314,13 +317,26 @@ function hookSchemaFor(opts: ParseVMSurfacesOptions, launch: VMLaunchEndpoint | 
         .superRefine((decl, ctx) => {
             const issue = (message: string) => ctx.addIssue({ code: 'custom', message });
             if (decl.event !== undefined) {
-                issue('VM hooks use `events` (an array of onAfterReady / userAction); found a singular `event`');
+                issue(
+                    'VM hooks use `events` (an array of onAfterReady / userAction / onMediaReconnected); found a singular `event`',
+                );
             }
             if (decl.target !== undefined) issue('file targets have no VM analogue; remove `target`');
             const lifecycle = decl.events.includes('onAfterReady');
             const userTriggerable = decl.events.includes('userAction');
-            if (decl.optional != null && !lifecycle) {
-                issue('`optional` requires the onAfterReady event; user firings are always terminal');
+            const platformFired = decl.events.includes('onMediaReconnected');
+            if (platformFired && (lifecycle || userTriggerable)) {
+                issue(
+                    'an onMediaReconnected hook is its own declaration: it may not also handle onAfterReady or userAction',
+                );
+            }
+            if (decl.optional != null && !lifecycle && !platformFired) {
+                issue(
+                    '`optional` requires the onAfterReady or onMediaReconnected event; user firings are always terminal',
+                );
+            }
+            if (platformFired && (decl.inputs?.length ?? 0) > 0) {
+                issue('an onMediaReconnected hook runs with no user to ask; remove `inputs`');
             }
             if (decl.userOptional != null && !lifecycle) {
                 issue('`userOptional` requires the onAfterReady event; the consent row renders nowhere else');
@@ -393,7 +409,9 @@ function tolerateEvents(list: unknown[], errors: string[]): unknown[] {
         const record = raw as Record<string, unknown>;
         const id = declaredId(raw);
         if (!Array.isArray(record.events)) {
-            errors.push(`Hook ${id}: events is required (onAfterReady, userAction) — declaration dropped`);
+            errors.push(
+                `Hook ${id}: events is required (onAfterReady, userAction, onMediaReconnected) — declaration dropped`,
+            );
             continue;
         }
         const events = record.events.filter((entry) => typeof entry === 'string' && KNOWN_EVENTS.has(entry));
@@ -452,7 +470,16 @@ export function parseVMHooks(
         itemSchema: hookSchemaFor(opts, launchEndpoint(document.guest?.postInstallUrl)),
     });
     errors.push(...parsed.errors);
-    return { supported: true, hooks: dedupe(parsed.items, 'Hook', errors), errors };
+    const hooks = dedupe(parsed.items, 'Hook', errors);
+    // One handler per platform-fired event: the platform tracks one run per firing.
+    const handlers = hooks.filter((hook) => hook.events.includes('onMediaReconnected'));
+    if (handlers.length > 1) {
+        errors.push(
+            `Hooks ${handlers.map((hook) => hook.id).join(', ')}: only one hook may handle onMediaReconnected — declarations dropped`,
+        );
+        return { supported: true, hooks: hooks.filter((hook) => !hook.events.includes('onMediaReconnected')), errors };
+    }
+    return { supported: true, hooks, errors };
 }
 
 /**

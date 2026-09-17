@@ -95,6 +95,20 @@
       "entrypoint": "run",
       "timeout": 600,
       "retries": 0
+    },
+    {
+      "id": "plex-media-recovery",
+      "title": "Scan libraries after a media folder reconnects",
+      "description": "When HexOS sees a default media folder connected again after an outage, asks Plex to scan that folder's library, so anything a scan during the outage marked unavailable is available again and anything added meanwhile is indexed. Nothing is asked while a folder is disconnected. Skipped when the server was not signed in during setup.",
+      "events": [
+        "onMediaReconnected"
+      ],
+      "optional": true,
+      "guestPort": 32400,
+      "script": "_hooks/plex_setup.ts",
+      "entrypoint": "onMediaReconnected",
+      "timeout": 120,
+      "retries": 0
     }
   ]
 }

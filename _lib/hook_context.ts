@@ -122,8 +122,19 @@ export interface VMHookContext {
     /** The blueprint id this VM was installed from. */
     blueprintId: string;
   };
-  /** The only lifecycle firing a setup hook receives. */
-  readonly event: "onAfterReady";
+  /**
+   * The event this run was fired for: `onAfterReady` for the install's setup
+   * and for "Run setup"; `onMediaReconnected` when the platform saw default
+   * media folders connected again after an outage (fired by the platform,
+   * never by a user; nothing to ask, nothing to park for). `userAction` is
+   * declared in the grammar; its run path is not built.
+   */
+  readonly event: "onAfterReady" | "userAction" | "onMediaReconnected";
+  /**
+   * The event's data: `{ folders: string[] }` on `onMediaReconnected` (the
+   * HexOS folder ids that reconnected, e.g. "Photos"); empty otherwise.
+   */
+  readonly eventData: Record<string, unknown>;
   /** The guest address the platform verified against the VM's MAC. */
   readonly host: string;
   /** The declared guestPort. */
