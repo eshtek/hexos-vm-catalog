@@ -64,6 +64,24 @@ export const LIBRARY_ATTEMPTS = 8;
 const LIBRARY_RETRY_MS = 5000;
 /** Plex's preference that removes library items whose files went missing at the next scan; off, so an absent share loses nothing. */
 const TRASH_PREFERENCE = "autoEmptyTrash";
+/**
+ * What the app's own hook writes after a claim, and the scan schedule a
+ * network mount needs. Plex cannot watch a CIFS mount for changes (its
+ * automatic update rests on filesystem notifications the mount never
+ * delivers), so it scans on a schedule: every library once an hour, which
+ * reads every library folder on the NAS once an hour. The EULA accepted opens
+ * the web UI on the server instead of its setup wizard; publishing the server
+ * on the account lets Plex apps find it (remote access may still need the
+ * user's router). Written only once trash emptying is confirmed off: a
+ * scheduled scan during a share outage must mark items unavailable, never
+ * remove them. A rerun of setup applies these again, over any later change.
+ */
+const SERVER_PREFERENCES: Record<string, string> = {
+  AcceptedEULA: "1",
+  PublishServerOnPlexOnlineKey: "1",
+  ScheduledLibraryUpdatesEnabled: "1",
+  ScheduledLibraryUpdateInterval: "3600",
+};
 
 export interface PlexSection {
   key: string;
@@ -391,6 +409,7 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
     { id: "claimed", message: "Claiming the server on your Plex account" },
     { id: "named", message: "Naming the server" },
     { id: "token", message: "Keeping the server's access token" },
+    { id: "preferences", message: "Applying the server preferences" },
     ...LIBRARIES.map((library) => ({ id: library.checkpointId, message: `Creating library: ${library.name}` })),
     { id: "scan", message: "Asking Plex to scan the libraries" },
   ]);
@@ -486,8 +505,11 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
   }
   await ctx.emitCheckpoint("token", "Kept the server's access token for HexOS");
 
-  // Disable trash removal before creating a section: creation can trigger a scan.
+  // Trash emptying off before anything can scan: creating a section triggers a
+  // scan, and the schedule set next scans on its own.
   await disableTrashEmptying(ctx, authToken);
+  await applyServerPreferences(ctx, authToken);
+  await ctx.emitCheckpoint("preferences", "EULA accepted, published on your Plex account, libraries scanned hourly");
   const sections: PlexSection[] = [];
   for (const library of LIBRARIES) {
     const { section, created } = await ensureLibrary(ctx, authToken, library);
@@ -563,6 +585,29 @@ async function ensureLibrary(ctx: VMHookContext, authToken: string, library: Lib
     { label: "Attempts", value: String(LIBRARY_ATTEMPTS) },
     { label: "Next step", value: "Allow Plex to finish starting, then run setup again" },
   ]);
+}
+
+/** The server preferences, written in one request and read back one by one. */
+async function applyServerPreferences(ctx: VMHookContext, authToken: string): Promise<void> {
+  const set = await ctx.fetch(`/:/prefs?${new URLSearchParams(SERVER_PREFERENCES).toString()}`, {
+    method: "PUT",
+    headers: withToken(authToken),
+  });
+  if (set.status !== 200) {
+    ctx.fail("Plex refused the server preferences", [{ label: "Status", value: String(set.status) }]);
+  }
+  const listing = (await ctx.fetch("/:/prefs", { headers: withToken(authToken) })).text();
+  for (const [id, expected] of Object.entries(SERVER_PREFERENCES)) {
+    const value = readPreference(listing, id);
+    const taken = expected === "1" ? readClaimed(value) === true : String(value) === expected;
+    if (!taken) {
+      ctx.fail("Plex did not take a server preference", [
+        { label: "Preference", value: id },
+        { label: "Expected", value: expected },
+        { label: "Reported", value: value === undefined ? "(not listed)" : String(value) },
+      ]);
+    }
+  }
 }
 
 /** Plex must not drop library items whose files are missing at a scan: an absent share is temporary, the records are not. */
