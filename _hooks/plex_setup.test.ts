@@ -275,7 +275,7 @@ const ownedClaimedGuest = (): Record<string, Answers> => ({
   ...libraryAnswers(),
 });
 
-const ALL_CHECKPOINTS = ["ready", "claimed", "named", "token", "preferences", ...expectedLibraries.map((lib) => lib.checkpointId), "scan"];
+const ALL_CHECKPOINTS = ["ready", "claimed", "preferences", ...expectedLibraries.map((lib) => lib.checkpointId)];
 
 describe("run: a fresh server", () => {
   test("claims it, names it after the VM, keeps the server's own token rather than the account's, creates all five libraries after disabling trash emptying and asks for their scans", async () => {
@@ -320,11 +320,8 @@ describe("run: a fresh server", () => {
     expect(recorded.emitted).toEqual([
       { id: "ready", message: "Plex answered at http://192.0.2.240:32400/identity" },
       { id: "claimed", message: "Claimed on your Plex account" },
-      { id: "named", message: "Named Plex_Test3" },
-      { id: "token", message: "Kept the server's access token for HexOS" },
-      { id: "preferences", message: "EULA accepted, published on your Plex account, libraries scanned hourly" },
+      { id: "preferences", message: "Named Plex_Test3; EULA accepted, published on your Plex account, libraries scanned hourly" },
       ...expectedLibraries.map((lib) => ({ id: lib.checkpointId, message: `${lib.name} at ${lib.location} (created)` })),
-      { id: "scan", message: "Scans requested for Movies, TV Shows, Music, Photos and Videos" },
     ]);
     expect(recorded.skipped).toEqual([]);
     expect(recorded.failed).toBeUndefined();
@@ -360,7 +357,7 @@ describe("run: a fresh server", () => {
     });
     await runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer }));
     expect(recorded.requests.map((request) => request.path)).toContain("/:/prefs?FriendlyName=Family%20Plex");
-    expect(recorded.emitted.find((cp) => cp.id === "named")?.message).toBe("Named Family Plex");
+    expect(recorded.emitted.find((cp) => cp.id === "preferences")?.message).toContain("Named Family Plex;");
     expect(recorded.secrets[SERVER_TOKEN_SECRET]).toBe(SERVER_TOKEN);
   });
 
@@ -377,7 +374,7 @@ describe("run: a fresh server", () => {
       },
     });
     await runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer }));
-    expect(recorded.emitted.find((cp) => cp.id === "named")?.message).toBe("Named Media_Box");
+    expect(recorded.emitted.find((cp) => cp.id === "preferences")?.message).toContain("Named Media_Box;");
   });
 });
 
@@ -529,7 +526,7 @@ describe("run: every write is verified, and a failed or unverified one stops the
       },
     });
     await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
-    expect(recorded.emitted.find((cp) => cp.id === "named")?.message).toBe("Named A & B");
+    expect(recorded.emitted.find((cp) => cp.id === "preferences")?.message).toContain("Named A & B;");
     expect(recorded.secrets[SERVER_TOKEN_SECRET]).toBe(SERVER_TOKEN);
   });
 
@@ -554,7 +551,7 @@ describe("run: every write is verified, and a failed or unverified one stops the
     const { ctx, recorded } = fakeContext({ readBack: () => undefined, guest: ownedClaimedGuest() });
     await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("read back");
     expect(recorded.secretWrites).toBe(1);
-    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named"]);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed"]);
   });
 
   test("a sign-in without a token fails before the guest is asked anything, with no checkpoint completed", async () => {
@@ -596,7 +593,7 @@ describe("run: the five default media libraries", () => {
     guest[`POST ${createPaths[2]}`] = response("refused", 400);
     const { ctx, recorded } = fakeContext({ guest });
     await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("/mnt/music");
-    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token", "preferences", "lib_movies", "lib_tv"]);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "preferences", "lib_movies", "lib_tv"]);
     expect(recorded.requests.some((r) => r.path.endsWith("/refresh"))).toBe(false);
     expect(recorded.requests.some((r) => r.path === createPaths[3])).toBe(false);
   });
@@ -631,7 +628,7 @@ describe("run: the five default media libraries", () => {
     expect(recorded.requests.filter((request) => request.method === "POST" && request.path === CREATE_PATH)).toHaveLength(LIBRARY_ATTEMPTS);
     expect(recorded.sleeps).toEqual(Array(LIBRARY_ATTEMPTS - 1).fill(5000));
     expect(recorded.failed?.message).not.toContain("mount");
-    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token", "preferences"]);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "preferences"]);
   });
 
   test("ordinary refusals and ambiguous transport failures are never replayed or exposed as response bodies", async () => {
@@ -691,7 +688,7 @@ describe("run: the five default media libraries", () => {
     expect(recorded.requests.filter((request) => request.path === "/library/sections")).toHaveLength(LIBRARY_ATTEMPTS);
     expect(recorded.sleeps).toEqual(Array(LIBRARY_ATTEMPTS - 1).fill(5000));
     expect(recorded.secretWrites).toBe(1);
-    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token", "preferences"]);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "preferences"]);
   });
 
   test("a library Plex refuses to create fails without assuming a cause or starting a scan", async () => {
@@ -702,7 +699,7 @@ describe("run: the five default media libraries", () => {
     expect(recorded.failed?.context).toContainEqual({ label: "Status", value: "400" });
     expect(recorded.requests.some((request) => request.path === TRASH_OFF_PATH)).toBe(true);
     expect(recorded.requests.some((request) => request.path === REFRESH_PATH)).toBe(false);
-    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token", "preferences"]);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "preferences"]);
   });
 
   test("a library Plex accepts but does not list fails", async () => {
@@ -710,7 +707,7 @@ describe("run: the five default media libraries", () => {
     guest["GET /library/sections"] = sectionsNone();
     const { ctx, recorded } = fakeContext({ guest });
     await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("does not list it");
-    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token", "preferences"]);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "preferences"]);
   });
 
   test("the server preferences Plex refuses, or does not take, fail after trash emptying is off and before the libraries", async () => {
@@ -735,7 +732,7 @@ describe("run: the five default media libraries", () => {
       // Trash emptying was turned off first; no library was made or scanned.
       expect(run.recorded.requests.some((request) => request.path === TRASH_OFF_PATH)).toBe(true);
       expect(run.recorded.requests.some((request) => request.path === REFRESH_PATH || request.path.startsWith("/library/sections"))).toBe(false);
-      expect(run.recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token"]);
+      expect(run.recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed"]);
     }
   });
 
@@ -753,7 +750,7 @@ describe("run: the five default media libraries", () => {
     for (const run of [a, b]) {
       // Nothing that scans is written while trash emptying is not confirmed off: no schedule, no library, no scan.
       expect(run.recorded.requests.some((request) => request.path === PREFERENCES_PATH || request.path === REFRESH_PATH)).toBe(false);
-      expect(run.recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token"]);
+      expect(run.recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed"]);
     }
   });
 
@@ -763,7 +760,7 @@ describe("run: the five default media libraries", () => {
     const { ctx, recorded } = fakeContext({ guest });
     await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("did not start the library scan");
     expect(recorded.failed?.context).toContainEqual({ label: "Library", value: "Movies" });
-    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "named", "token", "preferences", ...expectedLibraries.map((lib) => lib.checkpointId)]);
+    expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "preferences", ...expectedLibraries.map((lib) => lib.checkpointId)]);
   });
 });
 
@@ -857,7 +854,7 @@ describe("run: what a failure after a fresh claim says, and what the decoder mus
         },
       });
       await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
-      expect(recorded.emitted.find((cp) => cp.id === "named")?.message).toBe(`Named ${requested}`);
+      expect(recorded.emitted.find((cp) => cp.id === "preferences")?.message).toContain(`Named ${requested};`);
     }
   });
 

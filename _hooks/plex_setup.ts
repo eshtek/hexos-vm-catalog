@@ -404,14 +404,14 @@ export async function run(ctx: VMHookContext): Promise<void> {
 }
 
 export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<void> {
+  // The steps the deck lists, the shape of the Plex app's: the server answers,
+  // the claim, the preferences (the name and the kept token are part of them),
+  // one library each. The scans are logged, not a step of their own.
   await ctx.registerCheckpoints([
     { id: "ready", message: "Confirming Plex answers" },
     { id: "claimed", message: "Claiming the server on your Plex account" },
-    { id: "named", message: "Naming the server" },
-    { id: "token", message: "Keeping the server's access token" },
-    { id: "preferences", message: "Applying the server preferences" },
+    { id: "preferences", message: "Configuring preferences" },
     ...LIBRARIES.map((library) => ({ id: library.checkpointId, message: `Creating library: ${library.name}` })),
-    { id: "scan", message: "Asking Plex to scan the libraries" },
   ]);
 
   const authToken = readAccountToken(ctx.getInput(SIGN_IN_INPUT));
@@ -496,20 +496,20 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
       { label: "Reported", value: reported ?? "(none)" },
     ]);
   }
-  await ctx.emitCheckpoint("named", `Named ${name}`);
+  ctx.log(`named ${name}`);
 
   await ctx.secrets.set(SERVER_TOKEN_SECRET, accessToken);
   const kept = await ctx.secrets.get(SERVER_TOKEN_SECRET);
   if (kept !== accessToken) {
     ctx.fail("The server's access token could not be read back from the platform's store");
   }
-  await ctx.emitCheckpoint("token", "Kept the server's access token for HexOS");
+  ctx.log("kept the server's access token for HexOS");
 
   // Trash emptying off before anything can scan: creating a section triggers a
   // scan, and the schedule set next scans on its own.
   await disableTrashEmptying(ctx, authToken);
   await applyServerPreferences(ctx, authToken);
-  await ctx.emitCheckpoint("preferences", "EULA accepted, published on your Plex account, libraries scanned hourly");
+  await ctx.emitCheckpoint("preferences", `Named ${name}; EULA accepted, published on your Plex account, libraries scanned hourly`);
   const sections: PlexSection[] = [];
   for (const library of LIBRARIES) {
     const { section, created } = await ensureLibrary(ctx, authToken, library);
@@ -525,7 +525,7 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
       ]);
     }
   }
-  await ctx.emitCheckpoint("scan", "Scans requested for Movies, TV Shows, Music, Photos and Videos");
+  ctx.log("scans requested for Movies, TV Shows, Music, Photos and Videos");
 }
 
 /** The sections Plex lists, once its library subsystem answers; fails after the declared attempts. */
