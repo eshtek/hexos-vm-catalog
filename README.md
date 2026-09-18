@@ -201,7 +201,10 @@ Icons live under `_icons/apps/`, one per app, mirrored here exactly like the blu
     "resources": {
         "minMemoryMb": 2048, "recMemoryMb": 4096,
         "minVcpus": 1, "recVcpus": 2,
-        "diskGb": 32
+        "diskGb": 40                       // DECIMAL GB (40 = 40,000,000,000 bytes). For an image
+                                           // blueprint it must cover the image's virtual disk size
+                                           // (`qemu-img info`), which is binary: HAOS ships a 32 GiB
+                                           // disk, and 32 GiB does not fit in 32 GB
     },
     "guest": {
         "firmware": "UEFI",
