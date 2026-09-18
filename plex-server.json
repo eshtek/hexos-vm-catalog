@@ -2,6 +2,7 @@
   "id": "plex-server",
   "name": "Plex Media Server",
   "description": "Plex Media Server as a dedicated virtual machine, installed from Ubuntu's official cloud image and configured to start Plex on first boot. Open it and you land in Plex's own web interface: there is no operating system to set up and no account to create. Sign in to Plex during the install and HexOS claims the server on your account and names it; otherwise claim it yourself from Plex's own setup page. HexOS mounts its default media folders read-only; signing in also configures Movies, TV Shows, Music, Photos and Videos libraries.",
+  "icon": "_icons/plex.svg",
   "website": "https://www.plex.tv",
   "category": "appliance",
   "truenasVersion": ">=25.04.2.6",
