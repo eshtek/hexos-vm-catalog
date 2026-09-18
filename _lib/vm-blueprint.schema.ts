@@ -730,15 +730,15 @@ export const HEXOS_VM_CAPABILITIES = [
      */
     'plexAppliance',
     /**
-     * A first-boot profile can mount one of the NAS's SMB shares in the guest
-     * from install-time inputs (`firstBoot.mediaShare` on the blueprint, the
-     * `media*` install options). A box without this ignores those options,
-     * so the guest would boot with no share and its setup would fail at the
-     * library; the blueprint declares the capability rather than risk that.
+     * A first-boot profile mounts the six default HexOS media folders in the
+     * guest (`firstBoot.mediaShare` on the blueprint): the shares resolved from
+     * the box's locations before the download, the credential pair from the
+     * install, read-only CIFS mounts the appliance's service depends on. A box
+     * without this ignores the install's media options, so the guest would
+     * boot with no folders and its setup would fail at the first library; the
+     * blueprint declares the capability rather than risk that.
      */
-    'firstBootMedia',
-    /** Plex mounts all six resolved HexOS media locations and configures the app-compatible libraries. */
-    'plexDefaultMedia',
+    'firstBootDefaultMedia',
 ] as const;
 
 /**

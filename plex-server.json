@@ -6,7 +6,7 @@
   "website": "https://www.plex.tv",
   "category": "appliance",
   "truenasVersion": ">=25.04.2.6",
-  "requiredCapabilities": ["firstBoot", "plexAppliance", "firstBootMedia", "plexDefaultMedia"],
+  "requiredCapabilities": ["firstBoot", "plexAppliance", "firstBootDefaultMedia"],
   "provisioning": {
     "strategy": "image",
     "source": {
@@ -49,6 +49,7 @@
       "title": "Sign in to Plex",
       "description": "Claims the new server on your Plex account, names it, and configures Movies, TV Shows, Music, Photos and Videos libraries from the default HexOS folders. An existing claim is kept as it is: a server you already own is still named and its token kept, and a server your account does not own is not touched. Existing libraries at those locations are left alone. Accepts Plex's EULA, publishes the server on your Plex account so your Plex apps can find it, and scans the libraries hourly, since Plex cannot watch network folders for changes. Running setup again applies these settings again.",
       "events": ["onAfterReady"],
+      "kind": "connect",
       "optional": true,
       "userOptional": {
         "description": "Sign in to your Plex account once the server is running and HexOS claims it for you, names it, publishes it on your Plex account, and configures the five default media libraries, scanned hourly. Leave this off to claim it yourself from Plex's own setup page. By enabling this, you agree that HexOS claims the server on your behalf under the Plex Terms of Service.",
