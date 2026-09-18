@@ -62,6 +62,8 @@ type Library = (typeof LIBRARIES)[number];
 /** Plex's section listing and library creation can become ready separately: eight looks, five seconds apart. */
 export const LIBRARY_ATTEMPTS = 8;
 const LIBRARY_RETRY_MS = 5000;
+/** A beat before each configuration step's check lands, and one at the end, so the deck's checklist reads step by step instead of flashing to done. */
+const CHECKPOINT_PACE_MS = 2000;
 /** Plex's preference that removes library items whose files went missing at the next scan; off, so an absent share loses nothing. */
 const TRASH_PREFERENCE = "autoEmptyTrash";
 /**
@@ -509,11 +511,13 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
   // scan, and the schedule set next scans on its own.
   await disableTrashEmptying(ctx, authToken);
   await applyServerPreferences(ctx, authToken);
+  await ctx.sleep(CHECKPOINT_PACE_MS);
   await ctx.emitCheckpoint("preferences", `Named ${name}; EULA accepted, published on your Plex account, libraries scanned hourly`);
   const sections: PlexSection[] = [];
   for (const library of LIBRARIES) {
     const { section, created } = await ensureLibrary(ctx, authToken, library);
     sections.push(section);
+    await ctx.sleep(CHECKPOINT_PACE_MS);
     await ctx.emitCheckpoint(library.checkpointId, `${library.name} at ${library.location} (${created ? "created" : "already existed"})`);
   }
   for (const section of sections) {
@@ -526,6 +530,7 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
     }
   }
   ctx.log("scans requested for Movies, TV Shows, Music, Photos and Videos");
+  await ctx.sleep(CHECKPOINT_PACE_MS);
 }
 
 /** The sections Plex lists, once its library subsystem answers; fails after the declared attempts. */

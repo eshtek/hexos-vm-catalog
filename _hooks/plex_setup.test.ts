@@ -325,6 +325,8 @@ describe("run: a fresh server", () => {
     ]);
     expect(recorded.skipped).toEqual([]);
     expect(recorded.failed).toBeUndefined();
+    // A two-second beat before the preferences check, before each library's, and one at the end.
+    expect(recorded.sleeps.filter((ms) => ms === 2000)).toHaveLength(7);
   });
 
   test("keeps every token out of its logs, its checkpoints and every request path but the claim's own query", async () => {
@@ -417,7 +419,7 @@ describe("run: a server that answers claimed", () => {
     const { ctx, recorded } = fakeContext({ guest: { "GET /identity": identity(true) } });
     await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: response([]) }))).rejects.toThrow("does not list this server");
     expect(recorded.plexTv).toHaveLength(RESOURCES_ATTEMPTS);
-    expect(recorded.sleeps).toEqual(Array(RESOURCES_ATTEMPTS - 1).fill(10000));
+    expect(recorded.sleeps.filter((ms) => ms !== 2000)).toEqual(Array(RESOURCES_ATTEMPTS - 1).fill(10000));
     expect(recorded.requests).toEqual([]);
     expect(recorded.secretWrites).toBe(0);
     expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready"]);
@@ -434,7 +436,7 @@ describe("run: every write is verified, and a failed or unverified one stops the
     });
     await expect(runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer }))).rejects.toThrow("did not accept");
     expect(recorded.requests.filter((request) => request.method === "POST")).toHaveLength(CLAIM_ATTEMPTS);
-    expect(recorded.sleeps).toEqual(Array(CLAIM_ATTEMPTS - 1).fill(5000));
+    expect(recorded.sleeps.filter((ms) => ms !== 2000)).toEqual(Array(CLAIM_ATTEMPTS - 1).fill(5000));
     expect(recorded.failed?.context).toContainEqual({ label: "Last status", value: "403" });
     expect(recorded.requests.some((request) => request.method === "PUT")).toBe(false);
     expect(recorded.secretWrites).toBe(0);
@@ -534,7 +536,7 @@ describe("run: every write is verified, and a failed or unverified one stops the
     const { ctx, recorded } = fakeContext({ guest: ownedClaimedGuest() });
     await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: [response([]), response("busy", 503), resourcesAnswer] }));
     expect(recorded.plexTv).toHaveLength(3);
-    expect(recorded.sleeps).toEqual([10000, 10000]);
+    expect(recorded.sleeps.filter((ms) => ms !== 2000)).toEqual([10000, 10000]);
     expect(recorded.secrets[SERVER_TOKEN_SECRET]).toBe(SERVER_TOKEN);
   });
 
@@ -604,7 +606,7 @@ describe("run: the five default media libraries", () => {
     guest[`POST ${CREATE_PATH}`] = [startingUp(), response("", 201)];
     const { ctx, recorded } = fakeContext({ guest });
     await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
-    expect(recorded.sleeps).toEqual([5000]);
+    expect(recorded.sleeps.filter((ms) => ms !== 2000)).toEqual([5000]);
     expect(recorded.requests.filter((request) => request.path.startsWith("/library/sections")).map((request) => `${request.method} ${request.path}`))
       .toEqual(["GET /library/sections", `POST ${CREATE_PATH}`, ...LIBRARY_REQUESTS.slice(4)]);
     expect(recorded.emitted.map((cp) => cp.id)).toEqual(ALL_CHECKPOINTS);
@@ -626,7 +628,7 @@ describe("run: the five default media libraries", () => {
     const { ctx, recorded } = fakeContext({ guest });
     await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("still starting up");
     expect(recorded.requests.filter((request) => request.method === "POST" && request.path === CREATE_PATH)).toHaveLength(LIBRARY_ATTEMPTS);
-    expect(recorded.sleeps).toEqual(Array(LIBRARY_ATTEMPTS - 1).fill(5000));
+    expect(recorded.sleeps.filter((ms) => ms !== 2000)).toEqual(Array(LIBRARY_ATTEMPTS - 1).fill(5000));
     expect(recorded.failed?.message).not.toContain("mount");
     expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "preferences"]);
   });
@@ -638,7 +640,7 @@ describe("run: the five default media libraries", () => {
       const { ctx, recorded } = fakeContext({ guest });
       await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow();
       expect(recorded.requests.filter((request) => request.method === "POST" && request.path === CREATE_PATH)).toHaveLength(1);
-      expect(recorded.sleeps).toEqual([]);
+      expect(recorded.sleeps.filter((ms) => ms !== 2000)).toEqual([]);
       expect(JSON.stringify({ logs: recorded.logs, failure: recorded.failed })).not.toContain(ACCOUNT_TOKEN);
     }
   });
@@ -676,7 +678,7 @@ describe("run: the five default media libraries", () => {
     guest["GET /library/sections"] = [response("still starting up", 500), response("still starting up", 500), ...(libraryAnswers()["GET /library/sections"] as Answer[])];
     const { ctx, recorded } = fakeContext({ guest });
     await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
-    expect(recorded.sleeps).toEqual([5000, 5000]);
+    expect(recorded.sleeps.filter((ms) => ms !== 2000)).toEqual([5000, 5000]);
     expect(recorded.emitted.map((cp) => cp.id)).toEqual(ALL_CHECKPOINTS);
   });
 
@@ -686,7 +688,7 @@ describe("run: the five default media libraries", () => {
     const { ctx, recorded } = fakeContext({ guest });
     await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("library subsystem did not answer");
     expect(recorded.requests.filter((request) => request.path === "/library/sections")).toHaveLength(LIBRARY_ATTEMPTS);
-    expect(recorded.sleeps).toEqual(Array(LIBRARY_ATTEMPTS - 1).fill(5000));
+    expect(recorded.sleeps.filter((ms) => ms !== 2000)).toEqual(Array(LIBRARY_ATTEMPTS - 1).fill(5000));
     expect(recorded.secretWrites).toBe(1);
     expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "preferences"]);
   });
