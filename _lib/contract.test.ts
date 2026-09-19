@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { checkContract, declaredScripts } from "./contract";
+import { parseVMHooks } from "./vm-surfaces";
 import type { VMBlueprint } from "./vm-blueprint.schema";
 
 // What the validator does with a blueprint's surface declarations: which scripts
@@ -25,7 +26,7 @@ const hook = (overrides: Record<string, unknown> = {}) => ({
   id: "onboarding",
   title: "Onboarding check",
   events: ["onAfterReady"],
-  script: "_hooks/haos_setup.ts",
+  script: "home-assistant-os/haos_setup.ts",
   entrypoint: "run",
   guestPort: 8123,
   ...overrides,
@@ -33,15 +34,23 @@ const hook = (overrides: Record<string, unknown> = {}) => ({
 
 describe("declaredScripts", () => {
   test("names each hook's script with whether the sync would withhold the blueprint for it", () => {
-    const bp = { ...base, hooksSchema: 1, hooks: [hook(), hook({ id: "optional", optional: true, script: "_hooks/other.ts" })] } as VMBlueprint;
+    const bp = { ...base, hooksSchema: 1, hooks: [hook(), hook({ id: "optional", optional: true, script: "home-assistant-os/other.ts" })] } as VMBlueprint;
     expect(declaredScripts(bp)).toEqual([
-      { kind: "hook", id: "onboarding", script: "_hooks/haos_setup.ts", required: true },
-      { kind: "hook", id: "optional", script: "_hooks/other.ts", required: false },
+      { kind: "hook", id: "onboarding", script: "home-assistant-os/haos_setup.ts", required: true },
+      { kind: "hook", id: "optional", script: "home-assistant-os/other.ts", required: false },
     ]);
   });
 
   test("a blueprint without surfaces declares no scripts", () => {
     expect(declaredScripts(base)).toEqual([]);
+  });
+
+  test("a script path is any relative .ts or .js file in the repo (the blueprint's folder by convention); an absolute path or one that climbs is refused", () => {
+    const parse = (script: string) => parseVMHooks({ hooks: [hook({ script })], guest: base.guest }, { form: "authoring" });
+    expect(parse("shared/media.ts").hooks).toHaveLength(1);
+    expect(parse("home-assistant-os/haos_setup.ts").hooks).toHaveLength(1);
+    expect(parse("../secrets.ts").errors.join()).toContain('"." or ".." segments');
+    expect(parse("/etc/haos.ts").errors.join()).toContain("relative to the catalog root");
   });
 });
 

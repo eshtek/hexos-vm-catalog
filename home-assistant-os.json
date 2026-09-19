@@ -58,7 +58,7 @@
             },
             "guestPort": 8123,
             "altPorts": [80],
-            "script": "_hooks/haos_setup.ts",
+            "script": "home-assistant-os/haos_setup.ts",
             "entrypoint": "run",
             "timeout": 600,
             "retries": 1

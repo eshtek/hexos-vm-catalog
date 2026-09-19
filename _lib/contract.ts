@@ -175,7 +175,7 @@ export interface ContractResult {
   warnings: string[];
 }
 
-/** A script a blueprint's surface declarations name, as authored: a path under _hooks/ or _widgets/. */
+/** A script a blueprint's surface declarations name, as authored: a `.ts` or `.js` path from the catalog root, by convention in the blueprint's own folder. */
 export interface DeclaredScript {
   kind: "hook" | "widget";
   id: string;
@@ -368,7 +368,7 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
   // Surface declarations (setup hooks, widgets) are parsed here exactly as the
   // sync parses them in the authoring form, so every rule the parser reports
   // (an unsupported schema version, a hook with no port, a consent object on a
-  // user-fired verb, a script path outside _hooks/) fails the PR rather than
+  // user-fired verb, a script path that is absolute or climbs with "..") fails the PR rather than
   // the sync, where a dropped declaration is only a logged error and a
   // withheld blueprint keeps its last good document. A blueprint that declares
   // no surfaces has nothing to report.

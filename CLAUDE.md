@@ -85,7 +85,7 @@ longer knows is stripped before those checks see it — every blueprint then
 fails at once. Land the change upstream, then re-vendor.
 
 **A setup hook runs on a user's box against a guest it did not necessarily
-install.** Scripts under `_hooks/` reach the guest only through the context's
+install.** Scripts (in each blueprint's own folder) reach the guest only through the context's
 `fetch`/`waitForApp` (the platform binds them to the paths it verified against
 the VM's MAC) and import nothing at runtime — `import type { VMHookContext }
 from "../_lib/hook_context"` and no more; `bun run validate` refuses a runtime

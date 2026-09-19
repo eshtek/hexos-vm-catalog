@@ -213,7 +213,7 @@ Icons live under `_icons/apps/`, one per app, mirrored here exactly like the blu
         "postInstallUrl": "http://{ip}:8123"
     },
     "hooksSchema": 1,                      // optional: setup hooks the platform runs after the guest
-    "hooks": [ /* see "Setup hooks" below */ ] // is ready, from scripts under _hooks/ in this repo
+    "hooks": [ /* see "Setup hooks" below */ ] // is ready, from scripts in this repo (the blueprint's own folder)
 }
 ```
 
@@ -389,7 +389,7 @@ A blueprint may declare **setup hooks**: scripts in this repo that the HexOS box
             },
             "guestPort": 8123,                  // where the guest answers; defaults from postInstallUrl
             "altPorts": [80],                   // other declared ports a redirect may land on (max 4)
-            "script": "_hooks/haos_setup.ts",   // a path under _hooks/; the sync inlines the file at
+            "script": "home-assistant-os/haos_setup.ts", // a path from the repo root; the sync inlines the file at
             "entrypoint": "run",                // one pinned commit, so a box never fetches a script
             "inputs": [],                       // questions or an OAuth flow the user answers first
             "timeout": 600, "retries": 1
@@ -397,7 +397,7 @@ A blueprint may declare **setup hooks**: scripts in this repo that the HexOS box
     ]
 ```
 
-Scripts live under [`_hooks/`](_hooks/) (invisible to the sync as a directory; reachable only through a declaration's `script`). They import **types only** — `import type { VMHookContext } from "../_lib/hook_context"` — and nothing at runtime: the sync refuses any runtime `import`, `require` or re-export, and so does `bun run validate`. [`_lib/hook_context.ts`](_lib/hook_context.ts) is a hand-maintained mirror of the platform's `VMHookContext`; CI typechecks `_hooks/` against it and runs each script's own tests (`bun run test-hooks`, `_hooks/*.test.ts`). A required setup hook (`onAfterReady`, not `optional`) whose script is missing or fails the lint makes the sync **withhold the whole blueprint** (its last good document stays published); an optional hook is dropped with a logged error and the blueprint publishes without it. Either failure is silent to a user, so the validator treats both as errors.
+Scripts live in the blueprint's own folder, beside its screenshots ([`home-assistant-os/haos_setup.ts`](home-assistant-os/haos_setup.ts), [`plex-server/plex_setup.ts`](plex-server/plex_setup.ts)), as the app catalog keeps each app's scripts in its folder; the sync never reads a directory as a blueprint, so a script is reachable only through a declaration's `script`, a `.ts` or `.js` path from the repo root with no `..` segments (the folder is a convention the review keeps, not a rule the parser enforces). They import **types only** — `import type { VMHookContext } from "../_lib/hook_context"` — and nothing at runtime: the sync refuses any runtime `import`, `require` or re-export, and so does `bun run validate`. [`_lib/hook_context.ts`](_lib/hook_context.ts) is a hand-maintained mirror of the platform's `VMHookContext`; CI typechecks the script folders against it and runs each script's own tests (`bun run test-hooks`, the `*.test.ts` beside each script; a blueprint whose folder gains scripts joins the `test-hooks` command in `_lib/package.json` and the `include` list in `_lib/tsconfig.json`). A required setup hook (`onAfterReady`, not `optional`) whose script is missing or fails the lint makes the sync **withhold the whole blueprint** (its last good document stays published); an optional hook is dropped with a logged error and the blueprint publishes without it. Either failure is silent to a user, so the validator treats both as errors.
 
 Two rules for authors. A setup hook must never write to a guest it did not install, and must tolerate a guest the user has already set up by hand: confirm state, record what the guest actually establishes (a status page that is not served is "unknown", never proof of anything), and leave account creation to the user (or to a migration that carries that intent). And never put a credential into a checkpoint message or a log line; `ctx.secrets` keeps what a hook collects, bound to the VM instance and removed with it. The platform snapshots a blueprint's declarations at install and runs from that snapshot, including on a rerun; adopting a later catalog edit is a separate, explicit action, not part of "Run setup".
 

@@ -100,7 +100,7 @@
                     }
                 }
             ],
-            "script": "_hooks/plex_setup.ts",
+            "script": "plex-server/plex_setup.ts",
             "entrypoint": "run",
             "timeout": 600,
             "retries": 0
@@ -114,7 +114,7 @@
             ],
             "optional": true,
             "guestPort": 32400,
-            "script": "_hooks/plex_setup.ts",
+            "script": "plex-server/plex_setup.ts",
             "entrypoint": "onMediaReconnected",
             "timeout": 120,
             "retries": 0

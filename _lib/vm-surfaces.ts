@@ -38,8 +38,10 @@ import {
 // and reported as errors rather than by hiding the blueprint.
 //
 // Two forms of the same declaration exist:
-//   authoring: the catalog file. `script` names a path under _hooks/ (or
-//              _widgets/) in the catalog repo; `scriptContent` and `source`
+//   authoring: the catalog file. `script` names a `.ts` or `.js` file by its
+//              path from the catalog root, by convention in the blueprint's
+//              own `<id>/` folder for hooks and widgets alike, as the app
+//              catalog keeps each app's scripts; `scriptContent` and `source`
 //              are the sync's to write, so their presence is an error.
 //   stored:    the synced document a box reads. The sync inlined the file
 //              into `scriptContent`, removed `script` and stamped
@@ -192,22 +194,22 @@ export function launchEndpoint(postInstallUrl: string | undefined): VMLaunchEndp
 
 // ===== Script paths =====
 
-export type VMSurfaceScriptDir = '_hooks' | '_widgets';
-
 /**
  * Why an authored script path is refused, or undefined when it is
- * acceptable: a relative path under the surface's directory, a TypeScript
- * or JavaScript file, no empty, "." or ".." segments, and only characters a
- * URL carries verbatim as path segments. The sync appends the path to the
- * pinned commit's URL, and a URL parser reads "%2e%2e" as ".." and "\" as
- * "/", so a "%" or "\" would let a segment climb out of that commit; "?"
- * and "#" would end the path early. The same rules the app hook resolver
- * applies to file-backed scripts, plus the directory and the character set.
+ * acceptable: a path relative to the catalog root (by convention the
+ * blueprint's own folder, which is a review convention, not a rule, as in the
+ * app catalog), a TypeScript or JavaScript file, no empty, "." or ".."
+ * segments, and only characters a URL carries verbatim as path segments. The
+ * sync appends the path to the pinned commit's URL, and a URL parser reads
+ * "%2e%2e" as ".." and "\" as "/", so a "%" or "\" would let a segment
+ * climb out of that commit; "?" and "#" would end the path early. The same
+ * rules the app hook resolver applies to file-backed scripts, plus the
+ * character set.
  */
-export function vmScriptPathError(path: string, dir: VMSurfaceScriptDir): string | undefined {
+export function vmScriptPathError(path: string): string | undefined {
     if (path.includes('\0')) return 'contains a null byte';
     if (!/^[A-Za-z0-9_./-]+$/.test(path)) return 'may contain only letters, digits, "_", "-", "." and "/"';
-    if (!path.startsWith(`${dir}/`)) return `must be a path under ${dir}/`;
+    if (path.startsWith('/')) return 'must be relative to the catalog root';
     if (!/\.(ts|js)$/.test(path)) return 'must end in .ts or .js';
     if (path.split('/').some((segment) => segment === '' || segment === '.' || segment === '..')) {
         return 'must not contain empty, "." or ".." segments';
@@ -278,12 +280,12 @@ export const vmWidgetDeclarationSchema = z.object({
 type ScriptSourceFields = { script?: string; scriptContent?: string; source?: VMDeclarationSource };
 
 /** The form rules, shared by hooks and widgets. */
-function scriptSourceIssues(decl: ScriptSourceFields, opts: ParseVMSurfacesOptions, dir: VMSurfaceScriptDir): string[] {
+function scriptSourceIssues(decl: ScriptSourceFields, opts: ParseVMSurfacesOptions): string[] {
     const issues: string[] = [];
     if (opts.form === 'authoring') {
-        if (decl.script == null) issues.push(`script is required: a path under ${dir}/ in the catalog`);
+        if (decl.script == null) issues.push('script is required: a relative .ts or .js path in the catalog');
         else {
-            const why = vmScriptPathError(decl.script, dir);
+            const why = vmScriptPathError(decl.script);
             if (why) issues.push(`script ${why}`);
         }
         if (decl.scriptContent != null) issues.push('scriptContent is written by the sync, never authored');
@@ -350,7 +352,7 @@ function hookSchemaFor(opts: ParseVMSurfacesOptions, launch: VMLaunchEndpoint | 
             if (!userTriggerable && decl.rerun != null) {
                 issue('`rerun` applies to user firings only; remove it from this lifecycle-only hook');
             }
-            for (const message of scriptSourceIssues(decl, opts, '_hooks')) issue(message);
+            for (const message of scriptSourceIssues(decl, opts)) issue(message);
             if (decl.guestPort == null && launch == null) issue(NO_PORT);
         })
         .transform((decl): VMHookDeclaration => {
@@ -367,7 +369,7 @@ function widgetSchemaFor(opts: ParseVMSurfacesOptions, launch: VMLaunchEndpoint 
     return vmWidgetDeclarationSchema
         .superRefine((decl, ctx) => {
             const issue = (message: string) => ctx.addIssue({ code: 'custom', message });
-            for (const message of scriptSourceIssues(decl, opts, '_widgets')) issue(message);
+            for (const message of scriptSourceIssues(decl, opts)) issue(message);
             if (decl.guestPort == null && launch == null) issue(NO_PORT);
         })
         .transform((decl): VMWidgetDeclaration => {
