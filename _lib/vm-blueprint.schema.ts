@@ -720,6 +720,10 @@ export const HEXOS_VM_CAPABILITIES = [
      * unusable without it — on the CDROM path they boot with no account.
      */
     'virtioSeed',
+    /** vm/create accepts `installation_media_url`: the box downloads the installer ISO into Install Media before first boot, behind a VM_INSTALL task. */
+    'isoDownload',
+    /** vm/create accepts `additional_media`: extra ISOs attached as CDROMs after the install medium. */
+    'additionalMedia',
     /**
      * The `plex-appliance` first-boot profile: a stock Ubuntu cloud image
      * seeded to install Plex and report ready only once Plex answers, so the
