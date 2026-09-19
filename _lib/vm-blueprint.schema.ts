@@ -529,6 +529,10 @@ export const blueprintNeedsUsername = (provisioning: VMProvisioningDoc): boolean
 export const blueprintRequiresPassword = (provisioning: VMProvisioningDoc): boolean =>
     provisioning.strategy === 'installer-iso' || provisioning.strategy === 'installer-image';
 
+/** Whether the blueprint mounts the default HexOS folders at first boot, so the install asks for the shared SMB credential pair. */
+export const blueprintNeedsMediaShare = (provisioning: VMProvisioningDoc): boolean =>
+    provisioning.strategy === 'image' && provisioning.firstBoot?.mediaShare === true;
+
 /** Answer-file (Windows) blueprints additionally need the user-supplied installer ISO. */
 export const blueprintNeedsWindowsSetup = (provisioning: VMProvisioningDoc): boolean =>
     provisioning.strategy === 'answer-file';

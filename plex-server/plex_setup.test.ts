@@ -590,6 +590,14 @@ describe("run: the five default media libraries", () => {
     expect(recorded.emitted.filter((cp) => cp.message?.includes("already existed"))).toHaveLength(2);
   });
 
+  test("a listing whose section locations are malformed creates nothing: the run fails at the listing, with no POST", async () => {
+    const guest = ownedClaimedGuest();
+    guest["GET /library/sections"] = response({ MediaContainer: { Directory: [{ key: "7", type: "movie", title: "Movies", Location: null }] } });
+    const { ctx, recorded } = fakeContext({ guest });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow();
+    expect(recorded.requests.filter((r) => r.method === "POST" && r.path.startsWith("/library/sections")).map((r) => r.path)).toEqual([]);
+  });
+
   test("a later library failure preserves completed checkpoints and does not claim all scans ran", async () => {
     const guest = ownedClaimedGuest();
     guest[`POST ${createPaths[2]}`] = response("refused", 400);
@@ -971,6 +979,10 @@ describe("readers", () => {
       { key: "1", title: "No locations", type: "show", locations: [] },
     ]);
     expect(readSections(JSON.stringify({ MediaContainer: { Directory: [{ key: 1, title: "bad key" }] } }))).toBeUndefined();
+    // A Location that is present but not a list of paths is not the document: an empty answer would permit a creation.
+    for (const Location of [null, "/mnt/movies", [{ id: 3 }], [null], [{ path: 7 }]]) {
+      expect(readSections(JSON.stringify({ MediaContainer: { Directory: [{ key: "7", title: "Movies", type: "movie", Location }] } }))).toBeUndefined();
+    }
     expect(readSections(JSON.stringify({ MediaContainer: { Directory: "nope" } }))).toBeUndefined();
     expect(readSections("still starting up")).toBeUndefined();
     expect(readSections("<html>")).toBeUndefined();

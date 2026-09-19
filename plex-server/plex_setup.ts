@@ -254,7 +254,10 @@ export function readServerToken(text: string, machineIdentifier: string): PlexLi
  * per section with its `key`, `type`, `title` and `Location` list. No
  * `Directory` means no sections. Anything that is not that document reads as
  * undefined, so a subsystem that is still starting is told apart from a
- * server with no libraries.
+ * server with no libraries. A section without `Location` has none; a
+ * `Location` that is present but not a list of `{ path }` entries is not that
+ * document either, since an empty answer here would read as "nothing covers
+ * this folder" and permit a creation.
  */
 export function readSections(text: string): PlexSection[] | undefined {
   const parsed = parseJson(text) as { MediaContainer?: { Directory?: unknown } } | undefined;
@@ -268,10 +271,12 @@ export function readSections(text: string): PlexSection[] | undefined {
     if (typeof entry !== "object" || entry === null) return undefined;
     const { key, title, type, Location } = entry as { key?: unknown; title?: unknown; type?: unknown; Location?: unknown };
     if (typeof key !== "string" || typeof title !== "string" || typeof type !== "string") return undefined;
+    if (Location !== undefined && !Array.isArray(Location)) return undefined;
     const locations: string[] = [];
-    for (const location of Array.isArray(Location) ? Location : []) {
+    for (const location of Location ?? []) {
       const path = typeof location === "object" && location !== null ? (location as { path?: unknown }).path : undefined;
-      if (typeof path === "string") locations.push(path);
+      if (typeof path !== "string") return undefined;
+      locations.push(path);
     }
     sections.push({ key, title, type, locations });
   }
