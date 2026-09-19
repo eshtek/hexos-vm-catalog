@@ -385,7 +385,7 @@ A blueprint may declare **setup hooks**: scripts in this repo that the HexOS box
             "userOptional": {                   // present = a consent switch in the installer, on by
                 "description": "…",             // default. A hook that signs the user in anywhere MUST
                 "default": false,               // declare "default": false (the parser refuses otherwise)
-                "link": { "label": "…", "url": "…" } // optional: a link beside the consent text
+                "link": { "label": "…", "url": "https://example.com/setup" } // optional: a link beside the consent text
             },
             "guestPort": 8123,                  // where the guest answers; defaults from postInstallUrl
             "altPorts": [80],                   // other declared ports a redirect may land on (max 4)
