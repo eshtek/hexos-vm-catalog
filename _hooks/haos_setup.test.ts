@@ -129,7 +129,7 @@ describe("readOnboarding", () => {
 
 describe("describeOnboarding", () => {
   test("establishes fresh and onboarded from the status view", () => {
-    expect(describeOnboarding(response(FRESH))).toEqual({ known: true, message: "Fresh install: finish onboarding in the browser (user, core_config, analytics, integration)" });
+    expect(describeOnboarding(response(FRESH))).toEqual({ known: true, message: "Fresh install: finish onboarding in the browser (4 of 4 steps remain)" });
     expect(describeOnboarding(response([{ step: "user", done: true }]))).toEqual({ known: true, message: "Onboarded: an owner account already exists" });
   });
 
@@ -158,7 +158,7 @@ describe("run", () => {
     expect(recorded.waits).toEqual([{ path: "/", opts: { maxAttempts: 24 } }]);
     expect(recorded.fetches).toEqual([{ path: "/api/onboarding", method: "GET" }]);
     expect(recorded.emitted[0]).toEqual({ id: "reachable", message: "Home Assistant answered at http://192.0.2.201:8123/", progress: 50 });
-    expect(recorded.emitted[1]).toEqual({ id: "onboarding", message: "Fresh install: finish onboarding in the browser (user, core_config, analytics, integration)", progress: undefined });
+    expect(recorded.emitted[1]).toEqual({ id: "onboarding", message: "Fresh install: finish onboarding in the browser (4 of 4 steps remain)", progress: undefined });
     expect(recorded.skipped).toEqual([]);
   });
 

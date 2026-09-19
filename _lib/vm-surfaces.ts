@@ -676,3 +676,17 @@ export function lintScriptImports(source: string): string[] {
     }
     return errors.sort((a, b) => Number(/\d+/.exec(a)?.[0]) - Number(/\d+/.exec(b)?.[0]));
 }
+
+/**
+ * Consent for one userOptional hook: the explicit answer where one was given,
+ * else the declaration's default, where only an explicit `default: false`
+ * reads as not consented (the app installer's rule, `isAppSurfaceHookOptedIn`;
+ * the grammar requires that default of a hook that signs the user in
+ * somewhere, so an absent answer is "not consented" there without a second
+ * rule). One rule for the installer's switches, the deck's seed and the box's
+ * snapshot, so the consent shown and the consent applied cannot differ.
+ */
+export const isVMSetupHookOptedIn = (
+    hook: Pick<VMHookDeclaration, 'id' | 'userOptional'>,
+    hookOptIns: Record<string, boolean> | undefined,
+): boolean => hookOptIns?.[hook.id] ?? hook.userOptional?.default !== false;

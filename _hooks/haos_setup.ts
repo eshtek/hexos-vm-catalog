@@ -83,7 +83,8 @@ export function describeOnboarding(response: Pick<VMHookResponse, "status"> & { 
     return { known: false, message: "Onboarding state unknown: Home Assistant listed no steps. Open it in the browser to check." };
   }
   if (state.onboarded) return { known: true, message: "Onboarded: an owner account already exists" };
-  return { known: true, message: `Fresh install: finish onboarding in the browser (${state.pending.join(", ")})` };
+  // A count, not Home Assistant's step ids: the message reaches the user's checklist.
+  return { known: true, message: `Fresh install: finish onboarding in the browser (${state.pending.length} of ${state.steps.length} steps remain)` };
 }
 
 export async function run(ctx: VMHookContext): Promise<void> {
