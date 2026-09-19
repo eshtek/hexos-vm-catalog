@@ -920,6 +920,19 @@ describe("readers", () => {
     expect(readIdentity(`<MediaContainer claimed="0" machineIdentifier="${MID}"/>`)?.claimed).toBe(false);
     expect(readIdentity(JSON.stringify({ MediaContainer: { claimed: "1", machineIdentifier: MID } }))?.claimed).toBe(true);
     expect(readIdentity(JSON.stringify({ MediaContainer: { machineIdentifier: MID } }))).toBeUndefined();
+    // The attributes must sit on the root element: a document that is not the identity does not pass because some element carries them.
+    expect(readIdentity(`<MediaContainer size="1"><Server claimed="0" machineIdentifier="${MID}"/></MediaContainer>`)).toBeUndefined();
+    expect(readIdentity(`<html><body claimed="0" machineIdentifier="${MID}">not plex</body></html>`)).toBeUndefined();
+    // Nor because a MediaContainer element sits inside, or is commented out of, a document that is not the identity.
+    expect(readIdentity(`<html><MediaContainer claimed="0" machineIdentifier="${MID}"/></html>`)).toBeUndefined();
+    expect(readIdentity(`<!-- <MediaContainer claimed="0" machineIdentifier="${MID}"/> --><html/>`)).toBeUndefined();
+    // Nor when the root's name merely begins with MediaContainer.
+    expect(readIdentity(`<MediaContainer-error claimed="0" machineIdentifier="${MID}"/>`)).toBeUndefined();
+    expect(readIdentity(`<MediaContainer:Other xmlns:MediaContainer="urn:other" claimed="0" machineIdentifier="${MID}"/>`)).toBeUndefined();
+    // Plex's own declaration and whitespace ahead of the root are the identity.
+    expect(readIdentity(`<?xml version="1.0" encoding="UTF-8"?>\n<MediaContainer claimed="1" machineIdentifier="${MID}"/>`)?.claimed).toBe(true);
+    expect(readIdentity(`\n  <MediaContainer claimed="0" machineIdentifier="${MID}"/>`)?.claimed).toBe(false);
+    expect(readIdentity(JSON.stringify({ MediaContainer: [{ claimed: "0", machineIdentifier: MID }] }))).toBeUndefined();
     expect(readIdentity(JSON.stringify({ MediaContainer: { claimed: "maybe", machineIdentifier: MID } }))).toBeUndefined();
     expect(readIdentity(`<MediaContainer machineIdentifier="${MID}"/>`)).toBeUndefined();
     expect(readIdentity("<html>captive</html>")).toBeUndefined();
@@ -984,6 +997,8 @@ describe("readers", () => {
       expect(readSections(JSON.stringify({ MediaContainer: { Directory: [{ key: "7", title: "Movies", type: "movie", Location }] } }))).toBeUndefined();
     }
     expect(readSections(JSON.stringify({ MediaContainer: { Directory: "nope" } }))).toBeUndefined();
+    // An array where the container should be is not the sections document, not an empty library list.
+    expect(readSections(JSON.stringify({ MediaContainer: [] }))).toBeUndefined();
     expect(readSections("still starting up")).toBeUndefined();
     expect(readSections("<html>")).toBeUndefined();
   });
@@ -1058,11 +1073,20 @@ describe("onMediaReconnected", () => {
   const allSections = () => response({ MediaContainer: { size: 5, Directory: sectionEntries } });
   const recovery = (guest: Record<string, Answers>, opts: { secrets?: Record<string, string>; folders?: unknown } = {}) =>
     fakeContext({
-      guest,
+      // Trash emptying reads as off unless a test says otherwise: the recovery checks it before any scan.
+      guest: { "GET /:/prefs": prefsTrash(false), ...guest },
       event: "onMediaReconnected",
       eventData: { folders: opts.folders ?? ["Photos", "Media"] },
       secrets: opts.secrets ?? { [SERVER_TOKEN_SECRET]: SERVER_TOKEN },
     });
+
+  test("scans nothing while automatic trash emptying is on, or while the setting cannot be read: a scan would let Plex empty a library's trash", async () => {
+    for (const answer of [prefsTrash(true), prefsTrash("maybe"), response("<html>", 500), prefs(SERVER_PREFERENCES_TAKEN)]) {
+      const { ctx, recorded } = recovery({ "GET /identity": [identity(true)], "GET /:/prefs": answer, "GET /library/sections": [allSections()] });
+      await expect(onMediaReconnected(ctx)).rejects.toThrow("trash emptying is not confirmed off");
+      expect(recorded.requests.some((r) => r.path.endsWith("/refresh"))).toBe(false);
+    }
+  });
 
   test("reads the folders the platform names and maps a folder to its library by mount path", () => {
     expect(readReconnectedFolders({ folders: ["Photos", "Videos"] })).toEqual(["Photos", "Videos"]);
@@ -1083,10 +1107,11 @@ describe("onMediaReconnected", () => {
     expect(recorded.emitted).toEqual([{ id: "media:Photos", message: "Scan requested for Photos" }]);
     expect(recorded.skipped).toEqual(["media:Media"]);
     expect(recorded.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
+      "GET /:/prefs",
       "GET /library/sections",
       "GET /library/sections/10/refresh",
     ]);
-    expect(recorded.requests[1]?.headers["X-Plex-Token"]).toBe(SERVER_TOKEN);
+    expect(recorded.requests[2]?.headers["X-Plex-Token"]).toBe(SERVER_TOKEN);
     expect(recorded.failed).toBeUndefined();
     expect(recorded.secretWrites).toBe(0);
   });

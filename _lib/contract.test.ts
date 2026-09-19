@@ -66,3 +66,18 @@ describe("checkContract on surface declarations", () => {
     expect(checkContract(bp, "home-assistant-os.json").errors.filter((error) => error.startsWith("hooks: "))).toEqual([]);
   });
 });
+
+describe("a profile's own capability", () => {
+  test("the Plex profile must declare plexAppliance, and a mediaShare first boot must declare firstBootDefaultMedia", () => {
+    const plex = {
+      ...base,
+      requiredCapabilities: ["firstBoot"],
+      provisioning: { ...base.provisioning, strategy: "image", firstBoot: { profile: "plex-appliance", mediaShare: true } },
+    } as unknown as VMBlueprint;
+    const { errors } = checkContract(plex, "plex-server.json");
+    expect(errors.some((e) => e.includes('declare "plexAppliance"'))).toBe(true);
+    expect(errors.some((e) => e.includes('declare "firstBootDefaultMedia"'))).toBe(true);
+    const declared = { ...plex, requiredCapabilities: ["firstBoot", "plexAppliance", "firstBootDefaultMedia"] } as unknown as VMBlueprint;
+    expect(checkContract(declared, "plex-server.json").errors.filter((e) => e.includes("needs requiredCapabilities"))).toEqual([]);
+  });
+});

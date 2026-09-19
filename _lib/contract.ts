@@ -87,6 +87,9 @@ export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
 // allowlists): a capability listed here before it exists upstream turns the
 // check into a rubber stamp. Values are exact-match (no case folding) — the
 // backend compares them verbatim.
+/** The capability a first-boot profile stands on, where the profile is not part of every first-boot backend. */
+const PROFILE_CAPABILITIES: Record<string, readonly string[]> = { "plex-appliance": ["plexAppliance"] };
+
 export const KNOWN_VM_CAPABILITIES = new Set(["firstBoot", "appInstall", "virtioSeed", "isoDownload", "additionalMedia", "plexAppliance", "firstBootDefaultMedia"]);
 
 // Passthrough class vocabulary, enforced here for the same reason as
@@ -401,6 +404,20 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
     warnings.push(
       `requiredCapabilities declares "firstBoot" but provisioning has no firstBoot profile — harmless over-gating that hides the blueprint from hosts that could run it`,
     );
+  }
+  // A profile, or a first-boot field, that only some backends implement must
+  // be declared as a capability too, or an older backend installs the guest
+  // unconfigured while the document says it is configured.
+  if (p.strategy === "image" && p.firstBoot) {
+    const declared = new Set(bp.requiredCapabilities ?? []);
+    for (const [needed, why] of [
+      ...(PROFILE_CAPABILITIES[p.firstBoot.profile] ?? []).map((capability) => [capability, `the "${p.firstBoot?.profile}" profile`] as const),
+      ...(p.firstBoot.mediaShare === true ? [["firstBootDefaultMedia", "firstBoot.mediaShare"] as const] : []),
+    ]) {
+      if (!declared.has(needed)) {
+        errors.push(`${why} needs requiredCapabilities to declare "${needed}" — a backend without it would install this blueprint silently unconfigured`);
+      }
+    }
   }
 
   for (const flag of bp.cpuFeatures ?? []) {

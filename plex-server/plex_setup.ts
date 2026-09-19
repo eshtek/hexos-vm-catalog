@@ -205,10 +205,16 @@ export function readIdentity(text: string): PlexIdentity | undefined {
     if (typeof machineIdentifier !== "string" || machineIdentifier.length === 0 || claimed === undefined) return undefined;
     return { machineIdentifier, claimed, version: typeof container.version === "string" ? container.version : undefined };
   }
-  const machineIdentifier = attribute(text, "machineIdentifier");
-  const claimed = readClaimed(attribute(text, "claimed"));
+  // The XML form: the attributes must sit on the root MediaContainer element
+  // itself, the first element of the document after Plex's declaration, not on
+  // any element that happens to carry them, nested or commented out, or a
+  // document that is not Plex's identity could pass as one.
+  const root = /^\s*(?:<\?xml\b[^>]*\?>\s*)?<MediaContainer(?=[\s/>])([^>]*)>/.exec(text);
+  if (!root) return undefined;
+  const machineIdentifier = attribute(root[1] ?? "", "machineIdentifier");
+  const claimed = readClaimed(attribute(root[1] ?? "", "claimed"));
   if (!machineIdentifier || claimed === undefined) return undefined;
-  return { machineIdentifier, claimed, version: attribute(text, "version") };
+  return { machineIdentifier, claimed, version: attribute(root[1] ?? "", "version") };
 }
 
 /** The friendly name the server's root document reports. */
@@ -262,7 +268,7 @@ export function readServerToken(text: string, machineIdentifier: string): PlexLi
 export function readSections(text: string): PlexSection[] | undefined {
   const parsed = parseJson(text) as { MediaContainer?: { Directory?: unknown } } | undefined;
   const container = parsed?.MediaContainer;
-  if (!container || typeof container !== "object") return undefined;
+  if (!container || typeof container !== "object" || Array.isArray(container)) return undefined;
   const directories = container.Directory;
   if (directories === undefined) return [];
   if (!Array.isArray(directories)) return undefined;
@@ -379,6 +385,21 @@ export async function onMediaReconnected(ctx: VMHookContext): Promise<void> {
   const first = await ctx.waitForApp("/identity", { maxAttempts: RECOVERY_READY_ATTEMPTS, headers: JSON_ACCEPT });
   if (!readIdentity(first.text())) {
     ctx.fail("Plex answered, but not with its identity", [{ label: "Status", value: String(first.status) }]);
+  }
+  // No scan while automatic trash emptying is on, or while its state cannot
+  // be read: Plex empties the trash after a scan, and a folder that was gone
+  // may still be gone for a library this scan would touch. Setup turns the
+  // setting off, but a setup that failed after keeping the token, or a change
+  // made in Plex since, would leave it on.
+  const preferences = await ctx.fetch("/:/prefs", { headers: withToken(serverToken) });
+  if (preferences.status === 401) ctx.fail("Plex refused the server token", [{ label: "Status", value: "401" }]);
+  const trash = preferences.status === 200 ? readClaimed(readPreference(preferences.text(), TRASH_PREFERENCE)) : undefined;
+  if (trash !== false) {
+    ctx.fail("Plex's automatic trash emptying is not confirmed off; no scan requested", [
+      { label: "Preference", value: TRASH_PREFERENCE },
+      { label: "Reported", value: trash === undefined ? "(not readable)" : "on" },
+      { label: "Next step", value: "Run setup again, which turns it off, or turn it off in Plex's settings" },
+    ]);
   }
   const listing = await ctx.fetch("/library/sections", { headers: withToken(serverToken) });
   if (listing.status === 401) ctx.fail("Plex refused the server token", [{ label: "Status", value: "401" }]);
@@ -505,16 +526,17 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
   }
   ctx.log(`named ${name}`);
 
+  // Trash emptying off before anything can scan: creating a section triggers a
+  // scan, and the schedule set next scans on its own. The server token is kept
+  // only after that, so a setup that fails here leaves the recovery nothing to
+  // scan with (it checks the setting again on every run regardless).
+  await disableTrashEmptying(ctx, authToken);
   await ctx.secrets.set(SERVER_TOKEN_SECRET, accessToken);
   const kept = await ctx.secrets.get(SERVER_TOKEN_SECRET);
   if (kept !== accessToken) {
     ctx.fail("The server's access token could not be read back from the platform's store");
   }
   ctx.log("kept the server's access token for HexOS");
-
-  // Trash emptying off before anything can scan: creating a section triggers a
-  // scan, and the schedule set next scans on its own.
-  await disableTrashEmptying(ctx, authToken);
   await applyServerPreferences(ctx, authToken);
   await ctx.sleep(CHECKPOINT_PACE_MS);
   await ctx.emitCheckpoint("preferences", `Named ${name}; EULA accepted, published on your Plex account, libraries scanned hourly`);
