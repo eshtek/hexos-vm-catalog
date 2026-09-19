@@ -6,14 +6,16 @@ import type { VMHookContext } from "../_lib/hook_context";
  * server's own access token for the platform.
  *
  * What it changes on the guest, and nothing else: the claim (only on a server
- * whose identity says it is not yet claimed) and the friendly name (only on a
- * server plex.tv lists as owned by the signed-in account). An existing claim
+ * whose identity says it is not yet claimed), the friendly name (only on a
+ * server plex.tv lists as owned by the signed-in account), the server
+ * preferences it declares, and the five libraries below. An existing claim
  * is never touched: a server already claimed is named and its token kept if
  * the account owns it, and the hook stops before any write if the account
  * does not own it or plex.tv does not list it — a shared server, or someone
  * else's. An identity that does not say whether the server is claimed is not
  * proof that it is unclaimed, and stops the hook too. The five libraries use
- * the appliance's default HexOS mounts, with trash emptying disabled and scans requested.
+ * the appliance's default HexOS mounts, with trash emptying disabled and
+ * scans requested.
  *
  * Two tokens are involved and they are not interchangeable. The pin flow
  * yields the account token, which authorises the claim. The credential kept
@@ -47,6 +49,8 @@ const PLEX_TV_TIMEOUT_MS = 10000;
 const READY_ATTEMPTS = 24;
 export const CLAIM_ATTEMPTS = 3;
 const CLAIM_RETRY_MS = 5000;
+/** Per-request ceiling on the guest's claim endpoint, which talks to plex.tv on the server's behalf. */
+const CLAIM_TIMEOUT_MS = 15000;
 /** plex.tv lists a freshly claimed server once it has published itself: twelve looks, ten seconds apart. */
 export const RESOURCES_ATTEMPTS = 12;
 const RESOURCES_RETRY_MS = 10000;
@@ -90,10 +94,6 @@ export interface PlexSection {
   title: string;
   type: string;
   locations: string[];
-}
-
-export interface PlexSignIn {
-  authToken: string;
 }
 
 export interface PlexIdentity {
@@ -656,7 +656,7 @@ async function claimServer(ctx: VMHookContext, authToken: string, claimToken: st
       const response = await ctx.fetch(`/myplex/claim?token=${encodeURIComponent(claimToken)}`, {
         method: "POST",
         headers: withToken(authToken),
-        timeoutMs: 15000,
+        timeoutMs: CLAIM_TIMEOUT_MS,
       });
       lastStatus = response.status;
       if (response.status === 200) return 200;

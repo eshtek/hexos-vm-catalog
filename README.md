@@ -375,12 +375,17 @@ A blueprint may declare **setup hooks**: scripts in this repo that the HexOS box
             "id": "onboarding",                 // unique within the blueprint, lowercase slug
             "title": "Onboarding check",        // the consent row's label and the task's name
             "description": "…",                 // the consent row's body unless userOptional has its own
-            "events": ["onAfterReady"],         // the one lifecycle firing (user-fired verbs come later)
+            "events": ["onAfterReady"],         // the lifecycle firings it handles: onAfterReady once the
+                                                // guest is ready, onMediaReconnected when its media mounts
+                                                // come back (user-fired verbs come later)
             "optional": true,                   // a failure skips the hook; absent = a failure parks the
                                                 // setup until the user retries, skips or dismisses it
+            "kind": "connect",                  // a hook that signs the user in somewhere; the parser
+                                                // refuses it unless userOptional declares "default": false
             "userOptional": {                   // present = a consent switch in the installer, on by
                 "description": "…",             // default. A hook that signs the user in anywhere MUST
-                "default": false                // declare "default": false (the parser refuses otherwise)
+                "default": false,               // declare "default": false (the parser refuses otherwise)
+                "link": { "label": "…", "url": "…" } // optional: a link beside the consent text
             },
             "guestPort": 8123,                  // where the guest answers; defaults from postInstallUrl
             "altPorts": [80],                   // other declared ports a redirect may land on (max 4)
@@ -396,7 +401,7 @@ Scripts live under [`_hooks/`](_hooks/) (invisible to the sync as a directory; r
 
 Two rules for authors. A setup hook must never write to a guest it did not install, and must tolerate a guest the user has already set up by hand: confirm state, record what the guest actually establishes (a status page that is not served is "unknown", never proof of anything), and leave account creation to the user (or to a migration that carries that intent). And never put a credential into a checkpoint message or a log line; `ctx.secrets` keeps what a hook collects, bound to the VM instance and removed with it. The platform snapshots a blueprint's declarations at install and runs from that snapshot, including on a rerun; adopting a later catalog edit is a separate, explicit action, not part of "Run setup".
 
-The Plex appliance mounts the configured HexOS Media, Movies, Shows, Music, Photos and Videos folders read-only using the installation's SMB account. The hook matches the Plex app: Movies (`/mnt/movies`), TV Shows (`/mnt/shows`), Music (`/mnt/music`), Photos (`/mnt/photos`) and Videos (`/mnt/videos`), with the same agents, scanners and languages. Media is mounted at `/mnt/media` for manual use; it is not an extra library. Before creating libraries the hook disables automatic trash emptying, reuses each existing library by its exact location, and then requests a scan of all five. Existing libraries are never deleted or repointed. A successful section listing does not establish that Plex's agents have finished starting: library creation retries only Plex's explicit HTTP 400 startup refusal, up to eight attempts five seconds apart, checking for an existing library before each attempt. Other refusals and transport exceptions stop setup; an accepted creation is verified by listing the sections again.
+The Plex appliance mounts the configured HexOS Media, Movies, Shows, Music, Photos and Videos folders read-only using the installation's SMB account. The hook matches the Plex app: Movies (`/mnt/movies`), TV Shows (`/mnt/shows`), Music (`/mnt/music`), Photos (`/mnt/photos`) and Videos (`/mnt/videos`), with the same agents, scanners and languages. Media is mounted at `/mnt/media` for manual use; it is not an extra library. Before creating libraries the hook disables automatic trash emptying, reuses each existing library by its exact location, and then requests a scan of all five. Existing libraries are never deleted or repointed. Signing in claims the server on the account (only a server whose own identity says it is unclaimed), names it after the VM, keeps the server's access token for the platform, and writes the server preferences the hook declares, each read back after the write. A successful section listing does not establish that Plex's agents have finished starting: library creation retries only Plex's explicit HTTP 400 startup refusal, up to eight attempts five seconds apart, checking for an existing library before each attempt. Other refusals and transport exceptions stop setup; an accepted creation is verified by listing the sections again.
 
 ### Screenshots
 
@@ -535,7 +540,7 @@ bun run generate-tests -- --force   # regenerate the derivable fields everywhere
 | 🔴 broken | no usable installed system — the candidate for parking |
 | ⚪ untested | no result, or the result predates a functional change to the blueprint |
 
-A result records a digest of the blueprint's *functional* fields (`provisioning`, `guest`, `resources`, `requiredCapabilities`, `truenasVersion`, `cpuFeatures`), so bumping a version or changing a template marks it ⚪ until the sweep is re-run, while copy edits never expire a result. The rule for bumping a pinned version: open the PR, run the sweep against the PR branch, and merge once the blueprint reads 🟢 or 🟡 on every box for the *new* document — the old pinned version stays in place until then. Red never parks a blueprint by itself: parking is a change to `internal` in a reviewed PR.
+A result records a digest of the blueprint's *functional* fields (`provisioning`, `guest`, `resources`, `requiredCapabilities`, `truenasVersion`, `cpuFeatures`, and the surface declarations `hooksSchema`, `hooks`, `widgetsSchema`, `widgets`), so bumping a version or changing a template marks it ⚪ until the sweep is re-run, while copy edits never expire a result. The rule for bumping a pinned version: open the PR, run the sweep against the PR branch, and merge once the blueprint reads 🟢 or 🟡 on every box for the *new* document — the old pinned version stays in place until then. Red never parks a blueprint by itself: parking is a change to `internal` in a reviewed PR.
 
 ## Contributing
 
