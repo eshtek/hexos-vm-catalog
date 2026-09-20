@@ -1154,6 +1154,22 @@ describe("onMediaReconnected", () => {
       { label: "Status", value: "500" },
       { label: "Section", value: "10" },
     ]);
+    // A request that never reaches Plex is isolated the same way as one it refuses.
+    const unreachable = recovery(
+      {
+        "GET /identity": [identity(true)],
+        "GET /library/sections": [allSections()],
+        "GET /library/sections/10/refresh": [new Error("connection reset")],
+        "GET /library/sections/11/refresh": [response({}, 200)],
+      },
+      { folders: ["Photos", "Videos"] },
+    );
+    await expect(onMediaReconnected(unreachable.ctx)).rejects.toThrow("Plex refused the scan of Photos");
+    expect(unreachable.recorded.emitted).toEqual([{ id: "media:Videos", message: "Scan requested for Videos" }]);
+    expect(unreachable.recorded.failed?.context).toEqual([
+      { label: "Status", value: "unreachable: connection reset" },
+      { label: "Section", value: "10" },
+    ]);
     const empty = recovery({}, { folders: [] });
     await expect(onMediaReconnected(empty.ctx)).rejects.toThrow("The event named no folders");
     const malformed = recovery({}, { folders: "Photos" });

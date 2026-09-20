@@ -368,7 +368,7 @@ export async function onMediaReconnected(ctx: VMHookContext): Promise<void> {
   // starve the rest on every retry. The run still fails, naming every refusal,
   // and a refused folder's checkpoint stays absent, so the platform offers it
   // again after its window.
-  const refused: Array<{ name: string; status: number; section: string }> = [];
+  const refused: Array<{ name: string; status: string; section: string }> = [];
   for (const folder of folders) {
     const library = libraryForFolder(folder);
     if (!library) {
@@ -380,9 +380,19 @@ export async function onMediaReconnected(ctx: VMHookContext): Promise<void> {
       await ctx.skipCheckpoint(mediaCheckpoint(folder), `No ${library.name} library at ${library.location} on this server`);
       continue;
     }
-    const scan = await ctx.fetch(`/library/sections/${encodeURIComponent(section.key)}/refresh`, { headers: withToken(serverToken) });
+    // A request that does not reach Plex is a refusal of this library like any
+    // other: it is recorded and the next library is still asked. Once the
+    // attempt itself has ended, every request fails the same way and the run
+    // ends at the failure below.
+    let scan: { status: number } | undefined;
+    try {
+      scan = await ctx.fetch(`/library/sections/${encodeURIComponent(section.key)}/refresh`, { headers: withToken(serverToken) });
+    } catch (error) {
+      refused.push({ name: library.name, status: `unreachable: ${error instanceof Error ? error.message : String(error)}`, section: section.key });
+      continue;
+    }
     if (scan.status !== 200) {
-      refused.push({ name: library.name, status: scan.status, section: section.key });
+      refused.push({ name: library.name, status: String(scan.status), section: section.key });
       continue;
     }
     await ctx.emitCheckpoint(mediaCheckpoint(folder), `Scan requested for ${folder}`);
@@ -391,7 +401,7 @@ export async function onMediaReconnected(ctx: VMHookContext): Promise<void> {
     ctx.fail(
       `Plex refused the scan of ${refused.map((entry) => entry.name).join(", ")}`,
       refused.flatMap((entry) => [
-        { label: "Status", value: String(entry.status) },
+        { label: "Status", value: entry.status },
         { label: "Section", value: entry.section },
       ]),
     );
