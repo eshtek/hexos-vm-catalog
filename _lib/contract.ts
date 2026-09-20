@@ -102,6 +102,8 @@ export const KNOWN_VM_CAPABILITIES = new Set([
 
 /** The capability a first-boot profile stands on, where the profile is not part of every first-boot backend. */
 const PROFILE_CAPABILITIES: Record<string, readonly string[]> = { "plex-appliance": ["plexAppliance"] };
+/** The profiles that mount a media share from the install's inputs (the platform's own list); any other profile given `mediaShare` ignores it and the install fails. */
+const MEDIA_PROFILES: ReadonlySet<string> = new Set(["plex-appliance"]);
 
 // Passthrough class vocabulary, enforced here for the same reason as
 // KNOWN_CATEGORIES: the schema leaves `guest.passthrough` an open slug array so
@@ -420,6 +422,11 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
   // be declared as a capability too, or an older backend installs the guest
   // unconfigured while the document says it is configured.
   if (p.strategy === "image" && p.firstBoot) {
+    if (p.firstBoot.mediaShare === true && !MEDIA_PROFILES.has(p.firstBoot.profile)) {
+      errors.push(
+        `firstBoot.mediaShare is honoured only by a profile that mounts media (${[...MEDIA_PROFILES].join(", ")}); the "${p.firstBoot.profile}" profile ignores it and the install would fail`,
+      );
+    }
     const declared = new Set(bp.requiredCapabilities ?? []);
     for (const [needed, why] of [
       ...(PROFILE_CAPABILITIES[p.firstBoot.profile] ?? []).map((capability) => [capability, `the "${p.firstBoot?.profile}" profile`] as const),

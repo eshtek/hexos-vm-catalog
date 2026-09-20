@@ -484,7 +484,7 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
       ? "Already claimed on your Plex account"
       : claimedHow === "now"
         ? "Claimed on your Plex account"
-        : "Claimed on your Plex account (the claim was reconciled from the server, not acknowledged)",
+        : "Claimed on your Plex account (confirmed from the server)",
   );
 
   const name = chooseServerName(ctx);
@@ -528,14 +528,25 @@ export async function runWith(ctx: VMHookContext, plexTv: PlexTvFetch): Promise<
     await ctx.sleep(CHECKPOINT_PACE_MS);
     await ctx.emitCheckpoint(library.checkpointId, `${library.name} at ${library.location} (${created ? "created" : "already existed"})`);
   }
+  // Every library is asked for its scan before the run judges the answers, as
+  // the recovery does: one refused or unreachable scan neither stops the next
+  // library's request nor hides behind it, and the failure names them all.
+  const refused: Array<{ name: string; status: string }> = [];
   for (const section of sections) {
-    const scan = await ctx.fetch(`/library/sections/${encodeURIComponent(section.key)}/refresh`, { headers: withToken(authToken) });
-    if (scan.status !== 200) {
-      ctx.fail("Plex did not start the library scan", [
-        { label: "Library", value: section.title },
-        { label: "Status", value: String(scan.status) },
-      ]);
+    let scan: { status: number } | undefined;
+    try {
+      scan = await ctx.fetch(`/library/sections/${encodeURIComponent(section.key)}/refresh`, { headers: withToken(authToken) });
+    } catch (error) {
+      refused.push({ name: section.title, status: `unreachable: ${error instanceof Error ? error.message : String(error)}` });
+      continue;
     }
+    if (scan.status !== 200) refused.push({ name: section.title, status: String(scan.status) });
+  }
+  if (refused.length > 0) {
+    ctx.fail(
+      "Plex did not start every library scan",
+      refused.map((entry) => ({ label: entry.name, value: entry.status })),
+    );
   }
   ctx.log("scans requested for Movies, TV Shows, Music, Photos and Videos");
   await ctx.sleep(CHECKPOINT_PACE_MS);

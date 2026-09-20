@@ -68,6 +68,16 @@ describe("checkContract on surface declarations", () => {
 });
 
 describe("a profile's own capability", () => {
+  test("a mediaShare first boot on a profile that mounts no media is refused, whatever the blueprint declares", () => {
+    const openwrt = {
+      ...base,
+      requiredCapabilities: ["firstBoot", "firstBootDefaultMedia"],
+      provisioning: { ...base.provisioning, strategy: "image", firstBoot: { profile: "openwrt-lan-dhcp", mediaShare: true } },
+    } as unknown as VMBlueprint;
+    const { errors } = checkContract(openwrt, "openwrt.json");
+    expect(errors.some((e) => e.includes("mounts media"))).toBe(true);
+  });
+
   test("the Plex profile must declare plexAppliance, and a mediaShare first boot must declare firstBootDefaultMedia", () => {
     const plex = {
       ...base,

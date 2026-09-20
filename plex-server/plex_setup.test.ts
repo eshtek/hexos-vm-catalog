@@ -7,14 +7,18 @@ import {
   RESOURCES_ATTEMPTS,
   SERVER_TOKEN_SECRET,
   classifyGuestError,
+  libraryForFolder,
+  onMediaReconnected,
   readAccountToken,
   readClaimed,
   readFriendlyName,
   readIdentity,
   readPreference,
+  readReconnectedFolders,
   readSections,
   readServerToken,
-  runWith, onMediaReconnected, readReconnectedFolders, libraryForFolder } from "./plex_setup";
+  runWith,
+} from "./plex_setup";
 
 // The hook's contract as these tests pin it: it confirms Plex answers, claims a
 // server whose identity says it is unclaimed (and only that), writes nothing
@@ -752,8 +756,9 @@ describe("run: the five default media libraries", () => {
     const guest = ownedClaimedGuest();
     guest[`GET ${REFRESH_PATH}`] = response("busy", 500);
     const { ctx, recorded } = fakeContext({ guest });
-    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("did not start the library scan");
-    expect(recorded.failed?.context).toContainEqual({ label: "Library", value: "Movies" });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("did not start every library scan");
+    // The refusal is named by its library, as every refused scan is.
+    expect(recorded.failed?.context).toContainEqual({ label: "Movies", value: "500" });
     expect(recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed", "preferences", ...expectedLibraries.map((lib) => lib.checkpointId)]);
   });
 });
@@ -1026,7 +1031,7 @@ describe("a refused claim on a server that then reports itself claimed", () => {
     const plexTv = fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: resourcesAnswer });
     await runWith(ctx, plexTv);
     expect(recorded.failed).toBeUndefined();
-    expect(recorded.emitted.find((cp) => cp.id === "claimed")?.message).toContain("reconciled from the server, not acknowledged");
+    expect(recorded.emitted.find((cp) => cp.id === "claimed")?.message).toContain("confirmed from the server");
     expect(recorded.secrets[SERVER_TOKEN_SECRET]).toBe(SERVER_TOKEN);
     expect(recorded.logs.some((line) => line.includes("now reports itself claimed"))).toBe(true);
 
