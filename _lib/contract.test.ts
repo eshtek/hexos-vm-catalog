@@ -79,5 +79,10 @@ describe("a profile's own capability", () => {
     expect(errors.some((e) => e.includes('declare "firstBootDefaultMedia"'))).toBe(true);
     const declared = { ...plex, requiredCapabilities: ["firstBoot", "plexAppliance", "firstBootDefaultMedia"] } as unknown as VMBlueprint;
     expect(checkContract(declared, "plex-server.json").errors.filter((e) => e.includes("needs requiredCapabilities"))).toEqual([]);
+    // The capability the box reports at runtime while its setup-hooks gate is open is declarable; the unimplemented user-hooks one is not.
+    const gated = { ...declared, requiredCapabilities: ["firstBoot", "plexAppliance", "firstBootDefaultMedia", "vmHooks"] } as unknown as VMBlueprint;
+    expect(checkContract(gated, "plex-server.json").errors.filter((e) => e.toLowerCase().includes("capabilit"))).toEqual([]);
+    const unknown = { ...declared, requiredCapabilities: ["firstBoot", "plexAppliance", "firstBootDefaultMedia", "vmUserHooks"] } as unknown as VMBlueprint;
+    expect(checkContract(unknown, "plex-server.json").errors.some((e) => e.includes("vmUserHooks"))).toBe(true);
   });
 });

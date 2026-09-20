@@ -82,15 +82,26 @@ export const KNOWN_INSTALLER_IMAGE_TEMPLATES = new Set(["steamos-repair"]);
 export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
 
 // Mirror of HEXOS_VM_CAPABILITIES in the platform's vm-blueprints.ts — the
-// install-pipeline capabilities shipped backends can declare support for.
-// Extend ONLY after the platform change ships (same rule as the template
-// allowlists): a capability listed here before it exists upstream turns the
-// check into a rubber stamp. Values are exact-match (no case folding) — the
-// backend compares them verbatim.
+// install-pipeline capabilities shipped backends can declare support for —
+// plus `vmHooks`, which the box reports at runtime while its setup-hooks gate
+// is open rather than compiling in, so a blueprint whose setup is not optional
+// can ask for a box that will run it. Extend ONLY after the platform change
+// ships (same rule as the template allowlists): a capability listed here
+// before it exists upstream turns the check into a rubber stamp. Values are
+// exact-match (no case folding) — the backend compares them verbatim.
+export const KNOWN_VM_CAPABILITIES = new Set([
+  "firstBoot",
+  "appInstall",
+  "virtioSeed",
+  "isoDownload",
+  "additionalMedia",
+  "plexAppliance",
+  "firstBootDefaultMedia",
+  "vmHooks",
+]);
+
 /** The capability a first-boot profile stands on, where the profile is not part of every first-boot backend. */
 const PROFILE_CAPABILITIES: Record<string, readonly string[]> = { "plex-appliance": ["plexAppliance"] };
-
-export const KNOWN_VM_CAPABILITIES = new Set(["firstBoot", "appInstall", "virtioSeed", "isoDownload", "additionalMedia", "plexAppliance", "firstBootDefaultMedia"]);
 
 // Passthrough class vocabulary, enforced here for the same reason as
 // KNOWN_CATEGORIES: the schema leaves `guest.passthrough` an open slug array so

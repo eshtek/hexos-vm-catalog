@@ -7,7 +7,6 @@ import {
   RESOURCES_ATTEMPTS,
   SERVER_TOKEN_SECRET,
   classifyGuestError,
-  decodeXmlAttribute,
   readAccountToken,
   readClaimed,
   readFriendlyName,
@@ -517,21 +516,6 @@ describe("run: every write is verified, and a failed or unverified one stops the
     expect(ignored.recorded.emitted.map((cp) => cp.id)).toEqual(["ready", "claimed"]);
   });
 
-  test("a name Plex reports back with XML escaping verifies", async () => {
-    const { ctx, recorded } = fakeContext({
-      inputs: { plex_login: { authToken: ACCOUNT_TOKEN }, server_name: "A & B" },
-      guest: {
-        "GET /identity": identity(true),
-        "PUT /:/prefs?FriendlyName=A%20%26%20B": response(""),
-        "GET /": response(`<MediaContainer size="24" friendlyName="A &amp; B" machineIdentifier="${MID}"/>`),
-        ...libraryAnswers(),
-      },
-    });
-    await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }));
-    expect(recorded.emitted.find((cp) => cp.id === "preferences")?.message).toContain("Named A & B;");
-    expect(recorded.secrets[SERVER_TOKEN_SECRET]).toBe(SERVER_TOKEN);
-  });
-
   test("a listing that catches up late is waited for", async () => {
     const { ctx, recorded } = fakeContext({ guest: ownedClaimedGuest() });
     await runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: [response([]), response("busy", 503), resourcesAnswer] }));
@@ -826,19 +810,14 @@ describe("run: what a failure after a fresh claim says, and what the decoder mus
     expect(recordedSurfaces(recorded)).not.toContain("claim-redirect");
   });
 
-  test("a read-back whose XML is malformed (a raw `<`, a bare or unterminated ampersand) is not Plex's answer, and does not verify a name that reads the same", async () => {
-    for (const [requested, raw] of [
-      ["A & B", "A & B"],
-      ["A &amp", "A &amp"],
-      ["A &#xD800; B", "A &#xD800; B"],
-      ["A < B", "A < B"],
-    ]) {
+  test("a read-back that is not the JSON asked for is not Plex's answer, and does not verify a name that reads the same in it", async () => {
+    for (const raw of [`<MediaContainer friendlyName="Plex_Test3" machineIdentifier="${MID}"/>`, "Plex_Test3", ""]) {
       const { ctx, recorded } = fakeContext({
-        inputs: { plex_login: { authToken: ACCOUNT_TOKEN }, server_name: requested },
+        inputs: { plex_login: { authToken: ACCOUNT_TOKEN }, server_name: "Plex_Test3" },
         guest: {
           "GET /identity": identity(true),
-          [`PUT /:/prefs?FriendlyName=${encodeURIComponent(requested)}`]: response(""),
-          "GET /": response(`<MediaContainer friendlyName="${raw}" machineIdentifier="${MID}"/>`),
+          "PUT /:/prefs?FriendlyName=Plex_Test3": response(""),
+          "GET /": response(raw),
         },
       });
       await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("did not take the server name");
@@ -847,19 +826,14 @@ describe("run: what a failure after a fresh claim says, and what the decoder mus
     }
   });
 
-  test("a well-formed read-back whose decoded text contains an ampersand or a reference verifies", async () => {
-    for (const [requested, raw] of [
-      ["A & B", "A &amp; B"],
-      ["A &amp", "A &amp;amp"],
-      ["Tom & Jerry's", "Tom &amp; Jerry&apos;s"],
-      ["A < B", "A &lt; B"],
-    ]) {
+  test("a JSON read-back verifies whatever characters the name carries; there is nothing to decode", async () => {
+    for (const requested of ["A & B", "A &amp", "Tom & Jerry's", "A < B", "😀"]) {
       const { ctx, recorded } = fakeContext({
         inputs: { plex_login: { authToken: ACCOUNT_TOKEN }, server_name: requested },
         guest: {
           "GET /identity": identity(true),
           [`PUT /:/prefs?FriendlyName=${encodeURIComponent(requested)}`]: response(""),
-          "GET /": response(`<MediaContainer friendlyName="${raw}" machineIdentifier="${MID}"/>`),
+          "GET /": root(requested),
           ...libraryAnswers(),
         },
       });
@@ -867,18 +841,23 @@ describe("run: what a failure after a fresh claim says, and what the decoder mus
       expect(recorded.emitted.find((cp) => cp.id === "preferences")?.message).toContain(`Named ${requested};`);
     }
   });
+});
 
-  test("a read-back built from surrogate references does not verify a name that is the joined character", async () => {
-    const { ctx, recorded } = fakeContext({
-      inputs: { plex_login: { authToken: ACCOUNT_TOKEN }, server_name: "😀" },
-      guest: {
-        "GET /identity": identity(true),
-        "PUT /:/prefs?FriendlyName=%F0%9F%98%80": response(""),
-        "GET /": response(`<MediaContainer friendlyName="&#xD83D;&#xDE00;" machineIdentifier="${MID}"/>`),
-      },
-    });
-    await expect(runWith(ctx, fakePlexTv(recorded, { [RESOURCES_URL]: resourcesAnswer }))).rejects.toThrow("did not take the server name");
-    expect(recorded.secretWrites).toBe(0);
+describe("run: an identity that is not one", () => {
+  test("a document that is not the JSON identity asked for, XML included, is refused before any claim request", async () => {
+    for (const text of [
+      `<?xml version="1.0" encoding="UTF-8"?>\n<MediaContainer size="0" claimed="0" machineIdentifier="${MID}"></MediaContainer>`,
+      `<MediaContainer note=' claimed="0" machineIdentifier="${MID}" '/>`,
+      `<MediaContainer claimed="0" claimed='1' machineIdentifier="${MID}"/>`,
+      `<MediaContainer claimed="0" machineIdentifier="${MID}"><Server></MediaContainer>`,
+      `<MediaContainer claimed="0" machineIdentifier="${MID}" note="<"/>`,
+      `<MediaContainer claimed="0" machineIdentifier="${MID}">&unknown;</MediaContainer>`,
+    ]) {
+      const { ctx, recorded } = fakeContext({ guest: { "GET /identity": [response(text)] } });
+      await expect(runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer }))).rejects.toThrow("not with its identity");
+      expect(recorded.requests.some((request) => request.path.startsWith(CLAIM_PATH))).toBe(false);
+      expect(recorded.plexTv).toEqual([]);
+    }
   });
 });
 
@@ -910,66 +889,44 @@ describe("readers", () => {
     for (const value of [undefined, null, "", "yes", 2, {}, []]) expect(readClaimed(value)).toBeUndefined();
   });
 
-  test("readIdentity takes Plex's JSON and XML shapes with an explicit claim state, and nothing else", () => {
+  test("readIdentity takes Plex's JSON identity with an explicit claim state, and nothing else: XML, which Plex sends only when not asked for JSON, is not the answer", () => {
     expect(readIdentity(identity(false).text())).toEqual({ machineIdentifier: MID, claimed: false, version: "1.43.4.10903-e5521bd8c" });
-    expect(readIdentity(`<MediaContainer size="0" claimed="1" machineIdentifier="${MID}" version="1.43.4.10903-e5521bd8c"></MediaContainer>`)).toEqual({
-      machineIdentifier: MID,
-      claimed: true,
-      version: "1.43.4.10903-e5521bd8c",
-    });
-    expect(readIdentity(`<MediaContainer claimed="0" machineIdentifier="${MID}"/>`)?.claimed).toBe(false);
     expect(readIdentity(JSON.stringify({ MediaContainer: { claimed: "1", machineIdentifier: MID } }))?.claimed).toBe(true);
+    expect(readIdentity(JSON.stringify({ MediaContainer: { claimed: 0, machineIdentifier: MID, version: 7 } }))).toEqual({ machineIdentifier: MID, claimed: false, version: undefined });
+    // No claim state, no identifier, the wrong container shape, or a value that is not a claim state: no identity.
     expect(readIdentity(JSON.stringify({ MediaContainer: { machineIdentifier: MID } }))).toBeUndefined();
-    // The attributes must sit on the root element: a document that is not the identity does not pass because some element carries them.
-    expect(readIdentity(`<MediaContainer size="1"><Server claimed="0" machineIdentifier="${MID}"/></MediaContainer>`)).toBeUndefined();
-    expect(readIdentity(`<html><body claimed="0" machineIdentifier="${MID}">not plex</body></html>`)).toBeUndefined();
-    // Nor because a MediaContainer element sits inside, or is commented out of, a document that is not the identity.
-    expect(readIdentity(`<html><MediaContainer claimed="0" machineIdentifier="${MID}"/></html>`)).toBeUndefined();
-    expect(readIdentity(`<!-- <MediaContainer claimed="0" machineIdentifier="${MID}"/> --><html/>`)).toBeUndefined();
-    // Nor when the root's name merely begins with MediaContainer.
-    expect(readIdentity(`<MediaContainer-error claimed="0" machineIdentifier="${MID}"/>`)).toBeUndefined();
-    expect(readIdentity(`<MediaContainer:Other xmlns:MediaContainer="urn:other" claimed="0" machineIdentifier="${MID}"/>`)).toBeUndefined();
-    // Plex's own declaration and whitespace ahead of the root are the identity.
-    expect(readIdentity(`<?xml version="1.0" encoding="UTF-8"?>\n<MediaContainer claimed="1" machineIdentifier="${MID}"/>`)?.claimed).toBe(true);
-    expect(readIdentity(`\n  <MediaContainer claimed="0" machineIdentifier="${MID}"/>`)?.claimed).toBe(false);
+    expect(readIdentity(JSON.stringify({ MediaContainer: { claimed: true } }))).toBeUndefined();
+    expect(readIdentity(JSON.stringify({ MediaContainer: { claimed: true, machineIdentifier: "" } }))).toBeUndefined();
     expect(readIdentity(JSON.stringify({ MediaContainer: [{ claimed: "0", machineIdentifier: MID }] }))).toBeUndefined();
     expect(readIdentity(JSON.stringify({ MediaContainer: { claimed: "maybe", machineIdentifier: MID } }))).toBeUndefined();
-    expect(readIdentity(`<MediaContainer machineIdentifier="${MID}"/>`)).toBeUndefined();
-    expect(readIdentity("<html>captive</html>")).toBeUndefined();
-    expect(readIdentity(JSON.stringify({ MediaContainer: { claimed: true } }))).toBeUndefined();
+    expect(readIdentity(JSON.stringify({ MediaContainer: null }))).toBeUndefined();
+    expect(readIdentity(JSON.stringify([{ MediaContainer: { claimed: "0", machineIdentifier: MID } }]))).toBeUndefined();
+    // Every request carries Accept: application/json, so XML is not what was asked for, however well it is formed: Plex's own
+    // identity document, the shapes that once fooled an XML reader, HTML, and text all read the same way.
+    for (const text of [
+      `<?xml version="1.0" encoding="UTF-8"?>\n<MediaContainer size="0" claimed="1" machineIdentifier="${MID}" version="1.43.4.10903-e5521bd8c"></MediaContainer>`,
+      `<MediaContainer claimed="0" machineIdentifier="${MID}"/>`,
+      `<MediaContainer note=' claimed="0" machineIdentifier="${MID}" '/>`,
+      `<MediaContainer claimed="0" claimed='1' machineIdentifier="${MID}"/>`,
+      `<MediaContainer claimed="0" machineIdentifier="${MID}" note="<"/>`,
+      `<MediaContainer claimed="0" machineIdentifier="${MID}">&unknown;</MediaContainer>`,
+      `<html><body claimed="0" machineIdentifier="${MID}">not plex</body></html>`,
+      "<html>captive</html>",
+      "Unauthorized",
+      "",
+    ]) {
+      expect(readIdentity(text)).toBeUndefined();
+    }
   });
 
-  test("decodeXmlAttribute decodes the five named references and the numeric ones XML permits, and leaves everything else as written", () => {
-    expect(decodeXmlAttribute("A &amp; B &lt;3&gt; &quot;q&quot; &apos;a&apos;")).toBe(`A & B <3> "q" 'a'`);
-    expect(decodeXmlAttribute("caf&#233; &#x1F600; &#x9;&#xA;&#xD; &unknown; &#0;")).toBe("café 😀 \t\n\r &unknown; &#0;");
-    expect(decodeXmlAttribute("plain & bare &amp")).toBe("plain & bare &amp");
-    // Characters XML forbids stay as references: surrogates (singly or paired), controls, the two non-characters, out of range.
-    for (const forbidden of ["&#xD800;", "&#xDFFF;", "&#xD83D;&#xDE00;", "&#1;", "&#x1F;", "&#xFFFE;", "&#xFFFF;", "&#x110000;", "&#0;"]) {
-      expect(decodeXmlAttribute(forbidden)).toBe(forbidden);
-    }
-    // Only the five named entities, by own property: nothing inherited from Object.
-    for (const inherited of ["&constructor;", "&toString;", "&__proto__;", "&hasOwnProperty;"]) {
-      expect(decodeXmlAttribute(inherited)).toBe(inherited);
-    }
-  });
-
-  test("readFriendlyName reads the root document in either shape, decoding XML escapes", () => {
+  test("readFriendlyName reads the root document's name from the JSON asked for, and nothing else", () => {
     expect(readFriendlyName(root("Plex_Test3").text())).toBe("Plex_Test3");
-    expect(readFriendlyName(`<MediaContainer friendlyName="ubuntu" machineIdentifier="${MID}"/>`)).toBe("ubuntu");
-    expect(readFriendlyName(`<MediaContainer friendlyName="A &amp; B" machineIdentifier="${MID}"/>`)).toBe("A & B");
-    expect(readFriendlyName(`<MediaContainer friendlyName="A &amp;amp" machineIdentifier="${MID}"/>`)).toBe("A &amp");
     expect(readFriendlyName(root("A & B").text())).toBe("A & B");
+    expect(readFriendlyName(root("Tom & Jerry's <3").text())).toBe("Tom & Jerry's <3");
+    expect(readFriendlyName(JSON.stringify({ MediaContainer: { machineIdentifier: MID } }))).toBeUndefined();
+    expect(readFriendlyName(JSON.stringify({ MediaContainer: { friendlyName: 7 } }))).toBeUndefined();
+    expect(readFriendlyName(`<MediaContainer friendlyName="ubuntu" machineIdentifier="${MID}"/>`)).toBeUndefined();
     expect(readFriendlyName("Unauthorized")).toBeUndefined();
-  });
-
-  test("an XML attribute with a raw `<`, or whose ampersands do not all begin a complete, permitted reference, is not read at all", () => {
-    for (const raw of ["A & B", "A &amp", "A &amp B", "&#xD800;", "&#1;", "&#x110000;", "&constructor;", "&unknown;", "&#;", "&", "A < B", "<"]) {
-      expect(readFriendlyName(`<MediaContainer friendlyName="${raw}" machineIdentifier="${MID}"/>`)).toBeUndefined();
-      expect(readIdentity(`<MediaContainer claimed="1" machineIdentifier="${raw}"/>`)).toBeUndefined();
-    }
-    for (const raw of ["plain", "A &amp; B", "caf&#233;", "&#x1F600;", "&lt;&gt;&quot;&apos;", "&#x9;&#xA;&#xD;"]) {
-      expect(readFriendlyName(`<MediaContainer friendlyName="${raw}" machineIdentifier="${MID}"/>`)).toBeDefined();
-    }
   });
 
   test("readServerToken picks the server by machine identifier and tells unlisted, shared and tokenless apart", () => {
@@ -982,7 +939,27 @@ describe("readers", () => {
       owned: false,
       accessToken: SERVER_TOKEN,
     });
-    expect(readServerToken("<html>", MID)).toEqual({ listed: false });
+    // A document that is not the listing, or one naming the server twice, is no listing; an empty listing is "not listed yet".
+    expect(readServerToken("<html>", MID)).toBeUndefined();
+    expect(readServerToken(JSON.stringify({ error: "x" }), MID)).toBeUndefined();
+    expect(readServerToken(JSON.stringify([1, { clientIdentifier: MID, owned: true }]), MID)).toBeUndefined();
+    expect(
+      readServerToken(JSON.stringify([{ clientIdentifier: MID, owned: true, accessToken: "a" }, { clientIdentifier: MID, owned: false, accessToken: "b" }]), MID),
+    ).toBeUndefined();
+    expect(readServerToken("[]", MID)).toEqual({ listed: false });
+  });
+
+  test("a resources answer that is not the listing fails the run at once instead of being retried as an unregistered server", async () => {
+    const { ctx, recorded } = fakeContext({
+      guest: {
+        "GET /identity": [identity(false), identity(true)],
+        [`POST ${CLAIM_PATH}`]: response('<MyPlex signInState="ok"/>'),
+      },
+    });
+    await expect(runWith(ctx, fakePlexTv(recorded, { [CLAIM_URL]: claimTokenAnswer, [RESOURCES_URL]: response("<html>") }))).rejects.toThrow(
+      "not with its resources listing",
+    );
+    expect(recorded.plexTv.filter((request) => request.url === RESOURCES_URL)).toHaveLength(1);
   });
 
   test("readSections reads Plex's sections document, an empty one, and nothing else", () => {
@@ -1008,6 +985,11 @@ describe("readers", () => {
     expect(readPreference(prefsTrash("0").text(), "autoEmptyTrash")).toBe("0");
     expect(readPreference(prefsTrash(true).text(), "FriendlyName")).toBeUndefined();
     expect(readPreference("Unauthorized", "autoEmptyTrash")).toBeUndefined();
+    // A setting listed twice is a contradiction, not a value, whichever copy comes first.
+    const twice = JSON.stringify({
+      MediaContainer: { size: 2, Setting: [{ id: "autoEmptyTrash", type: "bool", value: false }, { id: "autoEmptyTrash", type: "bool", value: true }] },
+    });
+    expect(readPreference(twice, "autoEmptyTrash")).toBeUndefined();
   });
 
   test("classifyGuestError reports a transport error's kind from the allowlist, and 'error' for anything else", () => {
@@ -1081,7 +1063,10 @@ describe("onMediaReconnected", () => {
     });
 
   test("scans nothing while automatic trash emptying is on, or while the setting cannot be read: a scan would let Plex empty a library's trash", async () => {
-    for (const answer of [prefsTrash(true), prefsTrash("maybe"), response("<html>", 500), prefs(SERVER_PREFERENCES_TAKEN)]) {
+    const contradictory = response({
+      MediaContainer: { size: 2, Setting: [{ id: "autoEmptyTrash", type: "bool", value: false }, { id: "autoEmptyTrash", type: "bool", value: true }] },
+    });
+    for (const answer of [prefsTrash(true), prefsTrash("maybe"), response("<html>", 500), prefs(SERVER_PREFERENCES_TAKEN), contradictory]) {
       const { ctx, recorded } = recovery({ "GET /identity": [identity(true)], "GET /:/prefs": answer, "GET /library/sections": [allSections()] });
       await expect(onMediaReconnected(ctx)).rejects.toThrow("trash emptying is not confirmed off");
       expect(recorded.requests.some((r) => r.path.endsWith("/refresh"))).toBe(false);
@@ -1148,6 +1133,26 @@ describe("onMediaReconnected", () => {
     expect(partial.recorded.failed?.context).toEqual([
       { label: "Status", value: "500" },
       { label: "Section", value: "11" },
+    ]);
+    // A refused library does not keep the folders after it from being asked: each is its own scan, and the run fails naming every refusal.
+    const starved = recovery(
+      {
+        "GET /identity": [identity(true)],
+        "GET /library/sections": [allSections()],
+        "GET /library/sections/10/refresh": [response({}, 500)],
+        "GET /library/sections/11/refresh": [response({}, 200)],
+      },
+      { folders: ["Photos", "Videos"] },
+    );
+    await expect(onMediaReconnected(starved.ctx)).rejects.toThrow("Plex refused the scan of Photos");
+    expect(starved.recorded.emitted).toEqual([{ id: "media:Videos", message: "Scan requested for Videos" }]);
+    expect(starved.recorded.requests.filter((request) => request.path.endsWith("/refresh")).map((request) => request.path)).toEqual([
+      "/library/sections/10/refresh",
+      "/library/sections/11/refresh",
+    ]);
+    expect(starved.recorded.failed?.context).toEqual([
+      { label: "Status", value: "500" },
+      { label: "Section", value: "10" },
     ]);
     const empty = recovery({}, { folders: [] });
     await expect(onMediaReconnected(empty.ctx)).rejects.toThrow("The event named no folders");

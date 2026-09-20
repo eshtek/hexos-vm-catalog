@@ -102,7 +102,7 @@ export interface PlexIdentity {
   version?: string;
 }
 
-/** What plex.tv's resources listing says about one server, by its machine identifier. */
+/** What plex.tv's resources listing says about one server, by its machine identifier; undefined when the document is not the listing. */
 export type PlexListing = { listed: false } | { listed: true; owned: boolean; accessToken?: string };
 
 /** A request to plex.tv: the runtime's fetch, narrowed to what the hook reads, so a test can stand in. */
@@ -128,60 +128,10 @@ function parseJson(text: string): unknown {
   }
 }
 
-const XML_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
-
-/** XML's `Char` production: what a character reference may name. Surrogates, controls and the two non-characters are not characters. */
-const isXmlChar = (code: number): boolean =>
-  code === 0x9 || code === 0xa || code === 0xd || (code >= 0x20 && code <= 0xd7ff) || (code >= 0xe000 && code <= 0xfffd) || (code >= 0x10000 && code <= 0x10ffff);
-
-/** The character a reference names, when it is one of the five entities (by own property) or a permitted numeric reference. */
-function referencedCharacter(entity: string): string | undefined {
-  if (entity[0] === "#") {
-    const code = entity[1] === "x" || entity[1] === "X" ? Number.parseInt(entity.slice(2), 16) : Number.parseInt(entity.slice(1), 10);
-    return Number.isFinite(code) && isXmlChar(code) ? String.fromCodePoint(code) : undefined;
-  }
-  return Object.hasOwn(XML_ENTITIES, entity) ? XML_ENTITIES[entity] : undefined;
-}
-
-const XML_REFERENCE_AT = /^&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/;
-
 /**
- * Whether an attribute value as written is one XML allows: no raw `<`, and
- * every `&` beginning a complete reference the decoder resolves. Text that
- * fails this is not the server's answer and is not read at all, rather than
- * decoded as far as it goes and compared.
- */
-export function isWellFormedAttributeValue(raw: string): boolean {
-  if (raw.includes("<")) return false;
-  let at = raw.indexOf("&");
-  while (at !== -1) {
-    const match = XML_REFERENCE_AT.exec(raw.slice(at));
-    if (!match || referencedCharacter(match[1]) === undefined) return false;
-    at = raw.indexOf("&", at + match[0].length);
-  }
-  return true;
-}
-
-/**
- * An XML attribute value as written, with its character references decoded:
- * the five named entities, by own property, and numeric references to the
- * characters XML permits. Anything else stays as written, so a reference to
- * a surrogate, a control or a non-character can never decode into a name the
- * user asked for; the readers below refuse such a value before decoding it.
- */
-export function decodeXmlAttribute(value: string): string {
-  return value.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g, (whole, entity: string) => referencedCharacter(entity) ?? whole);
-}
-
-function attribute(text: string, name: string): string | undefined {
-  const match = new RegExp(`\\b${name}="([^"]*)"`).exec(text);
-  if (!match || !isWellFormedAttributeValue(match[1])) return undefined;
-  return decodeXmlAttribute(match[1]);
-}
-
-/**
- * Plex's claimed flag in the representations it uses (a JSON boolean, a 0/1,
- * or the strings of either); anything else is not a claim state.
+ * A Plex boolean in the representations it uses (a JSON boolean, a 0/1, or
+ * the strings of either): the claimed flag, and the on/off preferences read
+ * back from `/:/prefs`. Anything else is not a state.
  */
 export function readClaimed(value: unknown): boolean | undefined {
   if (value === true || value === 1 || value === "1" || value === "true") return true;
@@ -190,41 +140,38 @@ export function readClaimed(value: unknown): boolean | undefined {
 }
 
 /**
- * The server's identity as `/identity` reports it, in either of the shapes
- * Plex answers with (JSON when asked, XML otherwise). A document that does
- * not carry both the machine identifier and an explicit claim state is not
- * Plex's identity and reads as undefined rather than as a guess: a missing
- * claim state is not evidence that the server is unclaimed.
+ * Plex's document envelope, when the answer is the JSON the hook asked for. The
+ * hook reads JSON only: every request carries `Accept: application/json`, so
+ * an answer in any other form, XML included, is not an answer to the question
+ * put and reads as no document. One parser, the runtime's, decides what is
+ * well-formed; nothing here searches text for what it hopes to find.
  */
-export function readIdentity(text: string): PlexIdentity | undefined {
-  const parsed = parseJson(text) as { MediaContainer?: Record<string, unknown> } | undefined;
+function jsonContainer(text: string): Record<string, unknown> | undefined {
+  const parsed = parseJson(text) as { MediaContainer?: unknown } | undefined;
   const container = parsed?.MediaContainer;
-  if (container && typeof container === "object") {
-    const machineIdentifier = container.machineIdentifier;
-    const claimed = readClaimed(container.claimed);
-    if (typeof machineIdentifier !== "string" || machineIdentifier.length === 0 || claimed === undefined) return undefined;
-    return { machineIdentifier, claimed, version: typeof container.version === "string" ? container.version : undefined };
-  }
-  // The XML form: the attributes must sit on the root MediaContainer element
-  // itself, the first element of the document after Plex's declaration, not on
-  // any element that happens to carry them, nested or commented out, or a
-  // document that is not Plex's identity could pass as one.
-  const root = /^\s*(?:<\?xml\b[^>]*\?>\s*)?<MediaContainer(?=[\s/>])([^>]*)>/.exec(text);
-  if (!root) return undefined;
-  const machineIdentifier = attribute(root[1] ?? "", "machineIdentifier");
-  const claimed = readClaimed(attribute(root[1] ?? "", "claimed"));
-  if (!machineIdentifier || claimed === undefined) return undefined;
-  return { machineIdentifier, claimed, version: attribute(root[1] ?? "", "version") };
+  return container !== null && typeof container === "object" && !Array.isArray(container) ? (container as Record<string, unknown>) : undefined;
 }
 
-/** The friendly name the server's root document reports. */
+/**
+ * The server's identity as `/identity` reports it to a JSON request. A
+ * document that does not carry both the machine identifier and an explicit
+ * claim state is not Plex's identity and reads as undefined rather than as a
+ * guess: a missing claim state is not evidence that the server is unclaimed.
+ */
+export function readIdentity(text: string): PlexIdentity | undefined {
+  const container = jsonContainer(text);
+  if (!container) return undefined;
+  const machineIdentifier = container.machineIdentifier;
+  const claimed = readClaimed(container.claimed);
+  if (typeof machineIdentifier !== "string" || machineIdentifier.length === 0 || claimed === undefined) return undefined;
+  return { machineIdentifier, claimed, version: typeof container.version === "string" ? container.version : undefined };
+}
+
+/** The friendly name the server's root document reports to a JSON request. */
 export function readFriendlyName(text: string): string | undefined {
-  const parsed = parseJson(text) as { MediaContainer?: Record<string, unknown> } | undefined;
-  const container = parsed?.MediaContainer;
-  if (container && typeof container === "object") {
-    return typeof container.friendlyName === "string" ? container.friendlyName : undefined;
-  }
-  return attribute(text, "friendlyName");
+  const container = jsonContainer(text);
+  const name = container?.friendlyName;
+  return typeof name === "string" ? name : undefined;
 }
 
 /** The single-use claim token plex.tv hands out for the account token. */
@@ -238,14 +185,20 @@ export function readClaimToken(text: string): string | undefined {
  * `clientIdentifier` is the machine identifier the guest reported: whether it
  * is listed at all (a freshly claimed server may not be yet), whether the
  * signed-in account owns it (a shared server is listed but not owned, and
- * only an explicit `owned: true` counts), and its access token.
+ * only an explicit `owned: true` counts), and its access token. A document
+ * that is not the listing (not an array of entries), or one that lists the
+ * identifier twice, reads as undefined rather than as "not listed yet": the
+ * latter is retried while a server registers, the former never comes right.
  */
-export function readServerToken(text: string, machineIdentifier: string): PlexListing {
+export function readServerToken(text: string, machineIdentifier: string): PlexListing | undefined {
   const parsed = parseJson(text);
-  if (!Array.isArray(parsed)) return { listed: false };
-  const server = parsed.find(
-    (entry) => typeof entry === "object" && entry !== null && (entry as { clientIdentifier?: unknown }).clientIdentifier === machineIdentifier,
-  ) as { owned?: unknown; accessToken?: unknown } | undefined;
+  if (!Array.isArray(parsed) || !parsed.every((entry) => typeof entry === "object" && entry !== null)) return undefined;
+  const matching = parsed.filter((entry) => (entry as { clientIdentifier?: unknown }).clientIdentifier === machineIdentifier) as Array<{
+    owned?: unknown;
+    accessToken?: unknown;
+  }>;
+  if (matching.length > 1) return undefined;
+  const server = matching[0];
   if (!server) return { listed: false };
   const accessToken = server.accessToken;
   return {
@@ -289,13 +242,18 @@ export function readSections(text: string): PlexSection[] | undefined {
   return sections;
 }
 
-/** One preference's value from `/:/prefs` as JSON (`MediaContainer.Setting[]`), or undefined when it is not listed. */
+/**
+ * One preference's value from `/:/prefs` as JSON (`MediaContainer.Setting[]`),
+ * or undefined when it is not listed exactly once: a setting listed twice is
+ * a contradiction, not a value, and a reader that took the first copy would
+ * let the order of a malformed document decide whether a scan is safe.
+ */
 export function readPreference(text: string, id: string): unknown {
   const parsed = parseJson(text) as { MediaContainer?: { Setting?: unknown } } | undefined;
   const settings = parsed?.MediaContainer?.Setting;
   if (!Array.isArray(settings)) return undefined;
-  const setting = settings.find((entry) => typeof entry === "object" && entry !== null && (entry as { id?: unknown }).id === id);
-  return setting ? (setting as { value?: unknown }).value : undefined;
+  const matching = settings.filter((entry) => typeof entry === "object" && entry !== null && (entry as { id?: unknown }).id === id);
+  return matching.length === 1 ? (matching[0] as { value?: unknown }).value : undefined;
 }
 
 /** The answered server name, or the VM's own name when the question was left blank. */
@@ -405,6 +363,12 @@ export async function onMediaReconnected(ctx: VMHookContext): Promise<void> {
   if (listing.status === 401) ctx.fail("Plex refused the server token", [{ label: "Status", value: "401" }]);
   const sections = listing.status === 200 ? readSections(listing.text()) : undefined;
   if (!sections) ctx.fail("Plex did not list its libraries", [{ label: "Status", value: String(listing.status) }]);
+  // Each folder is its own scan: one library Plex refuses does not keep the
+  // folders after it from being asked, or a library that always refuses would
+  // starve the rest on every retry. The run still fails, naming every refusal,
+  // and a refused folder's checkpoint stays absent, so the platform offers it
+  // again after its window.
+  const refused: Array<{ name: string; status: number; section: string }> = [];
   for (const folder of folders) {
     const library = libraryForFolder(folder);
     if (!library) {
@@ -418,12 +382,19 @@ export async function onMediaReconnected(ctx: VMHookContext): Promise<void> {
     }
     const scan = await ctx.fetch(`/library/sections/${encodeURIComponent(section.key)}/refresh`, { headers: withToken(serverToken) });
     if (scan.status !== 200) {
-      ctx.fail(`Plex refused the scan of ${library.name}`, [
-        { label: "Status", value: String(scan.status) },
-        { label: "Section", value: section.key },
-      ]);
+      refused.push({ name: library.name, status: scan.status, section: section.key });
+      continue;
     }
     await ctx.emitCheckpoint(mediaCheckpoint(folder), `Scan requested for ${folder}`);
+  }
+  if (refused.length > 0) {
+    ctx.fail(
+      `Plex refused the scan of ${refused.map((entry) => entry.name).join(", ")}`,
+      refused.flatMap((entry) => [
+        { label: "Status", value: String(entry.status) },
+        { label: "Section", value: entry.section },
+      ]),
+    );
   }
 }
 
@@ -723,13 +694,21 @@ async function findOwnedServerToken(
     // Only the request is guarded: a decision made inside the guard would be
     // caught as a transport failure and retried instead of ending the hook.
     let listing: PlexListing | undefined;
+    let answered = false;
     try {
       const response = await plexTv(`${PLEX_TV}${RESOURCES_PATH}`, { headers: plexTvHeaders(authToken) });
       lastStatus = response.status;
-      if (response.status === 200) listing = readServerToken(await response.text(), machineIdentifier);
-      else ctx.log(`resources attempt ${attempt}/${RESOURCES_ATTEMPTS} answered ${response.status}`);
+      if (response.status === 200) {
+        answered = true;
+        listing = readServerToken(await response.text(), machineIdentifier);
+      } else ctx.log(`resources attempt ${attempt}/${RESOURCES_ATTEMPTS} answered ${response.status}`);
     } catch (error) {
       ctx.log(`resources attempt ${attempt}/${RESOURCES_ATTEMPTS} failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    // An answer that is not the listing never becomes one: fail now, by name,
+    // rather than retrying it as "not listed yet" for two minutes.
+    if (answered && listing === undefined) {
+      return ctx.fail("plex.tv answered, but not with its resources listing", [{ label: "Server", value: machineIdentifier }, claimedContext]);
     }
     if (listing?.listed) {
       if (!listing.owned) {
