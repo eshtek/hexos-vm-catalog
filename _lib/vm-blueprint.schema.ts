@@ -548,6 +548,21 @@ export const blueprintSourceVersion = (provisioning: VMProvisioningDoc): string 
     'source' in provisioning && 'version' in provisioning.source ? provisioning.source.version : undefined;
 
 /**
+ * The host the pinned image or ISO downloads from ("cloud.debian.org"), for
+ * copy that says where an install comes from; undefined for user-supplied
+ * media (Windows) or an unparsable URL.
+ */
+export const blueprintSourceHost = (provisioning: VMProvisioningDoc): string | undefined => {
+    const url = 'source' in provisioning && 'url' in provisioning.source ? provisioning.source.url : undefined;
+    if (!url) return undefined;
+    try {
+        return new URL(url).hostname;
+    } catch {
+        return undefined;
+    }
+};
+
+/**
  * Completed installs per blueprint over a window — what orders the "Most
  * popular this month" grid. Blueprints nobody has installed are absent rather
  * than present with 0, so callers must treat a missing entry as no installs.
@@ -671,6 +686,20 @@ export const HEXOS_VM_CAPABILITIES = [
      * unusable without it — on the CDROM path they boot with no account.
      */
     'virtioSeed',
+    /** vm/create accepts `installation_media_url`: the box downloads the installer ISO into Install Media before first boot, behind a VM_INSTALL task. */
+    'isoDownload',
+    /** vm/create accepts `additional_media`: extra ISOs attached as CDROMs after the install medium. */
+    'additionalMedia',
+    /** VMInfo reports `media`, and vm/:id/update accepts `attachMedia` / `removeMedia`. */
+    'mediaManagement',
+    /**
+     * Device passthrough keeps off the hardware the server runs on (#1756):
+     * vm/devices-available leaves out what the host holds, and every PCI and
+     * USB attach is re-checked fail-closed first. A box without this offers
+     * the boot pool's controller or the NIC carrying its address and attaches
+     * them unchecked, so the deck offers no passthrough until the box reports it.
+     */
+    'passthroughGuard',
 ] as const;
 
 /**
@@ -692,58 +721,195 @@ export function missingVMCapabilities(
 }
 
 /**
- * First-user names that collide with accounts or groups already baked into
- * Linux cloud images. cloud-init cannot create these (e.g. `root` already
- * exists, and Ubuntu ships with root logins disabled), so the machine comes
- * up unreachable. Protective, not exhaustive.
+ * Account and group names already present in the Linux blueprints' images, so
+ * unusable for the first user. A group counts as well as an account: useradd
+ * gives the new user a primary group of the same name and fails when the image
+ * has one (`scanner` on the Ubuntu desktop images). cloud-init then leaves the
+ * machine unreachable, and an installer never finishes.
+ *
+ * The union across every blueprint rather than per blueprint, so a name stays
+ * free of the packages a user may add later (`docker`, `libvirt`, `mysql`).
+ * Generated from the images by packages/dev/scripts/vm-reserved-usernames,
+ * which only ever adds names; rerun it when a blueprint is added or bumped.
+ * Names under RESERVED_LINUX_USERNAME_PREFIXES are left out.
  */
 export const RESERVED_LINUX_USERNAMES = new Set([
-    'root',
-    'daemon',
-    'bin',
-    'sys',
-    'sync',
-    'games',
-    'man',
-    'lp',
-    'mail',
-    'news',
-    'uucp',
-    'proxy',
-    'www-data',
-    'backup',
-    'list',
-    'irc',
-    'gnats',
-    'nobody',
-    'systemd-network',
-    'systemd-resolve',
-    'systemd-timesync',
-    'messagebus',
-    'syslog',
-    '_apt',
-    'tss',
-    'uuidd',
-    'tcpdump',
-    'sshd',
-    'pollinate',
-    'landscape',
-    'fwupd-refresh',
-    'usbmux',
-    'dnsmasq',
-    'polkitd',
-    'dhcpcd',
-    // Baked-in group names — the first user's primary group shares its name,
-    // so these collide at useradd time as well.
+    'abrt',
+    'adbusers',
     'adm',
-    'sudo',
-    'staff',
-    'users',
-    'wheel',
-    'operator',
     'admin',
+    'akmods',
+    'alpm',
+    'apache',
+    'audio',
+    'autologin',
+    'avahi',
+    'avahi-autoipd',
+    'backup',
+    'bin',
+    'bluetooth',
+    'brlapi',
+    'brltty',
+    'cdrom',
+    'cgred',
+    'chrony',
+    'clock',
+    'cockpit-ws',
+    'colord',
+    'cosmic-greeter',
+    'cosmic-initial-setup',
+    'crontab',
+    'cups',
+    'cups-browsed',
+    'cups-pk-helper',
+    'daemon',
+    'dbus',
+    'dhcpcd',
+    'dialout',
+    'dip',
+    'disk',
+    'dnsmasq',
+    'docker',
+    'dockerroot',
+    'empower',
+    'etcd',
+    'fax',
+    'flatpak',
+    'floppy',
+    'ftp',
+    'fwupd-refresh',
+    'gamemode',
+    'games',
+    'gdm',
+    'geoclue',
+    'git',
+    'gluster',
+    'gnats',
+    'gnome-initial-setup',
+    'gnome-remote-desktop',
+    'greeter',
+    'halt',
+    'hplip',
+    'http',
+    'i2c',
+    'input',
+    'irc',
+    'kernoops',
+    'kmem',
+    'kube',
+    'kvm',
+    'landscape',
+    'libvirt',
+    'lightdm',
+    'list',
+    'liveuser',
+    'locate',
+    'lock',
+    'log',
+    'lp',
+    'lpadmin',
+    'lxd',
+    'mail',
+    'malcontent-timer-ext-agent',
+    'malcontent-timerd',
+    'malcontent-webd',
+    'man',
+    'mem',
+    'messagebus',
+    'mysql',
+    'named',
+    'nbd',
+    'netdev',
+    'network',
+    'news',
+    'nfsnobody',
+    'nm-openconnect',
+    'nm-openvpn',
+    'nobody',
+    'nogroup',
+    'nopasswdlogin',
+    'ntp',
+    'nvidia-persistenced',
+    'openvpn',
+    'operator',
+    'optical',
+    'partimag',
+    'passim',
+    'pcscd',
+    'pipewire',
+    'plasma-setup',
+    'plasmalogin',
+    'plocate',
+    'plugdev',
+    'polkitd',
+    'pollinate',
+    'power',
+    'printadmin',
+    'proc',
+    'proxy',
+    'qat',
+    'qemu',
+    'rdma',
+    'realtime',
+    'render',
+    'rfkill',
+    'root',
+    'rpc',
+    'rpcuser',
+    'rtkit',
+    'saned',
+    'sasl',
+    'scanner',
+    'sddm',
+    'seat',
+    'setroubleshoot',
+    'sgx',
+    'shadow',
+    'shutdown',
+    'smmsp',
+    'speech-dispatcher',
+    'src',
+    'ssh_keys',
+    'sshd',
+    'ssl-cert',
+    'sssd',
+    'staff',
+    'storage',
+    'sudo',
+    'sync',
+    'sys',
+    'syslog',
+    'tape',
+    'tcpdump',
+    'trusted',
+    'tss',
+    'tty',
     'ubuntu',
+    'unbound',
+    'usbmux',
+    'usbmuxd',
+    'users',
+    'usershares',
+    'utempter',
+    'utmp',
+    'uucp',
+    'uuidd',
+    'vboxadd',
+    'vboxsf',
+    'video',
+    'voice',
+    'wheel',
+    'whoopsie',
+    'wsdd',
+    'www-data',
 ]);
+
+/** System accounts by convention (`_apt`, `_chrony`, `systemd-oom`), whatever the image. */
+export const RESERVED_LINUX_USERNAME_PREFIXES = ['_', 'systemd-'] as const;
+
+export const isReservedLinuxUsername = (username: string): boolean =>
+    RESERVED_LINUX_USERNAMES.has(username) ||
+    RESERVED_LINUX_USERNAME_PREFIXES.some((prefix) => username.startsWith(prefix));
 
 /** Account names Windows Setup refuses or that collide with built-ins. */
 export const RESERVED_WINDOWS_USERNAMES = new Set([
