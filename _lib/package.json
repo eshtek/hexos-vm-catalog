@@ -11,6 +11,7 @@
     "releases": "bun releases.ts",
     "tests": "bun tests.ts",
     "generate-tests": "bun tests.ts --generate",
+    "test-hooks": "bun test ../plex-server ../home-assistant-os contract.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

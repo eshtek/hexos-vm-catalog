@@ -113,6 +113,12 @@ export const VM_BLUEPRINT_FUNCTIONAL_FIELDS = [
     'requiredCapabilities',
     'truenasVersion',
     'cpuFeatures',
+    // Surface declarations run against the installed guest, so a changed hook
+    // or widget (or the dialect it is parsed under) is a functional change.
+    'hooksSchema',
+    'hooks',
+    'widgetsSchema',
+    'widgets',
 ] as const;
 
 /** Canonical JSON: keys sorted recursively, no whitespace, `undefined` members dropped. */

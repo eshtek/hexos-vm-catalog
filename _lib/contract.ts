@@ -12,6 +12,7 @@
 
 import { sourceDigests, type VMBlueprint } from "./vm-blueprint.schema";
 import type { VMApp } from "./vm-app.schema";
+import { parseVMHooks, parseVMWidgets } from "./vm-surfaces";
 
 // A backend that requires sha256 on every source rejects a sha512-only
 // document at sync time, which sets validationError and silently disables the
@@ -26,6 +27,13 @@ import type { VMApp } from "./vm-app.schema";
 export const MIN_SHA512_TRUENAS_VERSION = "";
 
 export const KNOWN_CLOUD_INIT_TEMPLATES = new Set(["linux-default"]);
+
+// First-boot profiles the backend ships for image-strategy blueprints (see
+// the platform's lib/vmFirstBoot.ts). Named by the blueprint, shipped by the
+// backend, and an unknown name fails the install loudly rather than booting a
+// guest that was promised configuration it never got — so it is checked here
+// instead, where a PR can see it.
+export const KNOWN_FIRST_BOOT_PROFILES = new Set(["openwrt-lan-dhcp", "plex-appliance"]);
 
 // Machine-config templates, and the delivery mechanism each one requires. A
 // mismatch is silent at runtime: the guest simply never sees the document and
@@ -74,12 +82,28 @@ export const KNOWN_INSTALLER_IMAGE_TEMPLATES = new Set(["steamos-repair"]);
 export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
 
 // Mirror of HEXOS_VM_CAPABILITIES in the platform's vm-blueprints.ts — the
-// install-pipeline capabilities shipped backends can declare support for.
-// Extend ONLY after the platform change ships (same rule as the template
-// allowlists): a capability listed here before it exists upstream turns the
-// check into a rubber stamp. Values are exact-match (no case folding) — the
-// backend compares them verbatim.
-export const KNOWN_VM_CAPABILITIES = new Set(["firstBoot", "virtioSeed"]);
+// install-pipeline capabilities shipped backends can declare support for —
+// plus `vmHooks`, which the box reports at runtime while its setup-hooks gate
+// is open rather than compiling in, so a blueprint whose setup is not optional
+// can ask for a box that will run it. Extend ONLY after the platform change
+// ships (same rule as the template allowlists): a capability listed here
+// before it exists upstream turns the check into a rubber stamp. Values are
+// exact-match (no case folding) — the backend compares them verbatim.
+export const KNOWN_VM_CAPABILITIES = new Set([
+  "firstBoot",
+  "appInstall",
+  "virtioSeed",
+  "isoDownload",
+  "additionalMedia",
+  "plexAppliance",
+  "firstBootDefaultMedia",
+  "vmHooks",
+]);
+
+/** The capability a first-boot profile stands on, where the profile is not part of every first-boot backend. */
+const PROFILE_CAPABILITIES: Record<string, readonly string[]> = { "plex-appliance": ["plexAppliance"] };
+/** The profiles that mount a media share from the install's inputs (the platform's own list); any other profile given `mediaShare` ignores it and the install fails. */
+const MEDIA_PROFILES: ReadonlySet<string> = new Set(["plex-appliance"]);
 
 // Passthrough class vocabulary, enforced here for the same reason as
 // KNOWN_CATEGORIES: the schema leaves `guest.passthrough` an open slug array so
@@ -167,6 +191,40 @@ export interface ContractResult {
   warnings: string[];
 }
 
+/** A script a blueprint's surface declarations name, as authored: a `.ts` or `.js` path from the catalog root, by convention in the blueprint's own folder. */
+export interface DeclaredScript {
+  kind: "hook" | "widget";
+  id: string;
+  script: string;
+  /** A required setup hook: the sync withholds the whole blueprint when its script is missing or fails the lint. */
+  required: boolean;
+}
+
+/**
+ * The scripts a blueprint declares, read the way the sync reads them (the
+ * authoring form, where each declaration names `script`). Declarations the
+ * parser drops name nothing here; their errors come from `checkContract`.
+ */
+export function declaredScripts(bp: VMBlueprint): DeclaredScript[] {
+  const scripts: DeclaredScript[] = [];
+  const hooks = parseVMHooks(bp, { form: "authoring" }).hooks;
+  for (const hook of hooks) {
+    if (hook.script) {
+      scripts.push({
+        kind: "hook",
+        id: hook.id,
+        script: hook.script,
+        required: hook.events.includes("onAfterReady") && !hook.optional,
+      });
+    }
+  }
+  // Widgets are parsed against the hooks: a button naming an unknown verb is dropped.
+  for (const widget of parseVMWidgets(bp, { form: "authoring", hooks }).widgets) {
+    if (widget.script) scripts.push({ kind: "widget", id: widget.id, script: widget.script, required: false });
+  }
+  return scripts;
+}
+
 export function checkContract(bp: VMBlueprint, filename: string): ContractResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -183,6 +241,11 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
   if (p.strategy === "cloud-init" && !KNOWN_CLOUD_INIT_TEMPLATES.has(p.cloudInit.userDataTemplate)) {
     errors.push(
       `unknown cloud-init template "${p.cloudInit.userDataTemplate}" — the backend ships only: ${[...KNOWN_CLOUD_INIT_TEMPLATES].join(", ")}`,
+    );
+  }
+  if (p.strategy === "image" && p.firstBoot && !KNOWN_FIRST_BOOT_PROFILES.has(p.firstBoot.profile)) {
+    errors.push(
+      `unknown first-boot profile "${p.firstBoot.profile}" — the backend ships only: ${[...KNOWN_FIRST_BOOT_PROFILES].join(", ")}`,
     );
   }
   if (p.strategy === "answer-file") {
@@ -318,6 +381,17 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
     );
   }
 
+  // Surface declarations (setup hooks, widgets) are parsed here exactly as the
+  // sync parses them in the authoring form, so every rule the parser reports
+  // (an unsupported schema version, a hook with no port, a consent object on a
+  // user-fired verb, a script path that is absolute or climbs with "..") fails the PR rather than
+  // the sync, where a dropped declaration is only a logged error and a
+  // withheld blueprint keeps its last good document. A blueprint that declares
+  // no surfaces has nothing to report.
+  const surfaceHooks = parseVMHooks(bp, { form: "authoring" });
+  for (const error of surfaceHooks.errors) errors.push(`hooks: ${error}`);
+  for (const error of parseVMWidgets(bp, { form: "authoring", hooks: surfaceHooks.hooks }).errors) errors.push(`widgets: ${error}`);
+
   // Capability declarations are a closed vocabulary this repo controls, unlike
   // cpuFeatures' open kernel-flag namespace — an unknown value is either a typo
   // (hides the blueprint on every up-to-date host) or a capability that hasn't
@@ -343,6 +417,25 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
     warnings.push(
       `requiredCapabilities declares "firstBoot" but provisioning has no firstBoot profile — harmless over-gating that hides the blueprint from hosts that could run it`,
     );
+  }
+  // A profile, or a first-boot field, that only some backends implement must
+  // be declared as a capability too, or an older backend installs the guest
+  // unconfigured while the document says it is configured.
+  if (p.strategy === "image" && p.firstBoot) {
+    if (p.firstBoot.mediaShare === true && !MEDIA_PROFILES.has(p.firstBoot.profile)) {
+      errors.push(
+        `firstBoot.mediaShare is honoured only by a profile that mounts media (${[...MEDIA_PROFILES].join(", ")}); the "${p.firstBoot.profile}" profile ignores it and the install would fail`,
+      );
+    }
+    const declared = new Set(bp.requiredCapabilities ?? []);
+    for (const [needed, why] of [
+      ...(PROFILE_CAPABILITIES[p.firstBoot.profile] ?? []).map((capability) => [capability, `the "${p.firstBoot?.profile}" profile`] as const),
+      ...(p.firstBoot.mediaShare === true ? [["firstBootDefaultMedia", "firstBoot.mediaShare"] as const] : []),
+    ]) {
+      if (!declared.has(needed)) {
+        errors.push(`${why} needs requiredCapabilities to declare "${needed}" — a backend without it would install this blueprint silently unconfigured`);
+      }
+    }
   }
 
   for (const flag of bp.cpuFeatures ?? []) {

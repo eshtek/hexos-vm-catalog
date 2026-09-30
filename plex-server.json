@@ -1,0 +1,123 @@
+{
+    "id": "plex-server",
+    "name": "Plex Media Server",
+    "description": "Plex Media Server as a dedicated virtual machine, installed from Ubuntu's official cloud image and configured to start Plex on first boot. Open it and you land in Plex's own web interface: there is no operating system to set up and no account to create. Sign in to Plex during the install and HexOS claims the server on your account and names it; otherwise claim it yourself from Plex's own setup page. HexOS mounts its default media folders read-only; signing in also configures Movies, TV Shows, Music, Photos and Videos libraries.",
+    "icon": "_icons/plex.svg",
+    "website": "https://www.plex.tv",
+    "category": "appliance",
+    "truenasVersion": ">=25.04.2.6",
+    "requiredCapabilities": [
+        "firstBoot",
+        "plexAppliance",
+        "firstBootDefaultMedia"
+    ],
+    "provisioning": {
+        "strategy": "image",
+        "source": {
+            "url": "https://cloud-images.ubuntu.com/releases/noble/{version}/ubuntu-24.04-server-cloudimg-amd64.img",
+            "version": "release-20260826",
+            "format": "qcow2",
+            "compression": "none",
+            "sha256": "d0fe84bb5f80853425fa6be28e2c106f30104c3cfe8611933f2e65c9b63f0e30",
+            "releasesUrl": "https://cloud-images.ubuntu.com/releases/noble/"
+        },
+        "firstBoot": {
+            "profile": "plex-appliance",
+            "mediaShare": true
+        }
+    },
+    "resources": {
+        "minMemoryMb": 2048,
+        "recMemoryMb": 4096,
+        "minVcpus": 2,
+        "recVcpus": 2,
+        "diskGb": 32
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": true,
+        "readiness": {
+            "type": "phone-home"
+        },
+        "postInstallUrl": "http://{ip}:32400/web"
+    },
+    "hooksSchema": 1,
+    "hooks": [
+        {
+            "id": "plex-account",
+            "title": "Sign in to Plex",
+            "description": "Claims the new server on your Plex account, names it, and configures Movies, TV Shows, Music, Photos and Videos libraries from the default HexOS folders. An existing claim is kept as it is: a server you already own is still named and its token kept, and a server your account does not own is not touched. Existing libraries at those locations are left alone. Accepts Plex's EULA, publishes the server on your Plex account so your Plex apps can find it, and scans the libraries hourly, since Plex cannot watch network folders for changes. Running setup again applies these settings again.",
+            "events": [
+                "onAfterReady"
+            ],
+            "kind": "connect",
+            "optional": true,
+            "userOptional": {
+                "description": "Sign in to your Plex account once the server is running and HexOS claims it for you, names it, publishes it on your Plex account, and configures the five default media libraries, scanned hourly. Leave this off to claim it yourself from Plex's own setup page. By enabling this, you agree that HexOS claims the server on your behalf under the Plex Terms of Service.",
+                "default": false,
+                "link": {
+                    "url": "https://www.plex.tv/about/privacy-legal/plex-terms-of-service/",
+                    "label": "Plex Terms of Service"
+                }
+            },
+            "guestPort": 32400,
+            "inputs": [
+                {
+                    "type": "oauth",
+                    "id": "plex_login",
+                    "name": "Sign in to Plex",
+                    "description": "Link this server to your Plex account.",
+                    "provider": "plex",
+                    "flow": {
+                        "type": "pin",
+                        "pinUrl": "https://plex.tv/api/v2/pins",
+                        "authUrl": "https://app.plex.tv/auth#?clientID={clientId}&code={code}",
+                        "pollUrl": "https://plex.tv/api/v2/pins/{pinId}",
+                        "clientId": "hexos-platform",
+                        "tokenField": "authToken",
+                        "headers": {
+                            "X-Plex-Client-Identifier": "{clientId}",
+                            "X-Plex-Product": "HexOS"
+                        }
+                    }
+                },
+                {
+                    "type": "question",
+                    "id": "server_name",
+                    "question": {
+                        "question": "Server name",
+                        "type": "text",
+                        "key": "server_name",
+                        "required": false,
+                        "default": "HexOS Plex",
+                        "description": "The name your Plex server will appear as to you and your friends. Clear it to use this VM's name.",
+                        "placeholder": "HexOS Plex"
+                    }
+                }
+            ],
+            "script": "plex-server/plex_setup.ts",
+            "entrypoint": "run",
+            "timeout": 600,
+            "retries": 0
+        },
+        {
+            "id": "plex-media-recovery",
+            "title": "Scan libraries after a media folder reconnects",
+            "description": "When HexOS sees a default media folder connected again after an outage, asks Plex to scan that folder's library, so anything a scan during the outage marked unavailable is available again and anything added meanwhile is indexed. Nothing is asked while a folder is disconnected. Skipped when the server was not signed in during setup.",
+            "events": [
+                "onMediaReconnected"
+            ],
+            "optional": true,
+            "guestPort": 32400,
+            "script": "plex-server/plex_setup.ts",
+            "entrypoint": "onMediaReconnected",
+            "timeout": 120,
+            "retries": 0
+        }
+    ]
+}

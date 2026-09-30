@@ -112,7 +112,9 @@ OS Foundation, the Debian Project, RESF, SUSE, the OpenWrt Project, System76, th
 Zorin Group, the Home Assistant project, the Flatcar/Bazzite/CachyOS teams, Microsoft, Valve
 Corporation, 37signals for the Omarchy mark, and the Linux/Tux mark), used here nominatively to
 identify the software the blueprint installs. `omarchy.svg` is an exact-geometry vectorization of
-the omarchy.org favicon (the project publishes no vector of its mark). If an upstream project
+the omarchy.org favicon (the project publishes no vector of its mark). `plex.svg` is the Plex
+mark (Plex, Inc.), the HexOS platform's Plex app tile re-exported for this catalog, so the appliance
+and the app read as one product on the deck. If an upstream project
 objects or rebrands, replace or remove the file here — nothing else references it.
 
 ## App icons

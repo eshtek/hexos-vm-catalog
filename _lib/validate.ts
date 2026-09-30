@@ -9,10 +9,11 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkAppContract, checkContract, MAX_RECOMMENDED_APPS, MIRRORED_ICON_FILE } from "./contract";
+import { checkAppContract, checkContract, declaredScripts, MAX_RECOMMENDED_APPS, MIRRORED_ICON_FILE } from "./contract";
 import { checkTests, readBlueprints } from "./tests";
 import { type VMApp, vmAppSchema } from "./vm-app.schema";
 import { type VMBlueprint, vmBlueprintSchema } from "./vm-blueprint.schema";
+import { lintScriptImports } from "./vm-surfaces";
 
 // This file lives in _lib/; blueprints live one level up in the repo root.
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -89,6 +90,33 @@ for (const file of files) {
       // checkable here.
       if (bp.icon && !/^https?:\/\//.test(bp.icon) && MIRRORED_ICON_FILE.test(bp.icon) && !existsSync(join(ROOT, bp.icon))) {
         errors.push(`icon "${bp.icon}" does not exist in the repo — mirrored icons must be committed (see _icons/)`);
+      }
+
+      // The scripts a blueprint's hooks and widgets name live in THIS repo and
+      // are inlined by the sync at one pinned commit, so a missing file, an
+      // empty one, or a runtime import is checkable here. The same lint runs
+      // at sync time: a required setup hook that fails it withholds the whole
+      // blueprint (its last good document stays published); an optional hook
+      // or a widget is dropped with a logged error and the blueprint publishes
+      // without it. Either way the failure is silent to a user, so it is an
+      // error here.
+      for (const declared of declaredScripts(bp)) {
+        const label = `${declared.kind} "${declared.id}" script "${declared.script}"`;
+        const consequence = declared.required
+          ? "the sync withholds the whole blueprint"
+          : `the sync drops the ${declared.kind}`;
+        if (!existsSync(join(ROOT, declared.script))) {
+          errors.push(`${label} does not exist in the repo — ${consequence}`);
+          continue;
+        }
+        const content = readFileSync(join(ROOT, declared.script), "utf8");
+        if (content.trim().length === 0) {
+          errors.push(`${label} is empty — ${consequence}`);
+          continue;
+        }
+        for (const message of lintScriptImports(content)) {
+          errors.push(`${label}: ${message} — ${consequence}`);
+        }
       }
     }
   }

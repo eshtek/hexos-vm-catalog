@@ -147,9 +147,27 @@ const provisioningImageSchema = z.object({
     firstBoot: z
         .object({
             profile: z.string().min(1).max(64),
+            /**
+             * The profile mounts the default HexOS media folders in the guest,
+             * read-only, using the credentials the installer
+             * collects (`mediaUsername`, `mediaPassword` in the
+             * install options). The values are rendered by the backend's own
+             * profile; the catalog still supplies no guest-executed content.
+             */
+            mediaShare: z.boolean().optional(),
         })
         .optional(),
 });
+
+/** An SMB share name as TrueNAS allows it, without the characters a mount unit or a shell would read. */
+export const VM_MEDIA_SHARE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ._-]{0,79}$/;
+/** An SMB account name, the charset TrueNAS's own user names use. */
+export const VM_MEDIA_USERNAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+/**
+ * Printable ASCII with no leading or trailing space: the value lands on a
+ * `password=` line that mount.cifs reads to the end of the line.
+ */
+export const VM_MEDIA_PASSWORD_PATTERN = /^[\x21-\x7e](?:[\x20-\x7e]{0,126}[\x21-\x7e])?$/;
 
 const provisioningCloudInitSchema = z.object({
     strategy: z.literal('cloud-init'),
@@ -413,6 +431,22 @@ export const vmBlueprintSchema = z.object({
     provisioning: vmProvisioningSchema,
     resources: vmBlueprintResourcesSchema,
     guest: vmBlueprintGuestSchema,
+    /**
+     * Surface declarations: setup hooks and dashboard widgets the guest's
+     * blueprint ships (parsed by vm-surfaces.ts), and a reserved key for the
+     * folder-attachment contract that consumer defines. Deliberately loose at
+     * the root: every stored document re-validates on every sync, so a
+     * declaration the catalog authors before the platform understands it
+     * must not validationError-hide the blueprint. Envelope and item rules
+     * (schema version, list shape, caps, per-entry drops) are enforced at
+     * read time by the parsers, which report errors instead of hiding rows;
+     * unknown extensions are inert.
+     */
+    hooksSchema: z.unknown().optional(),
+    hooks: z.unknown().optional(),
+    widgetsSchema: z.unknown().optional(),
+    widgets: z.unknown().optional(),
+    attachments: z.unknown().optional(),
 });
 
 export type VMImageSource = z.infer<typeof vmImageSourceSchema>;
@@ -494,6 +528,10 @@ export const blueprintNeedsUsername = (provisioning: VMProvisioningDoc): boolean
  */
 export const blueprintRequiresPassword = (provisioning: VMProvisioningDoc): boolean =>
     provisioning.strategy === 'installer-iso' || provisioning.strategy === 'installer-image';
+
+/** Whether the blueprint mounts the default HexOS folders at first boot, so the install asks for the shared SMB credential pair. */
+export const blueprintNeedsMediaShare = (provisioning: VMProvisioningDoc): boolean =>
+    provisioning.strategy === 'image' && provisioning.firstBoot?.mediaShare === true;
 
 /** Answer-file (Windows) blueprints additionally need the user-supplied installer ISO. */
 export const blueprintNeedsWindowsSetup = (provisioning: VMProvisioningDoc): boolean =>
@@ -700,6 +738,25 @@ export const HEXOS_VM_CAPABILITIES = [
      * them unchecked, so the deck offers no passthrough until the box reports it.
      */
     'passthroughGuard',
+    /**
+     * The `plex-appliance` first-boot profile: a stock Ubuntu cloud image
+     * seeded to install Plex and report ready only once Plex answers, so the
+     * guest is an appliance with no account and no operating system to meet.
+     * A box with `firstBoot` but an older backend has the mechanism and not
+     * this profile, and would fail the install on an unknown profile name,
+     * so the blueprint declares the profile itself rather than the mechanism.
+     */
+    'plexAppliance',
+    /**
+     * A first-boot profile mounts the six default HexOS media folders in the
+     * guest (`firstBoot.mediaShare` on the blueprint): the shares resolved from
+     * the box's locations before the download, the credential pair from the
+     * install, read-only CIFS mounts the appliance's service depends on. A box
+     * without this ignores the install's media options, so the guest would
+     * boot with no folders and its setup would fail at the first library; the
+     * blueprint declares the capability rather than risk that.
+     */
+    'firstBootDefaultMedia',
 ] as const;
 
 /**

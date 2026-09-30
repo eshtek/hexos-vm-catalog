@@ -53,6 +53,7 @@ package runtime that guest has, which is what decides which apps are offered on 
 |-----------|-------------|
 | [Home Assistant OS](home-assistant-os.json) | Official Home Assistant appliance OS |
 | [OpenWrt 25.12](openwrt.json) | Official OpenWrt x86-64 router/firewall image, managed from LuCI |
+| [Plex Media Server](plex-server.json) | Plex on Ubuntu's cloud image, started at first boot; open it and you are in Plex. Sign in during the install and it is claimed on your account |
 
 Drafts that aren't ready to ship live in a gitignored `_pending/` directory on
 the maintainer's machine — a draft carries `TODO` digests and URLs nobody has
@@ -213,7 +214,9 @@ Icons live under `_icons/apps/`, one per app, mirrored here exactly like the blu
         "tpm": false, "secureBoot": false, "hypervEnlightenments": false,
         "readiness": { "type": "mdns", "hostname": "homeassistant.local", "port": 8123 },
         "postInstallUrl": "http://{ip}:8123"
-    }
+    },
+    "hooksSchema": 1,                      // optional: setup hooks the platform runs after the guest
+    "hooks": [ /* see "Setup hooks" below */ ] // is ready, from scripts in this repo (the blueprint's own folder)
 }
 ```
 
@@ -234,9 +237,16 @@ whenever the pipeline gains or loses a step.
 5. Configure the domain (firmware, disk bus, NIC, CPU, memory) and boot.
 6. Wait for the guest to come online using the blueprint's readiness probe.
 
-Nothing is injected — no account is collected because the appliance ships with
-its own (HAOS-style). The blueprint supplies a bootable `source` image and a
-`readiness` probe that can see the appliance's own UI (e.g. mDNS + port).
+By default nothing is injected — no account is collected because the appliance
+ships with its own (HAOS-style). The blueprint supplies a bootable `source`
+image and a `readiness` probe that can see the appliance's own UI (e.g. mDNS +
+port). A blueprint may instead name a first-boot profile the backend ships
+(`firstBoot.profile`, one of the names in `_lib/contract.ts`), which the backend
+injects on the first boot the way the installer seeds are: the Plex appliance
+names `plex-appliance` and sets `firstBoot.mediaShare: true`, which makes the
+install ask for an SMB username and password so the guest can mount the default
+HexOS media folders read-only. The profile's content lives in the platform; the
+catalog only names it.
 
 #### `cloud-init` — vendor image, configured on first boot
 
@@ -357,6 +367,45 @@ Version bumps are a two-field change: `source.version` and its digest. `source.r
 > artifact rather than the vendor's docs — repeatedly this year, published media
 > has lagged the documented automation it is supposed to provide.
 
+### Setup hooks
+
+A blueprint may declare **setup hooks**: scripts in this repo that the HexOS box runs once the guest is ready, after the platform has confirmed that the guest's address answers ARP with the VM's own MAC on the network path a request will take. The hook reaches the guest only through the context it is handed (`ctx.fetch`, `ctx.waitForApp`, bound to those verified paths); there is no guest execution channel of any kind, and a script whose source imports, requires or re-exports a module is refused at sync (a check of the source text on a curated repo, not a sandbox around the script). The user consents per hook in the install dialog when the hook declares `userOptional`, and can rerun, skip or dismiss a setup step from the activity feed afterwards.
+
+```jsonc
+    "hooksSchema": 1,
+    "hooks": [
+        {
+            "id": "onboarding",                 // unique within the blueprint, lowercase slug
+            "title": "Onboarding check",        // the consent row's label and the task's name
+            "description": "…",                 // the consent row's body unless userOptional has its own
+            "events": ["onAfterReady"],         // the lifecycle firings it handles: onAfterReady once the
+                                                // guest is ready, onMediaReconnected when its media mounts
+                                                // come back (user-fired verbs come later)
+            "optional": true,                   // a failure skips the hook; absent = a failure parks the
+                                                // setup until the user retries, skips or dismisses it
+            "kind": "connect",                  // a hook that signs the user in somewhere; the parser
+                                                // refuses it unless userOptional declares "default": false
+            "userOptional": {                   // present = a consent switch in the installer, on by
+                "description": "…",             // default. A hook that signs the user in anywhere MUST
+                "default": false,               // declare "default": false (the parser refuses otherwise)
+                "link": { "label": "…", "url": "https://example.com/setup" } // optional: a link beside the consent text
+            },
+            "guestPort": 8123,                  // where the guest answers; defaults from postInstallUrl
+            "altPorts": [80],                   // other declared ports a redirect may land on (max 4)
+            "script": "home-assistant-os/haos_setup.ts", // a path from the repo root; the sync inlines the file at
+            "entrypoint": "run",                // one pinned commit, so a box never fetches a script
+            "inputs": [],                       // questions or an OAuth flow the user answers first
+            "timeout": 600, "retries": 1
+        }
+    ]
+```
+
+Scripts live in the blueprint's own folder, beside its screenshots ([`home-assistant-os/haos_setup.ts`](home-assistant-os/haos_setup.ts), [`plex-server/plex_setup.ts`](plex-server/plex_setup.ts)), as the app catalog keeps each app's scripts in its folder; the sync never reads a directory as a blueprint, so a script is reachable only through a declaration's `script`, a `.ts` or `.js` path from the repo root with no `..` segments (the folder is a convention the review keeps, not a rule the parser enforces). They import **types only** — `import type { VMHookContext } from "../_lib/hook_context"` — and nothing at runtime: the sync refuses a script whose source carries a runtime `import`, `require` or re-export, and so does `bun run validate`; the check reads the source text, it does not sandbox what a script does with what it is handed. [`_lib/hook_context.ts`](_lib/hook_context.ts) is a hand-maintained mirror of the platform's `VMHookContext`; CI typechecks the script folders against it and runs each script's own tests (`bun run test-hooks`, the `*.test.ts` beside each script; a blueprint whose folder gains scripts joins the `test-hooks` command in `_lib/package.json` and the `include` list in `_lib/tsconfig.json`). A required setup hook (`onAfterReady`, not `optional`) whose script is missing or fails the lint makes the sync **withhold the whole blueprint** (its last good document stays published); an optional hook is dropped with a logged error and the blueprint publishes without it. Either failure is silent to a user, so the validator treats both as errors.
+
+Two rules for authors. A setup hook must never write to a guest it did not install, and must tolerate a guest the user has already set up by hand: confirm state, record what the guest actually establishes (a status page that is not served is "unknown", never proof of anything), and leave account creation to the user (or to a migration that carries that intent). And never put a credential into a checkpoint message or a log line; `ctx.secrets` keeps what a hook collects, bound to the VM instance and removed with it. The platform snapshots a blueprint's declarations at install and runs from that snapshot, including on a rerun; there is no action today that adopts a later catalog edit, so a fix to a shipped hook reaches new installs only.
+
+The Plex appliance mounts the configured HexOS Media, Movies, Shows, Music, Photos and Videos folders read-only using the installation's SMB account. The hook matches the Plex app: Movies (`/mnt/movies`), TV Shows (`/mnt/shows`), Music (`/mnt/music`), Photos (`/mnt/photos`) and Videos (`/mnt/videos`), with the same agents, scanners and languages. Media is mounted at `/mnt/media` for manual use; it is not an extra library. Before creating libraries the hook disables automatic trash emptying, reuses each existing library by its exact location, and then requests a scan of all five. Existing libraries are never deleted or repointed. Signing in claims the server on the account (only a server whose own identity says it is unclaimed), names it (the answered name, or the VM's own name when the answer is left blank), keeps the server's access token for the platform, and writes the server preferences the hook declares, each read back after the write. A successful section listing does not establish that Plex's agents have finished starting: library creation retries only Plex's explicit HTTP 400 startup refusal, up to eight attempts five seconds apart, checking for an existing library before each attempt. Other refusals and transport exceptions stop setup; an accepted creation is verified by listing the sections again.
+
 ### Screenshots
 
 The detail sheet renders a gallery of up to **5** screenshots of the desktop (or web UI) the
@@ -422,9 +471,10 @@ bun install
 bun run validate
 ```
 
-The validator checks each root `*.json` against the vendored blueprint schema and each `apps/*.json` against the vendored app schema, then applies a few contract checks the schema can't express ([`_lib/contract.ts`](_lib/contract.ts)):
+The validator checks each root `*.json` against the vendored blueprint schema and each `apps/*.json` against the vendored app schema, parses any setup-hook and widget declarations with the platform's own parser (vendored as [`_lib/vm-surfaces.ts`](_lib/vm-surfaces.ts)), checks that every declared script exists and imports nothing at runtime, then applies a few contract checks the schema can't express ([`_lib/contract.ts`](_lib/contract.ts)):
 
 - `cloudInit.userDataTemplate` / `answerFile.template` / `seed.template` must name a template the backend actually ships (`linux-default`, `win11-pro`, `win10-pro`, `ubuntu-desktop-autoinstall`, `fedora-workstation-kickstart`, `fedora-kde-kickstart`, `opensuse-agama-profile`, `bazzite-kickstart`, `mint-preseed`, `zorin-preseed`, `pop-live-exec`, `omarchy-autoinstall`, `cachyos-headless`, `steamos-repair`, plus the machine-config pair `fcos-ignition` / `flatcar-ignition` today) — this is the highest-value check; a typo passes schema validation and only fails at install time
+- `firstBoot.profile` must name a first-boot profile the backend actually ships (`openwrt-lan-dhcp`, `plex-appliance`); an unknown name would fail the install loudly, so it is caught here instead
 - a duplicate `id` across two files is an error (the sync skips the duplicate)
 - every blueprint must have a row in the README tables above — this is the step that has actually been skipped in practice, so it is an error rather than a convention
 - `apps.runtime` must match the guest the provisioning strategy implies (answer-file is Windows, so `winget`); a desktop with no `apps.runtime` warns, since it will offer no apps at all
@@ -441,14 +491,14 @@ Errors fail the run; warnings don't.
 
 ### Keeping the schema copies current
 
-The vendored schemas are copies, so they can drift as the platform schemas evolve. `sync-schema` re-vendors both (blueprints and apps) from a local platform checkout, which defaults to a `../hexos-platform` sibling; override with `HEXOS_PLATFORM`:
+The vendored schemas are copies, so they can drift as the platform schemas evolve. `sync-schema` re-vendors all of them (blueprints, apps, test specs, and the surface grammar with its parser) from a local platform checkout, which defaults to a `../hexos-platform` sibling; override with `HEXOS_PLATFORM`:
 
 ```bash
 cd _lib
 bun run sync-schema
 ```
 
-When the backend adds a new provisioning template, also update the allowlists in [`_lib/contract.ts`](_lib/contract.ts).
+When the backend adds a new provisioning template or first-boot profile, also update the allowlists in [`_lib/contract.ts`](_lib/contract.ts).
 
 ## Checking for new versions
 
@@ -493,7 +543,7 @@ bun run generate-tests -- --force   # regenerate the derivable fields everywhere
 | 🔴 broken | no usable installed system — the candidate for parking |
 | ⚪ untested | no result, or the result predates a functional change to the blueprint |
 
-A result records a digest of the blueprint's *functional* fields (`provisioning`, `guest`, `resources`, `requiredCapabilities`, `truenasVersion`, `cpuFeatures`), so bumping a version or changing a template marks it ⚪ until the sweep is re-run, while copy edits never expire a result. The rule for bumping a pinned version: open the PR, run the sweep against the PR branch, and merge once the blueprint reads 🟢 or 🟡 on every box for the *new* document — the old pinned version stays in place until then. Red never parks a blueprint by itself: parking is a change to `internal` in a reviewed PR.
+A result records a digest of the blueprint's *functional* fields (`provisioning`, `guest`, `resources`, `requiredCapabilities`, `truenasVersion`, `cpuFeatures`, and the surface declarations `hooksSchema`, `hooks`, `widgetsSchema`, `widgets`), so bumping a version or changing a template marks it ⚪ until the sweep is re-run, while copy edits never expire a result. The rule for bumping a pinned version: open the PR, run the sweep against the PR branch, and merge once the blueprint reads 🟢 or 🟡 on every box for the *new* document — the old pinned version stays in place until then. Red never parks a blueprint by itself: parking is a change to `internal` in a reviewed PR.
 
 ## Contributing
 

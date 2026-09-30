@@ -1,0 +1,14 @@
+{
+    "blueprintId": "plex-server",
+    "strategy": "image",
+    "options": {
+        "username": false,
+        "password": false,
+        "userIso": false
+    },
+    "checks": {
+        "guestRead": false,
+        "reboot": false,
+        "seed": null
+    }
+}
