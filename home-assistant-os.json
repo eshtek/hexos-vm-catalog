@@ -25,7 +25,7 @@
         "recMemoryMb": 4096,
         "minVcpus": 1,
         "recVcpus": 2,
-        "diskGb": 32
+        "diskGb": 40
     },
     "guest": {
         "firmware": "UEFI",
