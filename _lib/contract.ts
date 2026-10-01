@@ -427,6 +427,14 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
         `firstBoot.mediaShare is honoured only by a profile that mounts media (${[...MEDIA_PROFILES].join(", ")}); the "${p.firstBoot.profile}" profile ignores it and the install would fail`,
       );
     }
+    // The install creates the SMB account the guest reads the folders as, under the name the
+    // blueprint gives it (the schema checks its shape). Without one the platform falls back on a
+    // generic name, so every media appliance would share it.
+    if (p.firstBoot.mediaShare === true && !p.firstBoot.mediaAccount) {
+      errors.push(
+        "firstBoot.mediaShare needs firstBoot.mediaAccount: the name of the SMB account the install creates for the VM (lowercase letters and digits, e.g. \"plexvm\")",
+      );
+    }
     const declared = new Set(bp.requiredCapabilities ?? []);
     for (const [needed, why] of [
       ...(PROFILE_CAPABILITIES[p.firstBoot.profile] ?? []).map((capability) => [capability, `the "${p.firstBoot?.profile}" profile`] as const),

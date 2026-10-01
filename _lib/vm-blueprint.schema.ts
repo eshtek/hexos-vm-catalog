@@ -134,6 +134,14 @@ export const vmExtraMediaSchema = z.object({
     ...checksumFieldsSchema,
 });
 
+/**
+ * The base name of a media-mounting appliance's SMB account, as its blueprint
+ * declares it: lowercase letters and digits, starting with a letter, short
+ * enough for TrueNAS's 32-character user names once the install appends a
+ * digit for a second VM (`plexvm`, then `plexvm2`…).
+ */
+export const VM_MEDIA_ACCOUNT_NAME_PATTERN = /^[a-z][a-z0-9]{1,30}$/;
+
 const provisioningImageSchema = z.object({
     strategy: z.literal('image'),
     source: vmImageSourceSchema,
@@ -149,12 +157,19 @@ const provisioningImageSchema = z.object({
             profile: z.string().min(1).max(64),
             /**
              * The profile mounts the default HexOS media folders in the guest,
-             * read-only, using the credentials the installer
-             * collects (`mediaUsername`, `mediaPassword` in the
-             * install options). The values are rendered by the backend's own
+             * read-only, as an SMB account the install creates for that VM
+             * with Read on those shares. The installer asks for no
+             * credentials. The values are rendered by the backend's own
              * profile; the catalog still supplies no guest-executed content.
              */
             mediaShare: z.boolean().optional(),
+            /**
+             * The name of that account, for a blueprint that mounts media:
+             * the first VM gets it as is, a second one the name with `2`, up
+             * to `9`. The catalog requires it of every `mediaShare`
+             * blueprint; a document without it gets the generic `vmmedia`.
+             */
+            mediaAccount: z.string().regex(VM_MEDIA_ACCOUNT_NAME_PATTERN).optional(),
         })
         .optional(),
 });
@@ -757,6 +772,15 @@ export const HEXOS_VM_CAPABILITIES = [
      * blueprint declares the capability rather than risk that.
      */
     'firstBootDefaultMedia',
+    /**
+     * A first-boot profile that mounts media reads it as an SMB account the
+     * install creates for the VM, granted Read on the shares it mounts and
+     * deleted with the VM; the install asks for no credential pair and refuses
+     * one. A box with `firstBootDefaultMedia` and not this still requires the
+     * pair, which the deck no longer collects, so it would refuse every such
+     * install: a blueprint that mounts media declares this as well.
+     */
+    'firstBootMediaAccount',
 ] as const;
 
 /**
