@@ -159,6 +159,10 @@ export const VM_SHARE_LOCATIONS = [
     'Downloads',
 ] as const;
 export type VMShareLocation = (typeof VM_SHARE_LOCATIONS)[number];
+/** What a share account may do on the shares a blueprint lists (`firstBoot.shareAccess`). */
+export const VM_SHARE_ACCESS = ['read', 'write'] as const;
+export type VMShareAccess = (typeof VM_SHARE_ACCESS)[number];
+
 /** What `firstBoot.mediaShare: true` stands for: the default media folders, the list's first six, in this order. */
 export const VM_DEFAULT_MEDIA_LOCATIONS: readonly VMShareLocation[] = VM_SHARE_LOCATIONS.slice(0, 6);
 
@@ -203,6 +207,14 @@ const provisioningImageSchema = z.object({
              * the generic `vmshare`.
              */
             shareAccount: z.string().regex(VM_SHARE_ACCOUNT_NAME_PATTERN).optional(),
+            /**
+             * What that account may do on the listed shares. `read` (the
+             * default): a Read share entry and a read-only mount. `write`:
+             * a Change share entry (read, write and delete, never ownership
+             * or the ACL) and a read-write mount, so the guest can change
+             * and delete the user's files in those folders.
+             */
+            shareAccess: z.enum(VM_SHARE_ACCESS).optional(),
         })
         .optional(),
 });
@@ -589,6 +601,11 @@ export function blueprintShareLocations(provisioning: VMProvisioningDoc): VMShar
     return mediaShare === true ? [...VM_DEFAULT_MEDIA_LOCATIONS] : [];
 }
 
+/** What the blueprint's share account may do on its shares: `firstBoot.shareAccess`, read unless it says write. */
+export function blueprintShareAccess(provisioning: VMProvisioningDoc): VMShareAccess {
+    return provisioning.strategy === 'image' && provisioning.firstBoot?.shareAccess === 'write' ? 'write' : 'read';
+}
+
 /** Answer-file (Windows) blueprints additionally need the user-supplied installer ISO. */
 export const blueprintNeedsWindowsSetup = (provisioning: VMProvisioningDoc): boolean =>
     provisioning.strategy === 'answer-file';
@@ -816,7 +833,8 @@ export const HEXOS_VM_CAPABILITIES = [
     /**
      * A first-boot profile mounts the HexOS locations the blueprint lists in
      * `firstBoot.shares`, as an SMB account the install creates for the VM,
-     * granted Read on those shares and deleted with the VM; the install asks
+     * granted Read on those shares (or Change, with `firstBoot.shareAccess:
+     * "write"`) and deleted with the VM; the install asks
      * for no credential pair and refuses one. A box with
      * `firstBootDefaultMedia` and not this ignores `shares` and still
      * requires the pair, which the deck no longer collects, so it would
