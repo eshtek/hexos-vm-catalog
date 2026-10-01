@@ -24,7 +24,7 @@
         "firstBoot": {
             "profile": "plex-appliance",
             "mediaShare": true,
-            "mediaAccount": "plexvm"
+            "shareAccount": "plexvm"
         }
     },
     "resources": {

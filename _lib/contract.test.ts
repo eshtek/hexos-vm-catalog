@@ -78,18 +78,18 @@ describe("a profile's own capability", () => {
     expect(errors.some((e) => e.includes("mounts media"))).toBe(true);
   });
 
-  test("a mediaShare first boot must name its media account", () => {
+  test("a mediaShare first boot must name its share account", () => {
     const plex = {
       ...base,
       requiredCapabilities: ["firstBoot", "plexAppliance", "firstBootDefaultMedia"],
       provisioning: { ...base.provisioning, strategy: "image", firstBoot: { profile: "plex-appliance", mediaShare: true } },
     } as unknown as VMBlueprint;
-    expect(checkContract(plex, "plex-server.json").errors.some((e) => e.includes("needs firstBoot.mediaAccount"))).toBe(true);
+    expect(checkContract(plex, "plex-server.json").errors.some((e) => e.includes("needs firstBoot.shareAccount"))).toBe(true);
     const named = {
       ...plex,
-      provisioning: { ...plex.provisioning, firstBoot: { profile: "plex-appliance", mediaShare: true, mediaAccount: "plexvm" } },
+      provisioning: { ...plex.provisioning, firstBoot: { profile: "plex-appliance", mediaShare: true, shareAccount: "plexvm" } },
     } as unknown as VMBlueprint;
-    expect(checkContract(named, "plex-server.json").errors.filter((e) => e.includes("mediaAccount"))).toEqual([]);
+    expect(checkContract(named, "plex-server.json").errors.filter((e) => e.includes("shareAccount"))).toEqual([]);
   });
 
   test("the Plex profile must declare plexAppliance, and a mediaShare first boot must declare firstBootDefaultMedia", () => {
