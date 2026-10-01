@@ -243,14 +243,20 @@ image and a `readiness` probe that can see the appliance's own UI (e.g. mDNS +
 port). A blueprint may instead name a first-boot profile the backend ships
 (`firstBoot.profile`, one of the names in `_lib/contract.ts`), which the backend
 injects on the first boot the way the installer seeds are: the Plex appliance
-names `plex-appliance` and sets `firstBoot.mediaShare: true`, so the guest
-mounts the default HexOS media folders read-only as an SMB account the install
-creates for that VM, with Read on those shares and deleted with the VM. The
+names `plex-appliance` and lists the HexOS locations it mounts in
+`firstBoot.shares` (`["Media", "Movies", "Shows", "Music", "Photos", "Videos"]`).
+A list may name the user's own folders only (`VM_SHARE_LOCATIONS` in the
+vendored schema: those six plus `Documents` and `Downloads`), each once, and
+each mounts read-only at `/mnt/<id in lowercase>` in the guest. The guest reads
+them as an SMB account the install creates for that VM, with Read on those
+shares and deleted with the VM; the installer asks for no credentials. The
 blueprint names that account in `firstBoot.shareAccount` (`plexvm` for Plex;
 lowercase letters and digits), and a second VM of the same blueprint gets the
-name with `2`, up to `9`. The contract requires the name of every `mediaShare`
-blueprint. The profile's content lives in the platform; the catalog only names
-it.
+name with `2`, up to `9`. The contract requires the name and the capability
+`firstBootShareAccount` of every blueprint that lists shares, refuses shares on
+a profile that mounts none, and refuses the old `firstBoot.mediaShare` flag the
+list replaced. The profile's content lives in the platform; the catalog only
+names it.
 
 #### `cloud-init` — vendor image, configured on first boot
 

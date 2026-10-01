@@ -97,13 +97,14 @@ export const KNOWN_VM_CAPABILITIES = new Set([
   "additionalMedia",
   "plexAppliance",
   "firstBootDefaultMedia",
+  "firstBootShareAccount",
   "vmHooks",
 ]);
 
 /** The capability a first-boot profile stands on, where the profile is not part of every first-boot backend. */
 const PROFILE_CAPABILITIES: Record<string, readonly string[]> = { "plex-appliance": ["plexAppliance"] };
-/** The profiles that mount a media share from the install's inputs (the platform's own list); any other profile given `mediaShare` ignores it and the install fails. */
-const MEDIA_PROFILES: ReadonlySet<string> = new Set(["plex-appliance"]);
+/** The profiles that mount shares (the platform's own list); the platform refuses shares on any other profile. */
+const SHARE_PROFILES: ReadonlySet<string> = new Set(["plex-appliance"]);
 
 // Passthrough class vocabulary, enforced here for the same reason as
 // KNOWN_CATEGORIES: the schema leaves `guest.passthrough` an open slug array so
@@ -422,9 +423,15 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
   // be declared as a capability too, or an older backend installs the guest
   // unconfigured while the document says it is configured.
   if (p.strategy === "image" && p.firstBoot) {
-    if (p.firstBoot.mediaShare === true && !MEDIA_PROFILES.has(p.firstBoot.profile)) {
+    // The list of HexOS locations replaced the flag that always meant the six media folders.
+    if (p.firstBoot.mediaShare !== undefined) {
       errors.push(
-        `firstBoot.mediaShare is honoured only by a profile that mounts media (${[...MEDIA_PROFILES].join(", ")}); the "${p.firstBoot.profile}" profile ignores it and the install would fail`,
+        'firstBoot.mediaShare is superseded: list the HexOS locations the guest mounts in firstBoot.shares (the six media folders are ["Media", "Movies", "Shows", "Music", "Photos", "Videos"])',
+      );
+    }
+    if (blueprintShareLocations(p).length > 0 && !SHARE_PROFILES.has(p.firstBoot.profile)) {
+      errors.push(
+        `firstBoot.shares is honoured only by a profile that mounts shares (${[...SHARE_PROFILES].join(", ")}); the platform refuses the "${p.firstBoot.profile}" profile with shares`,
       );
     }
     // The install creates the SMB account the guest reads the folders as, under the name the
@@ -436,12 +443,25 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
       );
     }
     const declared = new Set(bp.requiredCapabilities ?? []);
-    for (const [needed, why] of [
-      ...(PROFILE_CAPABILITIES[p.firstBoot.profile] ?? []).map((capability) => [capability, `the "${p.firstBoot?.profile}" profile`] as const),
-      ...(p.firstBoot.mediaShare === true ? [["firstBootDefaultMedia", "firstBoot.mediaShare"] as const] : []),
+    const unconfigured = "a backend without it would install this blueprint silently unconfigured";
+    for (const [needed, why, consequence] of [
+      ...(PROFILE_CAPABILITIES[p.firstBoot.profile] ?? []).map(
+        (capability) => [capability, `the "${p.firstBoot?.profile}" profile`, unconfigured] as const,
+      ),
+      // The platform that reads firstBoot.shares is the one that creates the share account; an older
+      // one drops the list and still asks for a credential pair the deck no longer sends.
+      ...(blueprintShareLocations(p).length > 0
+        ? [
+            [
+              "firstBootShareAccount",
+              "firstBoot.shares",
+              "a backend without it ignores the list and demands a credential pair the deck no longer sends, so it refuses every install",
+            ] as const,
+          ]
+        : []),
     ]) {
       if (!declared.has(needed)) {
-        errors.push(`${why} needs requiredCapabilities to declare "${needed}" — a backend without it would install this blueprint silently unconfigured`);
+        errors.push(`${why} needs requiredCapabilities to declare "${needed}": ${consequence}`);
       }
     }
   }
