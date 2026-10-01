@@ -442,6 +442,10 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
         "a first boot that mounts shares needs firstBoot.shareAccount: the name of the SMB account the install creates for the VM (lowercase letters and digits, e.g. \"plexvm\")",
       );
     }
+    // The access is what the account gets on the listed shares, so without a list it grants nothing.
+    if (p.firstBoot.shareAccess !== undefined && blueprintShareLocations(p).length === 0) {
+      errors.push("firstBoot.shareAccess applies to the shares the first boot mounts: list them in firstBoot.shares, or drop it");
+    }
     const declared = new Set(bp.requiredCapabilities ?? []);
     const unconfigured = "a backend without it would install this blueprint silently unconfigured";
     for (const [needed, why, consequence] of [

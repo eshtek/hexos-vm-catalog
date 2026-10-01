@@ -102,6 +102,13 @@ describe("a profile's own capability", () => {
     expect(checkContract(named, "plex-server.json").errors).toEqual([]);
   });
 
+  test("shareAccess needs a share list, and write passes with one", () => {
+    const listless = plexWith({ shareAccount: "plexvm", shareAccess: "write" }, ALL);
+    expect(checkContract(listless, "plex-server.json").errors.some((e) => e.includes("firstBoot.shareAccess"))).toBe(true);
+    const writer = plexWith({ shares: ["Downloads"], shareAccount: "plexvm", shareAccess: "write" }, ALL);
+    expect(checkContract(writer, "plex-server.json").errors).toEqual([]);
+  });
+
   test("the Plex profile must declare plexAppliance, and a shares first boot must declare firstBootShareAccount", () => {
     const bare = plexWith({ shares: MEDIA, shareAccount: "plexvm" }, ["firstBoot"]);
     const { errors } = checkContract(bare, "plex-server.json");
