@@ -10,7 +10,7 @@
 //   - answer-file:   hexos-platform  packages/backend/src/lib/autounattend.ts    (ANSWER_FILE_TEMPLATES)
 //   - installer-iso: hexos-platform  packages/backend/src/lib/installerSeed.ts   (INSTALLER_SEED_TEMPLATES)
 
-import { sourceDigests, type VMBlueprint } from "./vm-blueprint.schema";
+import { blueprintShareLocations, sourceDigests, type VMBlueprint } from "./vm-blueprint.schema";
 import type { VMApp } from "./vm-app.schema";
 import { parseVMHooks, parseVMWidgets } from "./vm-surfaces";
 
@@ -425,6 +425,14 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
     if (p.firstBoot.mediaShare === true && !MEDIA_PROFILES.has(p.firstBoot.profile)) {
       errors.push(
         `firstBoot.mediaShare is honoured only by a profile that mounts media (${[...MEDIA_PROFILES].join(", ")}); the "${p.firstBoot.profile}" profile ignores it and the install would fail`,
+      );
+    }
+    // The install creates the SMB account the guest reads the folders as, under the name the
+    // blueprint gives it (the schema checks its shape). Without one the platform falls back on a
+    // generic name, so every share-mounting appliance would share it.
+    if (blueprintShareLocations(p).length > 0 && !p.firstBoot.shareAccount) {
+      errors.push(
+        "a first boot that mounts shares needs firstBoot.shareAccount: the name of the SMB account the install creates for the VM (lowercase letters and digits, e.g. \"plexvm\")",
       );
     }
     const declared = new Set(bp.requiredCapabilities ?? []);

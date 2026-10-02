@@ -243,10 +243,14 @@ image and a `readiness` probe that can see the appliance's own UI (e.g. mDNS +
 port). A blueprint may instead name a first-boot profile the backend ships
 (`firstBoot.profile`, one of the names in `_lib/contract.ts`), which the backend
 injects on the first boot the way the installer seeds are: the Plex appliance
-names `plex-appliance` and sets `firstBoot.mediaShare: true`, which makes the
-install ask for an SMB username and password so the guest can mount the default
-HexOS media folders read-only. The profile's content lives in the platform; the
-catalog only names it.
+names `plex-appliance` and sets `firstBoot.mediaShare: true`, so the guest
+mounts the default HexOS media folders read-only as an SMB account the install
+creates for that VM, with Read on those shares and deleted with the VM. The
+blueprint names that account in `firstBoot.shareAccount` (`plexvm` for Plex;
+lowercase letters and digits), and a second VM of the same blueprint gets the
+name with `2`, up to `9`. The contract requires the name of every `mediaShare`
+blueprint. The profile's content lives in the platform; the catalog only names
+it.
 
 #### `cloud-init` — vendor image, configured on first boot
 

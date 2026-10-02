@@ -134,6 +134,38 @@ export const vmExtraMediaSchema = z.object({
     ...checksumFieldsSchema,
 });
 
+/**
+ * The base name of a share-mounting appliance's SMB account, as its blueprint
+ * declares it: lowercase letters and digits, starting with a letter, short
+ * enough for TrueNAS's 32-character user names once the install appends a
+ * digit for a second VM (`plexvm`, then `plexvm2`…).
+ */
+export const VM_SHARE_ACCOUNT_NAME_PATTERN = /^[a-z][a-z0-9]{1,30}$/;
+
+/**
+ * The HexOS locations (`LocationPreferenceId` values) a VM may mount from the
+ * NAS: the user's own folders. The system locations (applications, VM disks,
+ * install media) are never handed to a guest. Each one mounts at
+ * `/mnt/<id in lowercase>` in the guest, read-only.
+ */
+export const VM_SHARE_LOCATIONS = [
+    'Media',
+    'Movies',
+    'Shows',
+    'Music',
+    'Photos',
+    'Videos',
+    'Documents',
+    'Downloads',
+] as const;
+export type VMShareLocation = (typeof VM_SHARE_LOCATIONS)[number];
+/** What a share account may do on the shares a blueprint lists (`firstBoot.shareAccess`). */
+export const VM_SHARE_ACCESS = ['read', 'write'] as const;
+export type VMShareAccess = (typeof VM_SHARE_ACCESS)[number];
+
+/** What `firstBoot.mediaShare: true` stands for: the default media folders, the list's first six, in this order. */
+export const VM_DEFAULT_MEDIA_LOCATIONS: readonly VMShareLocation[] = VM_SHARE_LOCATIONS.slice(0, 6);
+
 const provisioningImageSchema = z.object({
     strategy: z.literal('image'),
     source: vmImageSourceSchema,
@@ -148,13 +180,41 @@ const provisioningImageSchema = z.object({
         .object({
             profile: z.string().min(1).max(64),
             /**
-             * The profile mounts the default HexOS media folders in the guest,
-             * read-only, using the credentials the installer
-             * collects (`mediaUsername`, `mediaPassword` in the
-             * install options). The values are rendered by the backend's own
-             * profile; the catalog still supplies no guest-executed content.
+             * The HexOS locations the profile mounts in the guest, read-only,
+             * as an SMB account the install creates for that VM with Read on
+             * their shares (`VM_SHARE_LOCATIONS`, each once). The installer
+             * asks for no credentials. The mounts are rendered by the
+             * backend's own profile; the catalog still supplies no
+             * guest-executed content.
+             */
+            shares: z
+                .array(z.enum(VM_SHARE_LOCATIONS))
+                .min(1)
+                .refine((locations) => new Set(locations).size === locations.length, {
+                    message: 'each location once',
+                })
+                .optional(),
+            /**
+             * Superseded by `shares`, kept for documents written before it:
+             * `true` mounts the default media folders
+             * (`VM_DEFAULT_MEDIA_LOCATIONS`). Ignored when `shares` is set.
              */
             mediaShare: z.boolean().optional(),
+            /**
+             * The name of that account: the first VM gets it as is, a second
+             * one the name with `2`, up to `9`. The catalog requires it of
+             * every blueprint that mounts shares; a document without it gets
+             * the generic `vmshare`.
+             */
+            shareAccount: z.string().regex(VM_SHARE_ACCOUNT_NAME_PATTERN).optional(),
+            /**
+             * What that account may do on the listed shares. `read` (the
+             * default): a Read share entry and a read-only mount. `write`:
+             * a Change share entry (read, write and delete, never ownership
+             * or the ACL) and a read-write mount, so the guest can change
+             * and delete the user's files in those folders.
+             */
+            shareAccess: z.enum(VM_SHARE_ACCESS).optional(),
         })
         .optional(),
 });
@@ -529,9 +589,22 @@ export const blueprintNeedsUsername = (provisioning: VMProvisioningDoc): boolean
 export const blueprintRequiresPassword = (provisioning: VMProvisioningDoc): boolean =>
     provisioning.strategy === 'installer-iso' || provisioning.strategy === 'installer-image';
 
-/** Whether the blueprint mounts the default HexOS folders at first boot, so the install asks for the shared SMB credential pair. */
-export const blueprintNeedsMediaShare = (provisioning: VMProvisioningDoc): boolean =>
-    provisioning.strategy === 'image' && provisioning.firstBoot?.mediaShare === true;
+/**
+ * The HexOS locations the blueprint mounts at first boot, in its order:
+ * `firstBoot.shares`, or the default media folders for a document that only
+ * says `mediaShare: true`. Empty for a blueprint that mounts nothing.
+ */
+export function blueprintShareLocations(provisioning: VMProvisioningDoc): VMShareLocation[] {
+    if (provisioning.strategy !== 'image' || !provisioning.firstBoot) return [];
+    const { shares, mediaShare } = provisioning.firstBoot;
+    if (shares) return [...shares];
+    return mediaShare === true ? [...VM_DEFAULT_MEDIA_LOCATIONS] : [];
+}
+
+/** What the blueprint's share account may do on its shares: `firstBoot.shareAccess`, read unless it says write. */
+export function blueprintShareAccess(provisioning: VMProvisioningDoc): VMShareAccess {
+    return provisioning.strategy === 'image' && provisioning.firstBoot?.shareAccess === 'write' ? 'write' : 'read';
+}
 
 /** Answer-file (Windows) blueprints additionally need the user-supplied installer ISO. */
 export const blueprintNeedsWindowsSetup = (provisioning: VMProvisioningDoc): boolean =>
@@ -757,6 +830,17 @@ export const HEXOS_VM_CAPABILITIES = [
      * blueprint declares the capability rather than risk that.
      */
     'firstBootDefaultMedia',
+    /**
+     * A first-boot profile mounts the HexOS locations the blueprint lists in
+     * `firstBoot.shares`, as an SMB account the install creates for the VM,
+     * granted Read on those shares (or Change, with `firstBoot.shareAccess:
+     * "write"`) and deleted with the VM; the install asks
+     * for no credential pair and refuses one. A box with
+     * `firstBootDefaultMedia` and not this ignores `shares` and still
+     * requires the pair, which the deck no longer collects, so it would
+     * refuse every such install: a blueprint that mounts shares declares this.
+     */
+    'firstBootShareAccount',
 ] as const;
 
 /**
