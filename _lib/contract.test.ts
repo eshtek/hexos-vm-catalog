@@ -68,45 +68,59 @@ describe("checkContract on surface declarations", () => {
 });
 
 describe("a profile's own capability", () => {
-  test("a mediaShare first boot on a profile that mounts no media is refused, whatever the blueprint declares", () => {
+  const MEDIA = ["Media", "Movies", "Shows", "Music", "Photos", "Videos"];
+  const plexWith = (firstBoot: Record<string, unknown>, requiredCapabilities: string[]) =>
+    ({
+      ...base,
+      requiredCapabilities,
+      provisioning: { ...base.provisioning, strategy: "image", firstBoot: { profile: "plex-appliance", ...firstBoot } },
+    }) as unknown as VMBlueprint;
+  const ALL = ["firstBoot", "plexAppliance", "firstBootShareAccount"];
+
+  test("shares on a profile that mounts none are refused, whatever the blueprint declares", () => {
     const openwrt = {
       ...base,
-      requiredCapabilities: ["firstBoot", "firstBootDefaultMedia"],
-      provisioning: { ...base.provisioning, strategy: "image", firstBoot: { profile: "openwrt-lan-dhcp", mediaShare: true } },
+      requiredCapabilities: ["firstBoot", "firstBootShareAccount"],
+      provisioning: {
+        ...base.provisioning,
+        strategy: "image",
+        firstBoot: { profile: "openwrt-lan-dhcp", shares: ["Downloads"], shareAccount: "routervm" },
+      },
     } as unknown as VMBlueprint;
-    const { errors } = checkContract(openwrt, "openwrt.json");
-    expect(errors.some((e) => e.includes("mounts media"))).toBe(true);
+    expect(checkContract(openwrt, "openwrt.json").errors.some((e) => e.includes("mounts shares"))).toBe(true);
   });
 
-  test("a mediaShare first boot must name its share account", () => {
-    const plex = {
-      ...base,
-      requiredCapabilities: ["firstBoot", "plexAppliance", "firstBootDefaultMedia"],
-      provisioning: { ...base.provisioning, strategy: "image", firstBoot: { profile: "plex-appliance", mediaShare: true } },
-    } as unknown as VMBlueprint;
-    expect(checkContract(plex, "plex-server.json").errors.some((e) => e.includes("needs firstBoot.shareAccount"))).toBe(true);
-    const named = {
-      ...plex,
-      provisioning: { ...plex.provisioning, firstBoot: { profile: "plex-appliance", mediaShare: true, shareAccount: "plexvm" } },
-    } as unknown as VMBlueprint;
-    expect(checkContract(named, "plex-server.json").errors.filter((e) => e.includes("shareAccount"))).toEqual([]);
+  test("the mediaShare flag is superseded by the list", () => {
+    const flagged = plexWith({ mediaShare: true, shareAccount: "plexvm" }, ALL);
+    expect(checkContract(flagged, "plex-server.json").errors.some((e) => e.includes("superseded"))).toBe(true);
   });
 
-  test("the Plex profile must declare plexAppliance, and a mediaShare first boot must declare firstBootDefaultMedia", () => {
-    const plex = {
-      ...base,
-      requiredCapabilities: ["firstBoot"],
-      provisioning: { ...base.provisioning, strategy: "image", firstBoot: { profile: "plex-appliance", mediaShare: true } },
-    } as unknown as VMBlueprint;
-    const { errors } = checkContract(plex, "plex-server.json");
+  test("a first boot that mounts shares must name its share account", () => {
+    const unnamed = plexWith({ shares: MEDIA }, ALL);
+    expect(checkContract(unnamed, "plex-server.json").errors.some((e) => e.includes("needs firstBoot.shareAccount"))).toBe(true);
+    const named = plexWith({ shares: MEDIA, shareAccount: "plexvm" }, ALL);
+    expect(checkContract(named, "plex-server.json").errors).toEqual([]);
+  });
+
+  test("shareAccess needs a share list, and write passes with one", () => {
+    const listless = plexWith({ shareAccount: "plexvm", shareAccess: "write" }, ALL);
+    expect(checkContract(listless, "plex-server.json").errors.some((e) => e.includes("firstBoot.shareAccess"))).toBe(true);
+    const writer = plexWith({ shares: ["Downloads"], shareAccount: "plexvm", shareAccess: "write" }, ALL);
+    expect(checkContract(writer, "plex-server.json").errors).toEqual([]);
+  });
+
+  test("the Plex profile must declare plexAppliance, and a shares first boot must declare firstBootShareAccount", () => {
+    const bare = plexWith({ shares: MEDIA, shareAccount: "plexvm" }, ["firstBoot"]);
+    const { errors } = checkContract(bare, "plex-server.json");
     expect(errors.some((e) => e.includes('declare "plexAppliance"'))).toBe(true);
-    expect(errors.some((e) => e.includes('declare "firstBootDefaultMedia"'))).toBe(true);
-    const declared = { ...plex, requiredCapabilities: ["firstBoot", "plexAppliance", "firstBootDefaultMedia"] } as unknown as VMBlueprint;
-    expect(checkContract(declared, "plex-server.json").errors.filter((e) => e.includes("needs requiredCapabilities"))).toEqual([]);
+    expect(errors.some((e) => e.includes('declare "firstBootShareAccount"') && e.includes("credential pair"))).toBe(true);
+    // A box with only the older media capability would offer it and refuse every install.
+    const pairOnly = plexWith({ shares: MEDIA, shareAccount: "plexvm" }, ["firstBoot", "plexAppliance", "firstBootDefaultMedia"]);
+    expect(checkContract(pairOnly, "plex-server.json").errors.filter((e) => e.includes("needs requiredCapabilities"))).toHaveLength(1);
     // The capability the box reports at runtime while its setup-hooks gate is open is declarable; the unimplemented user-hooks one is not.
-    const gated = { ...declared, requiredCapabilities: ["firstBoot", "plexAppliance", "firstBootDefaultMedia", "vmHooks"] } as unknown as VMBlueprint;
-    expect(checkContract(gated, "plex-server.json").errors.filter((e) => e.toLowerCase().includes("capabilit"))).toEqual([]);
-    const unknown = { ...declared, requiredCapabilities: ["firstBoot", "plexAppliance", "firstBootDefaultMedia", "vmUserHooks"] } as unknown as VMBlueprint;
+    const gated = plexWith({ shares: MEDIA, shareAccount: "plexvm" }, [...ALL, "vmHooks"]);
+    expect(checkContract(gated, "plex-server.json").errors).toEqual([]);
+    const unknown = plexWith({ shares: MEDIA, shareAccount: "plexvm" }, [...ALL, "vmUserHooks"]);
     expect(checkContract(unknown, "plex-server.json").errors.some((e) => e.includes("vmUserHooks"))).toBe(true);
   });
 });

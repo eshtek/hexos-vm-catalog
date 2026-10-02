@@ -9,7 +9,7 @@
     "requiredCapabilities": [
         "firstBoot",
         "plexAppliance",
-        "firstBootDefaultMedia"
+        "firstBootShareAccount"
     ],
     "provisioning": {
         "strategy": "image",
@@ -23,7 +23,7 @@
         },
         "firstBoot": {
             "profile": "plex-appliance",
-            "mediaShare": true,
+            "shares": ["Media", "Movies", "Shows", "Music", "Photos", "Videos"],
             "shareAccount": "plexvm"
         }
     },
