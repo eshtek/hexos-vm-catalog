@@ -18,7 +18,21 @@ schemas=(
   "vm-blueprints.ts:vm-blueprint.schema.ts"
   "vm-apps.ts:vm-app.schema.ts"
   "vm-blueprint-tests.ts:vm-blueprint-tests.schema.ts"
+  # The surface grammar (hooks and widgets): the leaf contracts and the parser
+  # that reads a blueprint's declarations and lints an inlined script. Kept
+  # under their upstream names because vm-surfaces imports ./surface-grammar.
+  "surface-grammar.ts:surface-grammar.ts"
+  "vm-surfaces.ts:vm-surfaces.ts"
 )
+
+# A vendored file may import another file vendored by this same script (the
+# surface parser imports its grammar); anything else platform-local is stray.
+vendored_names=""
+for entry in "${schemas[@]}"; do
+  name="${entry##*:}"
+  name="${name%.ts}"
+  vendored_names="${vendored_names:+$vendored_names|}$name"
+done
 
 for entry in "${schemas[@]}"; do
   src="$platform/packages/shared/eshtek/${entry%%:*}"
@@ -62,7 +76,7 @@ BANNER
   # breaks `bun run validate` (and CI) the moment it lands. Caught here rather
   # than in a confused PR — upstream helpers needing other types belong in a
   # sibling file (see eshtek/vm-blueprint-guest.ts), not in the schema.
-  stray_imports="$(grep -nE "^import .*from '(\.|\.\.)/" "$dest" || true)"
+  stray_imports="$(grep -nE "^(import|\} from|export .* from) .*from '(\.|\.\.)/|^\} from '(\.|\.\.)/" "$dest" | grep -vE "from '\./(${vendored_names})'" || true)"
   if [[ -n "$stray_imports" ]]; then
     echo "" >&2
     echo "error: the vendored schema imports platform-local modules that do not exist here:" >&2

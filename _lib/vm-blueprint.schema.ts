@@ -134,6 +134,38 @@ export const vmExtraMediaSchema = z.object({
     ...checksumFieldsSchema,
 });
 
+/**
+ * The base name of a share-mounting appliance's SMB account, as its blueprint
+ * declares it: lowercase letters and digits, starting with a letter, short
+ * enough for TrueNAS's 32-character user names once the install appends a
+ * digit for a second VM (`plexvm`, then `plexvm2`…).
+ */
+export const VM_SHARE_ACCOUNT_NAME_PATTERN = /^[a-z][a-z0-9]{1,30}$/;
+
+/**
+ * The HexOS locations (`LocationPreferenceId` values) a VM may mount from the
+ * NAS: the user's own folders. The system locations (applications, VM disks,
+ * install media) are never handed to a guest. Each one mounts at
+ * `/mnt/<id in lowercase>` in the guest, read-only.
+ */
+export const VM_SHARE_LOCATIONS = [
+    'Media',
+    'Movies',
+    'Shows',
+    'Music',
+    'Photos',
+    'Videos',
+    'Documents',
+    'Downloads',
+] as const;
+export type VMShareLocation = (typeof VM_SHARE_LOCATIONS)[number];
+/** What a share account may do on the shares a blueprint lists (`firstBoot.shareAccess`). */
+export const VM_SHARE_ACCESS = ['read', 'write'] as const;
+export type VMShareAccess = (typeof VM_SHARE_ACCESS)[number];
+
+/** What `firstBoot.mediaShare: true` stands for: the default media folders, the list's first six, in this order. */
+export const VM_DEFAULT_MEDIA_LOCATIONS: readonly VMShareLocation[] = VM_SHARE_LOCATIONS.slice(0, 6);
+
 const provisioningImageSchema = z.object({
     strategy: z.literal('image'),
     source: vmImageSourceSchema,
@@ -147,9 +179,55 @@ const provisioningImageSchema = z.object({
     firstBoot: z
         .object({
             profile: z.string().min(1).max(64),
+            /**
+             * The HexOS locations the profile mounts in the guest, read-only,
+             * as an SMB account the install creates for that VM with Read on
+             * their shares (`VM_SHARE_LOCATIONS`, each once). The installer
+             * asks for no credentials. The mounts are rendered by the
+             * backend's own profile; the catalog still supplies no
+             * guest-executed content.
+             */
+            shares: z
+                .array(z.enum(VM_SHARE_LOCATIONS))
+                .min(1)
+                .refine((locations) => new Set(locations).size === locations.length, {
+                    message: 'each location once',
+                })
+                .optional(),
+            /**
+             * Superseded by `shares`, kept for documents written before it:
+             * `true` mounts the default media folders
+             * (`VM_DEFAULT_MEDIA_LOCATIONS`). Ignored when `shares` is set.
+             */
+            mediaShare: z.boolean().optional(),
+            /**
+             * The name of that account: the first VM gets it as is, a second
+             * one the name with `2`, up to `9`. The catalog requires it of
+             * every blueprint that mounts shares; a document without it gets
+             * the generic `vmshare`.
+             */
+            shareAccount: z.string().regex(VM_SHARE_ACCOUNT_NAME_PATTERN).optional(),
+            /**
+             * What that account may do on the listed shares. `read` (the
+             * default): a Read share entry and a read-only mount. `write`:
+             * a Change share entry (read, write and delete, never ownership
+             * or the ACL) and a read-write mount, so the guest can change
+             * and delete the user's files in those folders.
+             */
+            shareAccess: z.enum(VM_SHARE_ACCESS).optional(),
         })
         .optional(),
 });
+
+/** An SMB share name as TrueNAS allows it, without the characters a mount unit or a shell would read. */
+export const VM_MEDIA_SHARE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ._-]{0,79}$/;
+/** An SMB account name, the charset TrueNAS's own user names use. */
+export const VM_MEDIA_USERNAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+/**
+ * Printable ASCII with no leading or trailing space: the value lands on a
+ * `password=` line that mount.cifs reads to the end of the line.
+ */
+export const VM_MEDIA_PASSWORD_PATTERN = /^[\x21-\x7e](?:[\x20-\x7e]{0,126}[\x21-\x7e])?$/;
 
 const provisioningCloudInitSchema = z.object({
     strategy: z.literal('cloud-init'),
@@ -413,6 +491,22 @@ export const vmBlueprintSchema = z.object({
     provisioning: vmProvisioningSchema,
     resources: vmBlueprintResourcesSchema,
     guest: vmBlueprintGuestSchema,
+    /**
+     * Surface declarations: setup hooks and dashboard widgets the guest's
+     * blueprint ships (parsed by vm-surfaces.ts), and a reserved key for the
+     * folder-attachment contract that consumer defines. Deliberately loose at
+     * the root: every stored document re-validates on every sync, so a
+     * declaration the catalog authors before the platform understands it
+     * must not validationError-hide the blueprint. Envelope and item rules
+     * (schema version, list shape, caps, per-entry drops) are enforced at
+     * read time by the parsers, which report errors instead of hiding rows;
+     * unknown extensions are inert.
+     */
+    hooksSchema: z.unknown().optional(),
+    hooks: z.unknown().optional(),
+    widgetsSchema: z.unknown().optional(),
+    widgets: z.unknown().optional(),
+    attachments: z.unknown().optional(),
 });
 
 export type VMImageSource = z.infer<typeof vmImageSourceSchema>;
@@ -495,6 +589,23 @@ export const blueprintNeedsUsername = (provisioning: VMProvisioningDoc): boolean
 export const blueprintRequiresPassword = (provisioning: VMProvisioningDoc): boolean =>
     provisioning.strategy === 'installer-iso' || provisioning.strategy === 'installer-image';
 
+/**
+ * The HexOS locations the blueprint mounts at first boot, in its order:
+ * `firstBoot.shares`, or the default media folders for a document that only
+ * says `mediaShare: true`. Empty for a blueprint that mounts nothing.
+ */
+export function blueprintShareLocations(provisioning: VMProvisioningDoc): VMShareLocation[] {
+    if (provisioning.strategy !== 'image' || !provisioning.firstBoot) return [];
+    const { shares, mediaShare } = provisioning.firstBoot;
+    if (shares) return [...shares];
+    return mediaShare === true ? [...VM_DEFAULT_MEDIA_LOCATIONS] : [];
+}
+
+/** What the blueprint's share account may do on its shares: `firstBoot.shareAccess`, read unless it says write. */
+export function blueprintShareAccess(provisioning: VMProvisioningDoc): VMShareAccess {
+    return provisioning.strategy === 'image' && provisioning.firstBoot?.shareAccess === 'write' ? 'write' : 'read';
+}
+
 /** Answer-file (Windows) blueprints additionally need the user-supplied installer ISO. */
 export const blueprintNeedsWindowsSetup = (provisioning: VMProvisioningDoc): boolean =>
     provisioning.strategy === 'answer-file';
@@ -546,6 +657,21 @@ export const blueprintAppRuntime = (blueprint: Pick<VMBlueprint, 'apps'>): 'wing
  */
 export const blueprintSourceVersion = (provisioning: VMProvisioningDoc): string | undefined =>
     'source' in provisioning && 'version' in provisioning.source ? provisioning.source.version : undefined;
+
+/**
+ * The host the pinned image or ISO downloads from ("cloud.debian.org"), for
+ * copy that says where an install comes from; undefined for user-supplied
+ * media (Windows) or an unparsable URL.
+ */
+export const blueprintSourceHost = (provisioning: VMProvisioningDoc): string | undefined => {
+    const url = 'source' in provisioning && 'url' in provisioning.source ? provisioning.source.url : undefined;
+    if (!url) return undefined;
+    try {
+        return new URL(url).hostname;
+    } catch {
+        return undefined;
+    }
+};
 
 /**
  * Completed installs per blueprint over a window — what orders the "Most
@@ -671,6 +797,50 @@ export const HEXOS_VM_CAPABILITIES = [
      * unusable without it — on the CDROM path they boot with no account.
      */
     'virtioSeed',
+    /** vm/create accepts `installation_media_url`: the box downloads the installer ISO into Install Media before first boot, behind a VM_INSTALL task. */
+    'isoDownload',
+    /** vm/create accepts `additional_media`: extra ISOs attached as CDROMs after the install medium. */
+    'additionalMedia',
+    /** VMInfo reports `media`, and vm/:id/update accepts `attachMedia` / `removeMedia`. */
+    'mediaManagement',
+    /**
+     * Device passthrough keeps off the hardware the server runs on (#1756):
+     * vm/devices-available leaves out what the host holds, and every PCI and
+     * USB attach is re-checked fail-closed first. A box without this offers
+     * the boot pool's controller or the NIC carrying its address and attaches
+     * them unchecked, so the deck offers no passthrough until the box reports it.
+     */
+    'passthroughGuard',
+    /**
+     * The `plex-appliance` first-boot profile: a stock Ubuntu cloud image
+     * seeded to install Plex and report ready only once Plex answers, so the
+     * guest is an appliance with no account and no operating system to meet.
+     * A box with `firstBoot` but an older backend has the mechanism and not
+     * this profile, and would fail the install on an unknown profile name,
+     * so the blueprint declares the profile itself rather than the mechanism.
+     */
+    'plexAppliance',
+    /**
+     * A first-boot profile mounts the six default HexOS media folders in the
+     * guest (`firstBoot.mediaShare` on the blueprint): the shares resolved from
+     * the box's locations before the download, the credential pair from the
+     * install, read-only CIFS mounts the appliance's service depends on. A box
+     * without this ignores the install's media options, so the guest would
+     * boot with no folders and its setup would fail at the first library; the
+     * blueprint declares the capability rather than risk that.
+     */
+    'firstBootDefaultMedia',
+    /**
+     * A first-boot profile mounts the HexOS locations the blueprint lists in
+     * `firstBoot.shares`, as an SMB account the install creates for the VM,
+     * granted Read on those shares (or Change, with `firstBoot.shareAccess:
+     * "write"`) and deleted with the VM; the install asks
+     * for no credential pair and refuses one. A box with
+     * `firstBootDefaultMedia` and not this ignores `shares` and still
+     * requires the pair, which the deck no longer collects, so it would
+     * refuse every such install: a blueprint that mounts shares declares this.
+     */
+    'firstBootShareAccount',
 ] as const;
 
 /**
@@ -692,58 +862,195 @@ export function missingVMCapabilities(
 }
 
 /**
- * First-user names that collide with accounts or groups already baked into
- * Linux cloud images. cloud-init cannot create these (e.g. `root` already
- * exists, and Ubuntu ships with root logins disabled), so the machine comes
- * up unreachable. Protective, not exhaustive.
+ * Account and group names already present in the Linux blueprints' images, so
+ * unusable for the first user. A group counts as well as an account: useradd
+ * gives the new user a primary group of the same name and fails when the image
+ * has one (`scanner` on the Ubuntu desktop images). cloud-init then leaves the
+ * machine unreachable, and an installer never finishes.
+ *
+ * The union across every blueprint rather than per blueprint, so a name stays
+ * free of the packages a user may add later (`docker`, `libvirt`, `mysql`).
+ * Generated from the images by packages/dev/scripts/vm-reserved-usernames,
+ * which only ever adds names; rerun it when a blueprint is added or bumped.
+ * Names under RESERVED_LINUX_USERNAME_PREFIXES are left out.
  */
 export const RESERVED_LINUX_USERNAMES = new Set([
-    'root',
-    'daemon',
-    'bin',
-    'sys',
-    'sync',
-    'games',
-    'man',
-    'lp',
-    'mail',
-    'news',
-    'uucp',
-    'proxy',
-    'www-data',
-    'backup',
-    'list',
-    'irc',
-    'gnats',
-    'nobody',
-    'systemd-network',
-    'systemd-resolve',
-    'systemd-timesync',
-    'messagebus',
-    'syslog',
-    '_apt',
-    'tss',
-    'uuidd',
-    'tcpdump',
-    'sshd',
-    'pollinate',
-    'landscape',
-    'fwupd-refresh',
-    'usbmux',
-    'dnsmasq',
-    'polkitd',
-    'dhcpcd',
-    // Baked-in group names — the first user's primary group shares its name,
-    // so these collide at useradd time as well.
+    'abrt',
+    'adbusers',
     'adm',
-    'sudo',
-    'staff',
-    'users',
-    'wheel',
-    'operator',
     'admin',
+    'akmods',
+    'alpm',
+    'apache',
+    'audio',
+    'autologin',
+    'avahi',
+    'avahi-autoipd',
+    'backup',
+    'bin',
+    'bluetooth',
+    'brlapi',
+    'brltty',
+    'cdrom',
+    'cgred',
+    'chrony',
+    'clock',
+    'cockpit-ws',
+    'colord',
+    'cosmic-greeter',
+    'cosmic-initial-setup',
+    'crontab',
+    'cups',
+    'cups-browsed',
+    'cups-pk-helper',
+    'daemon',
+    'dbus',
+    'dhcpcd',
+    'dialout',
+    'dip',
+    'disk',
+    'dnsmasq',
+    'docker',
+    'dockerroot',
+    'empower',
+    'etcd',
+    'fax',
+    'flatpak',
+    'floppy',
+    'ftp',
+    'fwupd-refresh',
+    'gamemode',
+    'games',
+    'gdm',
+    'geoclue',
+    'git',
+    'gluster',
+    'gnats',
+    'gnome-initial-setup',
+    'gnome-remote-desktop',
+    'greeter',
+    'halt',
+    'hplip',
+    'http',
+    'i2c',
+    'input',
+    'irc',
+    'kernoops',
+    'kmem',
+    'kube',
+    'kvm',
+    'landscape',
+    'libvirt',
+    'lightdm',
+    'list',
+    'liveuser',
+    'locate',
+    'lock',
+    'log',
+    'lp',
+    'lpadmin',
+    'lxd',
+    'mail',
+    'malcontent-timer-ext-agent',
+    'malcontent-timerd',
+    'malcontent-webd',
+    'man',
+    'mem',
+    'messagebus',
+    'mysql',
+    'named',
+    'nbd',
+    'netdev',
+    'network',
+    'news',
+    'nfsnobody',
+    'nm-openconnect',
+    'nm-openvpn',
+    'nobody',
+    'nogroup',
+    'nopasswdlogin',
+    'ntp',
+    'nvidia-persistenced',
+    'openvpn',
+    'operator',
+    'optical',
+    'partimag',
+    'passim',
+    'pcscd',
+    'pipewire',
+    'plasma-setup',
+    'plasmalogin',
+    'plocate',
+    'plugdev',
+    'polkitd',
+    'pollinate',
+    'power',
+    'printadmin',
+    'proc',
+    'proxy',
+    'qat',
+    'qemu',
+    'rdma',
+    'realtime',
+    'render',
+    'rfkill',
+    'root',
+    'rpc',
+    'rpcuser',
+    'rtkit',
+    'saned',
+    'sasl',
+    'scanner',
+    'sddm',
+    'seat',
+    'setroubleshoot',
+    'sgx',
+    'shadow',
+    'shutdown',
+    'smmsp',
+    'speech-dispatcher',
+    'src',
+    'ssh_keys',
+    'sshd',
+    'ssl-cert',
+    'sssd',
+    'staff',
+    'storage',
+    'sudo',
+    'sync',
+    'sys',
+    'syslog',
+    'tape',
+    'tcpdump',
+    'trusted',
+    'tss',
+    'tty',
     'ubuntu',
+    'unbound',
+    'usbmux',
+    'usbmuxd',
+    'users',
+    'usershares',
+    'utempter',
+    'utmp',
+    'uucp',
+    'uuidd',
+    'vboxadd',
+    'vboxsf',
+    'video',
+    'voice',
+    'wheel',
+    'whoopsie',
+    'wsdd',
+    'www-data',
 ]);
+
+/** System accounts by convention (`_apt`, `_chrony`, `systemd-oom`), whatever the image. */
+export const RESERVED_LINUX_USERNAME_PREFIXES = ['_', 'systemd-'] as const;
+
+export const isReservedLinuxUsername = (username: string): boolean =>
+    RESERVED_LINUX_USERNAMES.has(username) ||
+    RESERVED_LINUX_USERNAME_PREFIXES.some((prefix) => username.startsWith(prefix));
 
 /** Account names Windows Setup refuses or that collide with built-ins. */
 export const RESERVED_WINDOWS_USERNAMES = new Set([
