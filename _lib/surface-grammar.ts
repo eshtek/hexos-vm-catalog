@@ -207,11 +207,37 @@ export const hookConditionSchema = z
         return z.NEVER;
     });
 
-// ===== Widget sizes (platform-owned S/M/L templates; catalog fills slots) =====
+// ===== App widget layout (platform-owned template; catalog fills slots) =====
 
+// An app widget is the app's card (widgetsSchema 3): up to three slots beside
+// the app's identity, and an image field behind both. A list slot also says
+// how many rows it shows; one row is the featured form (title, bar, caption).
+// An image is never a slot, because the card's artwork is its background.
+export const widgetSlotsSchema = z
+    .array(
+        z.object({
+            type: z.enum(['text', 'stat', 'list', 'progress']),
+            field: z.string().min(1),
+            rows: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+        }),
+    )
+    .min(1)
+    .max(3);
+
+export const widgetBackgroundSchema = z.object({ field: z.string().min(1) });
+
+// ===== VM widget sizes =====
+
+// VM widgets still declare the sizes app widgets had under widgetsSchema 2.
+// Nothing draws a VM widget yet; when something does, it takes the app
+// widget's layout above and this goes.
 const widgetSlotRefSchema = z.object({
-    type: z.enum(['text', 'stat', 'list', 'image']),
+    type: z.enum(['text', 'stat', 'list', 'image', 'progress']),
     field: z.string().min(1),
+});
+
+const widgetCardSlotRefSchema = widgetSlotRefSchema.extend({
+    rows: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
 });
 
 export const widgetSizesSchema = z.object({
@@ -225,6 +251,12 @@ export const widgetSizesSchema = z.object({
         .object({
             media: z.object({ placement: z.enum(['left', 'right', 'both']), field: z.string().min(1) }).optional(),
             slots: z.array(widgetSlotRefSchema).min(1).max(4),
+        })
+        .optional(),
+    card: z
+        .object({
+            background: z.object({ field: z.string().min(1) }).optional(),
+            slots: z.array(widgetCardSlotRefSchema).min(1).max(3),
         })
         .optional(),
 });

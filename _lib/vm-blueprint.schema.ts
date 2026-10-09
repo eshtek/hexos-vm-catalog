@@ -224,9 +224,10 @@ const provisioningImageSchema = z.object({
              * CIFS mounts from the box's VM shim as the share account.
              * `virtiofs`: the box hands each folder straight to the guest,
              * with no network and no password in the path, on a box that
-             * reports `firstBootVirtiofs` and can run it; any other box
-             * ignores the field and mounts over SMB, so a blueprint never
-             * needs to require the capability.
+             * reports `firstBootVirtiofs`, can run it, and has the
+             * `vm-virtiofs` feature open; any other box ignores the field
+             * and mounts over SMB, so a blueprint never needs to require
+             * the capability.
              */
             shareTransport: z.enum(VM_SHARE_TRANSPORTS).optional(),
         })
@@ -866,10 +867,11 @@ export const HEXOS_VM_CAPABILITIES = [
     'virtualDisplay',
     /**
      * A first-boot profile can mount the blueprint's shares over virtiofs
-     * when the blueprint asks (`firstBoot.shareTransport: "virtiofs"`): the
-     * box runs one virtiofsd per folder as the share account and starts the
-     * VM itself. A box without this ignores the field and mounts over SMB,
-     * so blueprints never list it in `requiredCapabilities`.
+     * when the blueprint asks (`firstBoot.shareTransport: "virtiofs"`) and
+     * its `vm-virtiofs` feature is open: the box runs one virtiofsd per
+     * folder as the share account and starts the VM itself. A box without
+     * this, or with the feature closed, mounts over SMB, so blueprints never
+     * list it in `requiredCapabilities`.
      */
     'firstBootVirtiofs',
 ] as const;
