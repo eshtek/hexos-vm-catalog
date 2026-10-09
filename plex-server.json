@@ -14,17 +14,18 @@
     "provisioning": {
         "strategy": "image",
         "source": {
-            "url": "https://cloud-images.ubuntu.com/releases/noble/{version}/ubuntu-24.04-server-cloudimg-amd64.img",
-            "version": "release-20260826",
+            "url": "https://cloud-images.ubuntu.com/releases/resolute/{version}/ubuntu-26.04-server-cloudimg-amd64.img",
+            "version": "release-20260927",
             "format": "qcow2",
             "compression": "none",
-            "sha256": "d0fe84bb5f80853425fa6be28e2c106f30104c3cfe8611933f2e65c9b63f0e30",
-            "releasesUrl": "https://cloud-images.ubuntu.com/releases/noble/"
+            "sha256": "8800651811af9a85465ad1d552add729947bb16488dddb4a9b5305a3d97332b2",
+            "releasesUrl": "https://cloud-images.ubuntu.com/releases/resolute/"
         },
         "firstBoot": {
             "profile": "plex-appliance",
             "shares": ["Media", "Movies", "Shows", "Music", "Photos", "Videos"],
-            "shareAccount": "plexvm"
+            "shareAccount": "plexvm",
+            "shareTransport": "virtiofs"
         }
     },
     "resources": {

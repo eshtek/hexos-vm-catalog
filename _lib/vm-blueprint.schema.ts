@@ -163,6 +163,10 @@ export type VMShareLocation = (typeof VM_SHARE_LOCATIONS)[number];
 export const VM_SHARE_ACCESS = ['read', 'write'] as const;
 export type VMShareAccess = (typeof VM_SHARE_ACCESS)[number];
 
+/** How a first boot's shares reach the guest (`firstBoot.shareTransport`). */
+export const VM_SHARE_TRANSPORTS = ['smb', 'virtiofs'] as const;
+export type VMShareTransport = (typeof VM_SHARE_TRANSPORTS)[number];
+
 /** What `firstBoot.mediaShare: true` stands for: the default media folders, the list's first six, in this order. */
 export const VM_DEFAULT_MEDIA_LOCATIONS: readonly VMShareLocation[] = VM_SHARE_LOCATIONS.slice(0, 6);
 
@@ -215,6 +219,17 @@ const provisioningImageSchema = z.object({
              * and delete the user's files in those folders.
              */
             shareAccess: z.enum(VM_SHARE_ACCESS).optional(),
+            /**
+             * How the guest reaches the listed shares. `smb` (the default):
+             * CIFS mounts from the box's VM shim as the share account.
+             * `virtiofs`: the box hands each folder straight to the guest,
+             * with no network and no password in the path, on a box that
+             * reports `firstBootVirtiofs`, can run it, and has the
+             * `vm-virtiofs` feature open; any other box ignores the field
+             * and mounts over SMB, so a blueprint never needs to require
+             * the capability.
+             */
+            shareTransport: z.enum(VM_SHARE_TRANSPORTS).optional(),
         })
         .optional(),
 });
@@ -606,6 +621,13 @@ export function blueprintShareAccess(provisioning: VMProvisioningDoc): VMShareAc
     return provisioning.strategy === 'image' && provisioning.firstBoot?.shareAccess === 'write' ? 'write' : 'read';
 }
 
+/** How the blueprint asks for its shares to reach the guest: `firstBoot.shareTransport`, SMB unless it says virtiofs. */
+export function blueprintShareTransport(provisioning: VMProvisioningDoc): VMShareTransport {
+    return provisioning.strategy === 'image' && provisioning.firstBoot?.shareTransport === 'virtiofs'
+        ? 'virtiofs'
+        : 'smb';
+}
+
 /** Answer-file (Windows) blueprints additionally need the user-supplied installer ISO. */
 export const blueprintNeedsWindowsSetup = (provisioning: VMProvisioningDoc): boolean =>
     provisioning.strategy === 'answer-file';
@@ -841,6 +863,17 @@ export const HEXOS_VM_CAPABILITIES = [
      * refuse every such install: a blueprint that mounts shares declares this.
      */
     'firstBootShareAccount',
+    /** VMInfo reports `virtualDisplay`, and vm/:id/update accepts `virtualDisplay`. */
+    'virtualDisplay',
+    /**
+     * A first-boot profile can mount the blueprint's shares over virtiofs
+     * when the blueprint asks (`firstBoot.shareTransport: "virtiofs"`) and
+     * its `vm-virtiofs` feature is open: the box runs one virtiofsd per
+     * folder as the share account and starts the VM itself. A box without
+     * this, or with the feature closed, mounts over SMB, so blueprints never
+     * list it in `requiredCapabilities`.
+     */
+    'firstBootVirtiofs',
 ] as const;
 
 /**
