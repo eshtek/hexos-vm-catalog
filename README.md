@@ -261,6 +261,15 @@ a profile that mounts none, refuses `shareAccess` without a list, and refuses
 the old `firstBoot.mediaShare` flag the list replaced. The profile's content lives in the platform; the catalog only
 names it.
 
+`firstBoot.shareTransport: "virtiofs"` asks for the same folders over virtiofs
+instead: the box shares each folder straight into the guest (one `virtiofsd`
+per folder, running as that same account), with no network and no password in
+the path, and starts the VM itself. A box that can't (an older platform, or a
+TrueNAS train it hasn't been proven on) ignores the field and mounts over SMB,
+so the blueprint doesn't require a capability for it. The contract refuses the
+field without a share list, and `virtiofs` on a profile that can't take it
+(only `plex-appliance` can).
+
 #### `cloud-init` — vendor image, configured on first boot
 
 1. Allocate the zvol, download, verify and write the image (as for `image`).
@@ -417,7 +426,7 @@ Scripts live in the blueprint's own folder, beside its screenshots ([`home-assis
 
 Two rules for authors. A setup hook must never write to a guest it did not install, and must tolerate a guest the user has already set up by hand: confirm state, record what the guest actually establishes (a status page that is not served is "unknown", never proof of anything), and leave account creation to the user (or to a migration that carries that intent). And never put a credential into a checkpoint message or a log line; `ctx.secrets` keeps what a hook collects, bound to the VM instance and removed with it. The platform snapshots a blueprint's declarations at install and runs from that snapshot, including on a rerun; there is no action today that adopts a later catalog edit, so a fix to a shipped hook reaches new installs only.
 
-The Plex appliance mounts the configured HexOS Media, Movies, Shows, Music, Photos and Videos folders read-only using the installation's SMB account. The hook matches the Plex app: Movies (`/mnt/movies`), TV Shows (`/mnt/shows`), Music (`/mnt/music`), Photos (`/mnt/photos`) and Videos (`/mnt/videos`), with the same agents, scanners and languages. Media is mounted at `/mnt/media` for manual use; it is not an extra library. Before creating libraries the hook disables automatic trash emptying, reuses each existing library by its exact location, and then requests a scan of all five. Existing libraries are never deleted or repointed. Signing in claims the server on the account (only a server whose own identity says it is unclaimed), names it (the answered name, or the VM's own name when the answer is left blank), keeps the server's access token for the platform, and writes the server preferences the hook declares, each read back after the write. A successful section listing does not establish that Plex's agents have finished starting: library creation retries only Plex's explicit HTTP 400 startup refusal, up to eight attempts five seconds apart, checking for an existing library before each attempt. Other refusals and transport exceptions stop setup; an accepted creation is verified by listing the sections again.
+The Plex appliance mounts the configured HexOS Media, Movies, Shows, Music, Photos and Videos folders read-only, over virtiofs where the box supports it and otherwise over SMB, as the installation's share account. The hook matches the Plex app: Movies (`/mnt/movies`), TV Shows (`/mnt/shows`), Music (`/mnt/music`), Photos (`/mnt/photos`) and Videos (`/mnt/videos`), with the same agents, scanners and languages. Media is mounted at `/mnt/media` for manual use; it is not an extra library. Before creating libraries the hook disables automatic trash emptying, reuses each existing library by its exact location, and then requests a scan of all five. Existing libraries are never deleted or repointed. Signing in claims the server on the account (only a server whose own identity says it is unclaimed), names it (the answered name, or the VM's own name when the answer is left blank), keeps the server's access token for the platform, and writes the server preferences the hook declares, each read back after the write. A successful section listing does not establish that Plex's agents have finished starting: library creation retries only Plex's explicit HTTP 400 startup refusal, up to eight attempts five seconds apart, checking for an existing library before each attempt. Other refusals and transport exceptions stop setup; an accepted creation is verified by listing the sections again.
 
 ### Screenshots
 

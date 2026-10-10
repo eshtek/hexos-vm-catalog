@@ -105,6 +105,10 @@ export const KNOWN_VM_CAPABILITIES = new Set([
 const PROFILE_CAPABILITIES: Record<string, readonly string[]> = { "plex-appliance": ["plexAppliance"] };
 /** The profiles that mount shares (the platform's own list); the platform refuses shares on any other profile. */
 const SHARE_PROFILES: ReadonlySet<string> = new Set(["plex-appliance"]);
+/** The profiles that can take their shares over virtiofs (the platform's own list); any other falls back to SMB. */
+const VIRTIOFS_PROFILES: ReadonlySet<string> = new Set(["plex-appliance"]);
+/** The most folders the platform hands one VM over virtiofs (its VIRTIOFS_MAX_SHARES); more fall back to SMB. */
+const VIRTIOFS_MAX_SHARES = 7;
 
 // Passthrough class vocabulary, enforced here for the same reason as
 // KNOWN_CATEGORIES: the schema leaves `guest.passthrough` an open slug array so
@@ -440,6 +444,21 @@ export function checkContract(bp: VMBlueprint, filename: string): ContractResult
     if (blueprintShareLocations(p).length > 0 && !p.firstBoot.shareAccount) {
       errors.push(
         "a first boot that mounts shares needs firstBoot.shareAccount: the name of the SMB account the install creates for the VM (lowercase letters and digits, e.g. \"plexvm\")",
+      );
+    }
+    // The transport is how the listed shares reach the guest, so without a list it carries nothing; a
+    // profile the platform cannot hand virtiofs folders to would quietly mount over SMB instead.
+    if (p.firstBoot.shareTransport !== undefined && blueprintShareLocations(p).length === 0) {
+      errors.push("firstBoot.shareTransport applies to the shares the first boot mounts: list them in firstBoot.shares, or drop it");
+    }
+    if (p.firstBoot.shareTransport === "virtiofs" && !VIRTIOFS_PROFILES.has(p.firstBoot.profile)) {
+      errors.push(
+        `firstBoot.shareTransport "virtiofs" is honored only by ${[...VIRTIOFS_PROFILES].join(", ")}; the "${p.firstBoot.profile}" profile would mount over SMB`,
+      );
+    }
+    if (p.firstBoot.shareTransport === "virtiofs" && blueprintShareLocations(p).length > VIRTIOFS_MAX_SHARES) {
+      errors.push(
+        `firstBoot.shareTransport "virtiofs" takes at most ${VIRTIOFS_MAX_SHARES} shares (one QEMU device each); with more the platform mounts over SMB`,
       );
     }
     // The access is what the account gets on the listed shares, so without a list it grants nothing.

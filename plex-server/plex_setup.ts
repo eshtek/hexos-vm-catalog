@@ -71,10 +71,10 @@ const CHECKPOINT_PACE_MS = 2000;
 /** Plex's preference that removes library items whose files went missing at the next scan; off, so an absent share loses nothing. */
 const TRASH_PREFERENCE = "autoEmptyTrash";
 /**
- * What the app's own hook writes after a claim, and the scan schedule a
- * network mount needs. Plex cannot watch a CIFS mount for changes (its
- * automatic update rests on filesystem notifications the mount never
- * delivers), so it scans on a schedule: every library once an hour, which
+ * What the app's own hook writes after a claim, and the scan schedule the
+ * folders need. Plex cannot watch a CIFS or virtiofs mount for changes (its
+ * automatic update rests on filesystem notifications neither delivers for
+ * changes made on the NAS), so it scans on a schedule: every library once an hour, which
  * reads every library folder on the NAS once an hour. The EULA accepted opens
  * the web UI on the server instead of its setup wizard; publishing the server
  * on the account lets Plex apps find it (remote access may still need the

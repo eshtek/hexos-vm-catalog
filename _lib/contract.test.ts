@@ -109,6 +109,25 @@ describe("a profile's own capability", () => {
     expect(checkContract(writer, "plex-server.json").errors).toEqual([]);
   });
 
+  test("shareTransport needs a share list, and virtiofs a profile that takes it", () => {
+    const listless = plexWith({ shareAccount: "plexvm", shareTransport: "virtiofs" }, ALL);
+    expect(checkContract(listless, "plex-server.json").errors.some((e) => e.includes("firstBoot.shareTransport applies"))).toBe(true);
+    const virtiofs = plexWith({ shares: MEDIA, shareAccount: "plexvm", shareTransport: "virtiofs" }, ALL);
+    expect(checkContract(virtiofs, "plex-server.json").errors).toEqual([]);
+    const smb = plexWith({ shares: MEDIA, shareAccount: "plexvm", shareTransport: "smb" }, ALL);
+    expect(checkContract(smb, "plex-server.json").errors).toEqual([]);
+    const openwrt = {
+      ...base,
+      requiredCapabilities: ["firstBoot"],
+      provisioning: { ...base.provisioning, strategy: "image", firstBoot: { profile: "openwrt-lan-dhcp", shareTransport: "virtiofs" } },
+    } as unknown as VMBlueprint;
+    expect(checkContract(openwrt, "openwrt.json").errors.some((e) => e.includes('"openwrt-lan-dhcp" profile would mount over SMB'))).toBe(true);    const everyFolder = plexWith(
+      { shares: [...MEDIA, "Documents", "Downloads"], shareAccount: "plexvm", shareTransport: "virtiofs" },
+      ALL,
+    );
+    expect(checkContract(everyFolder, "plex-server.json").errors.some((e) => e.includes("at most 7 shares"))).toBe(true);
+  });
+
   test("the Plex profile must declare plexAppliance, and a shares first boot must declare firstBootShareAccount", () => {
     const bare = plexWith({ shares: MEDIA, shareAccount: "plexvm" }, ["firstBoot"]);
     const { errors } = checkContract(bare, "plex-server.json");
