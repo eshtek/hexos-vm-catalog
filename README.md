@@ -212,8 +212,12 @@ Icons live under `_icons/apps/`, one per app, mirrored here exactly like the blu
         "diskBus": "VIRTIO",               // "AHCI" | "VIRTIO"
         "nicModel": "VIRTIO",              // "E1000" | "VIRTIO"
         "tpm": false, "secureBoot": false, "hypervEnlightenments": false,
-        "readiness": { "type": "mdns", "hostname": "homeassistant.local", "port": 8123 },
-        "postInstallUrl": "http://{ip}:8123"
+        "readiness": { "type": "mdns", "hostname": "homeassistant.local", "port": 80 },
+        "postInstallUrl": "http://{ip}",   // the VM card's Launch link; {ip} is the guest's address
+        "postInstallAltPorts": [8123]      // optional: other ports the UI may answer on (max 4). The
+                                           // platform probes them with postInstallUrl's own port and
+                                           // links to the one that answers. HAOS 2026.8 serves new
+                                           // installs on 80; installs from before it keep 8123
     },
     "hooksSchema": 1,                      // optional: setup hooks the platform runs after the guest
     "hooks": [ /* see "Setup hooks" below */ ] // is ready, from scripts in this repo (the blueprint's own folder)
@@ -412,8 +416,8 @@ A blueprint may declare **setup hooks**: scripts in this repo that the HexOS box
                 "default": false,               // declare "default": false (the parser refuses otherwise)
                 "link": { "label": "…", "url": "https://example.com/setup" } // optional: a link beside the consent text
             },
-            "guestPort": 8123,                  // where the guest answers; defaults from postInstallUrl
-            "altPorts": [80],                   // other declared ports a redirect may land on (max 4)
+            "guestPort": 80,                    // where the guest answers; defaults from postInstallUrl
+            "altPorts": [8123],                 // other declared ports a redirect may land on (max 4)
             "script": "home-assistant-os/haos_setup.ts", // a path from the repo root; the sync inlines the file at
             "entrypoint": "run",                // one pinned commit, so a box never fetches a script
             "inputs": [],                       // questions or an OAuth flow the user answers first
