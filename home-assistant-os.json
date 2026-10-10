@@ -41,9 +41,10 @@
         "readiness": {
             "type": "mdns",
             "hostname": "homeassistant.local",
-            "port": 8123
+            "port": 80
         },
-        "postInstallUrl": "http://{ip}:8123"
+        "postInstallUrl": "http://{ip}",
+        "postInstallAltPorts": [8123]
     },
     "hooksSchema": 1,
     "hooks": [
@@ -56,8 +57,8 @@
             "userOptional": {
                 "description": "Lets HexOS confirm Home Assistant is reachable after install and note whether you still need to create its owner account. It reads one status page and changes nothing."
             },
-            "guestPort": 8123,
-            "altPorts": [80],
+            "guestPort": 80,
+            "altPorts": [8123],
             "script": "home-assistant-os/haos_setup.ts",
             "entrypoint": "run",
             "timeout": 600,

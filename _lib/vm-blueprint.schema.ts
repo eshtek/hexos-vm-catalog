@@ -405,6 +405,13 @@ export const vmBlueprintGuestSchema = z.object({
     readiness: vmReadinessSchema,
     /** Success-notification deep link; "{ip}" is substituted with the discovered address. */
     postInstallUrl: z.string().max(512).optional(),
+    /**
+     * Other ports the web UI may answer on. The backend probes postInstallUrl's
+     * own port and these, and points the VM's Launch link at the one that
+     * answers: Home Assistant OS 2026.8 moved new installs from 8123 to 80
+     * while older installs kept 8123, so no single template fits both.
+     */
+    postInstallAltPorts: z.array(z.number().int().min(1).max(65535)).max(4).optional(),
 });
 
 export const vmBlueprintSchema = z.object({
@@ -874,6 +881,12 @@ export const HEXOS_VM_CAPABILITIES = [
      * list it in `requiredCapabilities`.
      */
     'firstBootVirtiofs',
+    /**
+     * Graphics card sharing: `gpu-sharing` lists and sets each card's mode, VM starts refuse
+     * with VM_GPU_IN_USE and take `stopGpuHolder`, and installs take `gpuSharingModes`. A box
+     * without this would 404 the pane and start a VM on a card another VM holds.
+     */
+    'gpuSharing',
 ] as const;
 
 /**
