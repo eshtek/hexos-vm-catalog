@@ -21,6 +21,7 @@ Grouped by `category`, which is how the HexOS UI groups them too.
 | [Flatcar Container Linux](flatcar.json) | Immutable auto-updating container host, configured by Ignition |
 | [Rocky Linux 9](rocky-9.json) | Official Rocky GenericCloud image, RHEL-compatible |
 | [Rocky Linux 10](rocky-10.json) | Official Rocky GenericCloud image; needs an x86-64-v3 CPU |
+| [NixOS 26.05](nixos-26.05.json) | Minimal server with declarative account, networking and guest services |
 | [Ubuntu Server 24.04 LTS](ubuntu-24.04.json) | Canonical's official cloud image, configured on first boot |
 | [Ubuntu Server 26.04 LTS](ubuntu-26.04.json) | Canonical's official cloud image, configured on first boot |
 
@@ -578,3 +579,9 @@ A result records a digest of the blueprint's *functional* fields (`provisioning`
 3. Run `bun run validate` and fix any errors
 4. Test it against a staging/dev HexOS environment (sync from your branch, or point `VM_CATALOG_PATH` at your checkout)
 5. Submit a pull request including where the image is published, how its checksum was obtained, and any special guest requirements
+
+NixOS uses the `nixos-minimal` installer template and requires the platform's
+`nixosInstaller` capability. Land and release that platform support before
+promoting this blueprint to catalog staging or prod. The install needs network
+access to the Nix binary cache. It leaves `/etc/nixos/configuration.nix` and
+`hardware-configuration.nix` for the owner to maintain with `nixos-rebuild`.

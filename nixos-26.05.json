@@ -1,0 +1,43 @@
+{
+    "id": "nixos-26.05",
+    "name": "NixOS 26.05",
+    "description": "A minimal NixOS server installed hands-free from the official installer. Your account, SSH access, networking and guest agent are declared in /etc/nixos/configuration.nix, ready to customize with nixos-rebuild.",
+    "icon": "_icons/nixos.svg",
+    "website": "https://nixos.org/",
+    "category": "server",
+    "truenasVersion": ">=25.04.2.6",
+    "requiredCapabilities": [
+        "nixosInstaller"
+    ],
+    "provisioning": {
+        "strategy": "installer-iso",
+        "source": {
+            "url": "https://releases.nixos.org/nixos/26.05/nixos-{version}/nixos-minimal-{version}-x86_64-linux.iso",
+            "version": "26.05.12297.cd4ea8d57de1",
+            "sha256": "ea9c3e4adba25799fce5b11508efd339ca23825309b34dc32285e21f1ede456c",
+            "releasesUrl": "https://releases.nixos.org/nixos/26.05/"
+        },
+        "seed": {
+            "template": "nixos-minimal"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 2048,
+        "recMemoryMb": 4096,
+        "minVcpus": 2,
+        "recVcpus": 2,
+        "diskGb": 32
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}
