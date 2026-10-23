@@ -57,6 +57,7 @@ export const KNOWN_MACHINE_CONFIG_TEMPLATES = new Map<string, "fw-cfg" | "config
 ]);
 export const KNOWN_ANSWER_FILE_TEMPLATES = new Set(["win11-pro", "win10-pro"]);
 export const KNOWN_INSTALLER_SEED_TEMPLATES = new Set([
+  "nixos-minimal",
   "ubuntu-desktop-autoinstall",
   "fedora-workstation-kickstart",
   "fedora-kde-kickstart",
@@ -90,6 +91,7 @@ export const KNOWN_CATEGORIES = new Set(["server", "desktop", "appliance"]);
 // before it exists upstream turns the check into a rubber stamp. Values are
 // exact-match (no case folding) — the backend compares them verbatim.
 export const KNOWN_VM_CAPABILITIES = new Set([
+  "nixosInstaller",
   "firstBoot",
   "appInstall",
   "virtioSeed",

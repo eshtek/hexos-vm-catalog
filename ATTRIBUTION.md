@@ -172,3 +172,9 @@ PNG because no vector of the mark is published anywhere.
 
 If an upstream project objects or rebrands, replace or remove the file and clear the `icon` field on
 its `apps/*.json` — the picker falls back to a lettered tile, and nothing else references it.
+
+## NixOS
+
+| File | Source | Author | Licence | Version note |
+|------|--------|--------|---------|--------------|
+| `_icons/nixos.svg` | [NixOS artwork](https://github.com/NixOS/nixos-artwork/blob/master/logo/nix-snowflake-colours.svg) | Simon Frankau and Tim Cuthbertson | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), confirmed by [NixOS branding](https://github.com/NixOS/branding#licensing) | Unmodified colored snowflake |

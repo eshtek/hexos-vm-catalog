@@ -887,6 +887,8 @@ export const HEXOS_VM_CAPABILITIES = [
      * without this would 404 the pane and start a VM on a card another VM holds.
      */
     'gpuSharing',
+    /** The nixos-minimal unattended installer and declarative guest configuration. */
+    'nixosInstaller',
 ] as const;
 
 /**
@@ -982,6 +984,7 @@ export const RESERVED_LINUX_USERNAMES = new Set([
     'input',
     'irc',
     'kernoops',
+    'keys',
     'kmem',
     'kube',
     'kvm',
@@ -1015,6 +1018,7 @@ export const RESERVED_LINUX_USERNAMES = new Set([
     'nobody',
     'nogroup',
     'nopasswdlogin',
+    'nscd',
     'ntp',
     'nvidia-persistenced',
     'openvpn',
@@ -1039,6 +1043,7 @@ export const RESERVED_LINUX_USERNAMES = new Set([
     'rdma',
     'realtime',
     'render',
+    'resolvconf',
     'rfkill',
     'root',
     'rpc',
@@ -1092,7 +1097,7 @@ export const RESERVED_LINUX_USERNAMES = new Set([
 ]);
 
 /** System accounts by convention (`_apt`, `_chrony`, `systemd-oom`), whatever the image. */
-export const RESERVED_LINUX_USERNAME_PREFIXES = ['_', 'systemd-'] as const;
+export const RESERVED_LINUX_USERNAME_PREFIXES = ['_', 'systemd-', 'nixbld'] as const;
 
 export const isReservedLinuxUsername = (username: string): boolean =>
     RESERVED_LINUX_USERNAMES.has(username) ||

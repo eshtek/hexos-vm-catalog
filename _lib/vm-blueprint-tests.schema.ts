@@ -661,6 +661,11 @@ export interface VMPlatformImpactRule {
  */
 export const VM_PLATFORM_IMPACT_RULES: VMPlatformImpactRule[] = [
     {
+        path: 'packages/backend/src/lib/nixosInstallerSeed.ts',
+        affects: { strategies: ['installer-iso'] },
+        reason: 'NixOS installer configuration',
+    },
+    {
         path: 'packages/backend/src/lib/cloudInitSeed.ts',
         affects: { strategies: ['cloud-init'] },
         reason: 'cloud-init user-data templates',
