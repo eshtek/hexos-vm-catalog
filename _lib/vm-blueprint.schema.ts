@@ -889,6 +889,8 @@ export const HEXOS_VM_CAPABILITIES = [
     'gpuSharing',
     /** The nixos-minimal unattended installer and declarative guest configuration. */
     'nixosInstaller',
+    /** omarchy-autoinstall picks the kernel an Omarchy 4.0.4 or later ISO can install. */
+    'omarchyKernel',
 ] as const;
 
 /**
