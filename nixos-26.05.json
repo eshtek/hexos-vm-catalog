@@ -15,7 +15,7 @@
             "url": "https://releases.nixos.org/nixos/26.05/nixos-{version}/nixos-minimal-{version}-x86_64-linux.iso",
             "version": "26.05.12400.da6dc0e7b260",
             "sha256": "bace94cc43946a95c6252b097cf627dbca6ec4b48d938d405c1043b0a2f0cffb",
-            "releasesUrl": "https://releases.nixos.org/nixos/26.05/"
+            "releasesUrl": "https://releases.nixos.org/?prefix=nixos/26.05/"
         },
         "seed": {
             "template": "nixos-minimal"
