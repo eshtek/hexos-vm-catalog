@@ -10,10 +10,10 @@
         "strategy": "cloud-init",
         "source": {
             "url": "https://cloud-images.ubuntu.com/releases/26.04/{version}/ubuntu-26.04-server-cloudimg-amd64.img",
-            "version": "release-20260823",
+            "version": "release-20261016",
             "format": "qcow2",
             "compression": "none",
-            "sha256": "8196be9d7958059cb56c6c75c80fdf6cee8a8885bc149ea791d7db1c7ef93035",
+            "sha256": "5645d0318ad21f643ebb1ac4567514620e9893380b07b0201fda163baa5b7eb5",
             "releasesUrl": "https://cloud-images.ubuntu.com/releases/26.04/"
         },
         "cloudInit": {
