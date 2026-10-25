@@ -109,7 +109,10 @@ const STALL_WINDOW_MS = Number(
 //
 //  - 404/410 is the exact signal this tool exists to raise. It reads the same
 //    on every attempt, so a retry buys nothing and delays a real report behind
-//    two backoffs. One request, then out.
+//    two backoffs. One request, then out. The exception is a 404 served by a
+//    different host than the one asked: a mirror redirector (Fedora's
+//    download.fedoraproject.org) picks a mirror per request, and one stale
+//    mirror says nothing about the file. That gets the ladder.
 //  - Transport errors, timeouts, 408, 429 and 5xx are the transient class: the
 //    host exists and is declining to answer this second. Those get the ladder.
 //  - Every other 4xx is a durable statement about the URL, not the moment.
@@ -145,6 +148,10 @@ async function headOnce(url: string, timeoutMs: number): Promise<{ ok: boolean; 
         const size = res.headers.get('content-length');
         const human = size ? formatBytes(Number(size)) : 'size unknown';
         if (res.status === 404 || res.status === 410) {
+            const mirror = res.redirected ? new URL(res.url).host : null;
+            if (mirror && mirror !== new URL(url).host) {
+                return { ok: false, retriable: true, detail: `${res.status} from mirror ${mirror}` };
+            }
             return {
                 ok: false,
                 retriable: false,
@@ -293,6 +300,25 @@ async function selfTest(): Promise<number> {
     const gonePass = !goneCase.ok && goneHits === 1;
     console.log(`${gonePass ? '✓' : '✗'} self-test deleted file not retried: ${goneHits} attempt(s) — ${goneCase.detail}`);
     if (!gonePass) failed++;
+
+    // A redirector that lands on a stale mirror once must not fail the run.
+    let mirrorHits = 0;
+    const staleMirror = Bun.serve({ port: 0, fetch: () => new Response('gone', { status: 404 }) });
+    const goodMirror = Bun.serve({ port: 0, fetch: () => new Response(null, { status: 200 }) });
+    const redirector = Bun.serve({
+        port: 0,
+        fetch: (req) => {
+            const port = ++mirrorHits === 1 ? staleMirror.port : goodMirror.port;
+            return Response.redirect(`http://127.0.0.1:${port}${new URL(req.url).pathname}`, 302);
+        },
+    });
+    const mirrorCase = await head(`http://localhost:${redirector.port}/netinst.iso`);
+    redirector.stop(true);
+    staleMirror.stop(true);
+    goodMirror.stop(true);
+    const mirrorPass = mirrorCase.ok && mirrorHits === 2;
+    console.log(`${mirrorPass ? '✓' : '✗'} self-test stale mirror retried: ${mirrorHits} attempt(s) — ${mirrorCase.detail}`);
+    if (!mirrorPass) failed++;
 
     return failed;
 }
