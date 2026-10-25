@@ -101,6 +101,7 @@ export const KNOWN_VM_CAPABILITIES = new Set([
   "firstBootDefaultMedia",
   "firstBootShareAccount",
   "vmHooks",
+  "omarchyKernel",
 ]);
 
 /** The capability a first-boot profile stands on, where the profile is not part of every first-boot backend. */
