@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // VENDORED FILE — do not edit by hand.
 //
-// Verbatim copy of a schema from the hexOS platform monorepo:
+// Verbatim copy of a schema from the HexOS platform monorepo:
 //   packages/shared/eshtek/vm-blueprints.ts
 //
 // That file is the single source of truth. This repo keeps a copy rather than
