@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Re-vendor the catalog schemas from the hexOS platform monorepo into _lib/.
+# Re-vendor the catalog schemas from the HexOS platform monorepo into _lib/.
 # Resolves paths from its own location; point HEXOS_PLATFORM at your platform
 # checkout if it isn't the default sibling dir.
 #
@@ -51,7 +51,7 @@ for entry in "${schemas[@]}"; do
 // ─────────────────────────────────────────────────────────────────────────────
 // VENDORED FILE — do not edit by hand.
 //
-// Verbatim copy of a schema from the hexOS platform monorepo:
+// Verbatim copy of a schema from the HexOS platform monorepo:
 //   packages/shared/eshtek/${entry%%:*}
 //
 // That file is the single source of truth. This repo keeps a copy rather than
