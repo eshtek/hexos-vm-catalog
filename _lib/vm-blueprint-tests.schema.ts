@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // VENDORED FILE — do not edit by hand.
 //
-// Verbatim copy of a schema from the hexOS platform monorepo:
+// Verbatim copy of a schema from the HexOS platform monorepo:
 //   packages/shared/eshtek/vm-blueprint-tests.ts
 //
 // That file is the single source of truth. This repo keeps a copy rather than
@@ -660,6 +660,11 @@ export interface VMPlatformImpactRule {
  * file that is missing here is invisible to the CI check.
  */
 export const VM_PLATFORM_IMPACT_RULES: VMPlatformImpactRule[] = [
+    {
+        path: 'packages/backend/src/lib/nixosInstallerSeed.ts',
+        affects: { strategies: ['installer-iso'] },
+        reason: 'NixOS installer configuration',
+    },
     {
         path: 'packages/backend/src/lib/cloudInitSeed.ts',
         affects: { strategies: ['cloud-init'] },

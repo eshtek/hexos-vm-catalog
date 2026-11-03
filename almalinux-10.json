@@ -21,10 +21,10 @@
         "strategy": "cloud-init",
         "source": {
             "url": "https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/AlmaLinux-10-GenericCloud-{version}.x86_64.qcow2",
-            "version": "10.2-20260526.0",
+            "version": "10.2-20261012.0",
             "format": "qcow2",
             "compression": "none",
-            "sha256": "47f2218668dd4776be140dd92fa3bea700be1766e2c7d88bdfd6a4b50f477b4d",
+            "sha256": "cbee4726fc0f5a60694bb4f289003cc221e715dfbacebcce76b54daf386d8eca",
             "releasesUrl": "https://repo.almalinux.org/almalinux/10/cloud/x86_64/images/"
         },
         "cloudInit": {

@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // VENDORED FILE — do not edit by hand.
 //
-// Verbatim copy of a schema from the hexOS platform monorepo:
+// Verbatim copy of a schema from the HexOS platform monorepo:
 //   packages/shared/eshtek/surface-grammar.ts
 //
 // That file is the single source of truth. This repo keeps a copy rather than
@@ -216,7 +216,7 @@ export const hookConditionSchema = z
 export const widgetSlotsSchema = z
     .array(
         z.object({
-            type: z.enum(['text', 'stat', 'list', 'progress']),
+            type: z.enum(['text', 'stat', 'list', 'progress', 'chart']),
             field: z.string().min(1),
             rows: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
         }),
@@ -225,6 +225,14 @@ export const widgetSlotsSchema = z
     .max(3);
 
 export const widgetBackgroundSchema = z.object({ field: z.string().min(1) });
+
+// More views the card steps to after the widget's own title and slots, which
+// are the first. A box that predates slides strips the key and draws the first
+// view alone, so the first view must stand on its own.
+export const widgetSlidesSchema = z
+    .array(z.object({ title: z.string().min(1), slots: widgetSlotsSchema }))
+    .min(1)
+    .max(3);
 
 // ===== VM widget sizes =====
 

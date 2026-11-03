@@ -10,10 +10,10 @@
         "strategy": "machine-config",
         "source": {
             "url": "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/{version}/x86_64/fedora-coreos-{version}-openstack.x86_64.qcow2.xz",
-            "version": "44.20260802.3.1",
+            "version": "44.20260928.3.2",
             "format": "qcow2",
             "compression": "xz",
-            "sha256": "c2e63dccf821d70e90afe66bb7cb2c68d3a34d121496290d5670b3488903cc5e",
+            "sha256": "b8a20acdb9d6af3c04bdf58751e8353e010f0fd4583ff29c02f357e59878657f",
             "releasesUrl": "https://builds.coreos.fedoraproject.org/streams/stable.json"
         },
         "machineConfig": {

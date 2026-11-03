@@ -10,10 +10,10 @@
         "strategy": "machine-config",
         "source": {
             "url": "https://stable.release.flatcar-linux.net/amd64-usr/{version}/flatcar_production_openstack_image.img",
-            "version": "4593.2.5",
+            "version": "4757.2.2",
             "format": "qcow2",
             "compression": "none",
-            "sha512": "e26ce7bcb4aa1420f6e04f998ce7f5d8bc30b4d6b11ab00e304a0307b0c0ce4ed6d0e79dee1eb096a697a492f8a643ace15b4654621c866ffc35fcda96e399c6",
+            "sha512": "b7e937c19d43ac5626604273a9baf222b1c2d225db645b278ac2670cef640a8e66cdb6acfd65ed53c8bc5df4344575a687d3a1a5ae4e5602d5ccc95924067ada",
             "releasesUrl": "https://stable.release.flatcar-linux.net/amd64-usr/"
         },
         "machineConfig": {

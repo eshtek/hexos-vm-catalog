@@ -16,10 +16,10 @@
         "strategy": "image",
         "source": {
             "url": "https://downloads.openwrt.org/releases/{version}/targets/x86/64/openwrt-{version}-x86-64-generic-ext4-combined-efi.img.gz",
-            "version": "25.12.5",
+            "version": "25.12.6",
             "format": "raw",
             "compression": "gz",
-            "sha256": "c8ee59ce7b0f635a6b50c1b7307b07ee7785214a6faf2af42280dd4ef4310290",
+            "sha256": "1ef06b324d04490a90de26d6f2a292111854f05e3c946648fad70c339b52f739",
             "releasesUrl": "https://downloads.openwrt.org/releases/"
         },
         "firstBoot": {

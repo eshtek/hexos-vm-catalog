@@ -12,6 +12,9 @@
     ],
     "category": "desktop",
     "truenasVersion": ">=25.04.2.6",
+    "requiredCapabilities": [
+        "omarchyKernel"
+    ],
     "apps": {
         "runtime": "flatpak"
     },
@@ -19,8 +22,8 @@
         "strategy": "installer-iso",
         "source": {
             "url": "https://iso.omarchy.org/omarchy-{version}.iso",
-            "version": "4.0.2",
-            "sha256": "2ef8e624aa1bec7e277e28056b8535a6c9373ba48d7ede3f1a01cb6d2373cfb8",
+            "version": "4.0.6",
+            "sha256": "b542db5fecc37395d9af6654a8146ebed225f275ae4d5a6fcf432e40afe7bb88",
             "releasesUrl": "https://github.com/basecamp/omarchy/releases"
         },
         "seed": {
