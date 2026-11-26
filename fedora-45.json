@@ -1,0 +1,42 @@
+{
+    "id": "fedora-45",
+    "name": "Fedora 45",
+    "description": "Fedora 45 from the official Cloud Base image, with cutting-edge packages and a recent kernel. Configured on first boot with your user account and SSH access.",
+    "icon": "_icons/fedora.svg",
+    "website": "https://fedoraproject.org/cloud/",
+    "category": "server",
+    "truenasVersion": ">=25.04.2.6",
+    "provisioning": {
+        "strategy": "cloud-init",
+        "source": {
+            "url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/45/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-{version}.x86_64.qcow2",
+            "version": "45-1.4",
+            "format": "qcow2",
+            "compression": "none",
+            "sha256": "50bdc5e70f6a24f540932d15411c1c6ae9fcfa40fb990d876d83c5cc823b2ad0",
+            "releasesUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/45/Cloud/x86_64/images/"
+        },
+        "cloudInit": {
+            "userDataTemplate": "linux-default"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 2048,
+        "recMemoryMb": 4096,
+        "minVcpus": 1,
+        "recVcpus": 2,
+        "diskGb": 32
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

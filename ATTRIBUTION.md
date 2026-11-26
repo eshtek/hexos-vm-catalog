@@ -33,7 +33,9 @@ One row per file. When adding images, record where it came from, who made it, an
 | `ubuntu-desktop-26.04/screenshots/applications-menu.jpg` | [Ubuntu 26.04 LTS applications menu - English.png](https://commons.wikimedia.org/wiki/File:Ubuntu_26.04_LTS_applications_menu_-_English.png) | Canonical Limited | GPL | matches the version we ship |
 | `ubuntu-desktop-26.04/screenshots/quick-menu.jpg` | [Ubuntu 26.04 LTS Quick menu - English.png](https://commons.wikimedia.org/wiki/File:Ubuntu_26.04_LTS_Quick_menu_-_English.png) | Canonical Limited | GPL | matches the version we ship |
 | `fedora-workstation-44/screenshots/desktop.jpg` | [Fedora 44 Workstation.png](https://commons.wikimedia.org/wiki/File:Fedora_44_Workstation.png) | The Fedora Project | GPL | matches the version we ship |
+| `fedora-workstation-45/screenshots/desktop.jpg` | [Fedora 44 Workstation.png](https://commons.wikimedia.org/wiki/File:Fedora_44_Workstation.png) | The Fedora Project | GPL | Fedora 44 Workstation (we ship 45) |
 | `fedora-kde-44/screenshots/desktop.jpg` | [Fedora 42 KDE Plasma Desktop English.png](https://commons.wikimedia.org/wiki/File:Fedora_42_KDE_Plasma_Desktop_English.png) | The Fedora Project | GPL | **Fedora 42 KDE (we ship 44)** — no Fedora KDE 43/44 shot exists on Commons |
+| `fedora-kde-45/screenshots/desktop.jpg` | [Fedora 42 KDE Plasma Desktop English.png](https://commons.wikimedia.org/wiki/File:Fedora_42_KDE_Plasma_Desktop_English.png) | The Fedora Project | GPL | **Fedora 42 KDE (we ship 45)**: no newer Fedora KDE shot exists on Commons |
 | `bazzite/screenshots/desktop-gnome.jpg` | [Bazzite 42 GNOME default desktop - English.png](https://commons.wikimedia.org/wiki/File:Bazzite_42_GNOME_default_desktop_-_English.png) | The Bazzite Team | GPL | Bazzite 42 (we ship the Fedora 41 base build) |
 | `bazzite/screenshots/menu-kde.jpg` | [Bazzite 42 KDE Menu - English.png](https://commons.wikimedia.org/wiki/File:Bazzite_42_KDE_Menu_-_English.png) | The Bazzite Team | GPL | Bazzite 42 (we ship the Fedora 41 base build) |
 | `bazzite/screenshots/files.jpg` | [Bazzite 42 GNOME Files 48.4.1 dark - English.png](https://commons.wikimedia.org/wiki/File:Bazzite_42_GNOME_Files_48.4.1_dark_-_English.png) | The Bazzite Team | GPL | Bazzite 42 (we ship the Fedora 41 base build) |
@@ -60,8 +62,8 @@ An empty `screenshots` array is a decision, not an omission — the detail sheet
 a gallery. `bun run validate` warns about it so the gap stays visible; the warning is expected for:
 
 - **The server images** — `almalinux-9`, `almalinux-10`, `debian-12`, `debian-13`, `fedora-44`,
-  `fedora-coreos`, `flatcar`, `rocky-9`, `rocky-10`, `ubuntu-24.04`, `ubuntu-26.04`. These boot to a
-  console login and have no desktop; five invented frames would misrepresent what the user gets.
+  `fedora-45`, `fedora-coreos`, `flatcar`, `rocky-9`, `rocky-10`, `ubuntu-24.04`, `ubuntu-26.04`.
+  These boot to a console login and have no desktop; five invented frames would misrepresent what the user gets.
   A screenshot of a login prompt is not worth 200 KB in a cloned repo.
 - **Windows** — `windows-10`, `windows-11`. See below.
 
