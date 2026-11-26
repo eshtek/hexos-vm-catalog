@@ -13,10 +13,10 @@
         "strategy": "cloud-init",
         "source": {
             "url": "https://cloud.debian.org/images/cloud/bookworm/{version}/debian-12-genericcloud-amd64-{version}.qcow2",
-            "version": "20261021-2638",
+            "version": "20261117-2665",
             "format": "qcow2",
             "compression": "none",
-            "sha512": "9f181877006e8d9ca4f4554eba8729a829936f0f7d1db5e77f69b1ef0f6bc372b4d46f3dae39b10d84f9131496c2cc1d449264f26577fe934a79de5a5512a3dd",
+            "sha512": "946b917a37882f16e5b3b0b2cbe5744637d0cd36190b5b53cbb21d14a54557d5b45e9e523021b8f52c1707dbe470489f3515458e0680ded76ee2574b4a8daf1b",
             "releasesUrl": "https://cloud.debian.org/images/cloud/bookworm/"
         },
         "cloudInit": {

@@ -21,10 +21,10 @@
     "provisioning": {
         "strategy": "installer-iso",
         "source": {
-            "url": "https://iso.omarchy.org/omarchy-{version}.iso",
-            "version": "4.0.6",
-            "sha256": "b542db5fecc37395d9af6654a8146ebed225f275ae4d5a6fcf432e40afe7bb88",
-            "releasesUrl": "https://github.com/basecamp/omarchy/releases"
+            "url": "https://iso.omarchy.org/omarchy-{version}-x86.iso",
+            "version": "4.5.0",
+            "sha256": "5d6288bc57f96f6231719830457582c846a2291985201c36a9a7d1216978b00f",
+            "releasesUrl": "https://github.com/omacom/omarchy/releases"
         },
         "seed": {
             "template": "omarchy-autoinstall"

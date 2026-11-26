@@ -10,10 +10,10 @@
         "strategy": "cloud-init",
         "source": {
             "url": "https://cloud.debian.org/images/cloud/trixie/{version}/debian-13-genericcloud-amd64-{version}.qcow2",
-            "version": "20261021-2638",
+            "version": "20261123-2671",
             "format": "qcow2",
             "compression": "none",
-            "sha512": "16e0965312c56feb331049d45d2b1b5778f3f942a33d4300eedbb97527707f2bea87c0006f3e4cc7a25fadbff739c4e235a51fb9bcd1b66fd554f7f8e80ba45c",
+            "sha512": "76488ba3bea2349cc595fedad7748b8ba98d6b36da398eaf2bbbae3db896ba1017d4ff41cd277926784cef2c1c11145a0d600f9b4afde9b8f174d698db0cda03",
             "releasesUrl": "https://cloud.debian.org/images/cloud/trixie/"
         },
         "cloudInit": {

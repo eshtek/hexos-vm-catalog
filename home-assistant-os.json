@@ -13,10 +13,10 @@
         "strategy": "image",
         "source": {
             "url": "https://github.com/home-assistant/operating-system/releases/download/{version}/haos_ova-{version}.qcow2.xz",
-            "version": "18.3",
+            "version": "18.4",
             "format": "qcow2",
             "compression": "xz",
-            "sha256": "fae6a728768cc10aff60d4820bfcd40d64cd77fab82c8bd92af13b3d9d414090",
+            "sha256": "756ec485b1b153099ca53e88a5eebd63a801d56b791afe5c6d63ef94a35dc02d",
             "releasesUrl": "https://github.com/home-assistant/operating-system/releases"
         }
     },

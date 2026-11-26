@@ -13,8 +13,8 @@
         "strategy": "installer-iso",
         "source": {
             "url": "https://releases.nixos.org/nixos/26.05/nixos-{version}/nixos-minimal-{version}-x86_64-linux.iso",
-            "version": "26.05.12400.da6dc0e7b260",
-            "sha256": "bace94cc43946a95c6252b097cf627dbca6ec4b48d938d405c1043b0a2f0cffb",
+            "version": "26.05.15079.0dc498bfe49b",
+            "sha256": "68a615138a826afb6e09a8055dd6df606309cd72857f686c15256492ce83c1df",
             "releasesUrl": "https://releases.nixos.org/?prefix=nixos/26.05/"
         },
         "seed": {

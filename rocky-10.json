@@ -11,10 +11,10 @@
         "strategy": "cloud-init",
         "source": {
             "url": "https://dl.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud-Base-{version}.x86_64.qcow2",
-            "version": "10.2-20260525.0",
+            "version": "10.3-20261112.0",
             "format": "qcow2",
             "compression": "none",
-            "sha256": "9fc9e9ff16888bb68ac39b0392e25c9c92684d50c85f1cce6ab549363bbc4b48",
+            "sha256": "68eae06d402c8b19e7dca06e85bdc43a3476089afa3ee20d93d0d43cf9871e9e",
             "releasesUrl": "https://dl.rockylinux.org/pub/rocky/10/images/x86_64/"
         },
         "cloudInit": {

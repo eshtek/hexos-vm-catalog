@@ -21,7 +21,7 @@ PENDING="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_pending"
 # anyone who could also rewrite the image, which defeats the point of fetching
 # it from the publisher at all.
 SOURCES=(
-    "opensuse-leap-16|sha512|https://download.opensuse.org/distribution/leap/16.0/offline/Leap-16.0-offline-installer-x86_64-Build178.27.install.iso.sha512|Leap-16.0-offline-installer-x86_64-Build178.27.install.iso"
+    "opensuse-leap-16|sha512|https://download.opensuse.org/distribution/leap/16.1/offline/Leap-16.1-offline-installer-x86_64-Build60.2.install.iso.sha512|Leap-16.1-offline-installer-x86_64-Build60.2.install.iso"
 )
 
 # Expected hex length per field, so a truncated or wrong-algorithm fetch is

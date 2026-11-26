@@ -1,7 +1,7 @@
 {
     "id": "opensuse-leap-16",
-    "name": "openSUSE Leap 16.0",
-    "description": "openSUSE Leap 16.0, installed hands-free from the official offline installer. This is a fixed-release desktop and workstation distribution built from the same sources as SUSE Linux Enterprise, with 24 months of updates per release.",
+    "name": "openSUSE Leap 16.1",
+    "description": "openSUSE Leap 16.1, installed hands-free from the official offline installer. This is a fixed-release desktop and workstation distribution built from the same sources as SUSE Linux Enterprise, with 24 months of updates per release.",
     "icon": "_icons/opensuse.svg",
     "website": "https://get.opensuse.org/leap/",
     "screenshots": [
@@ -26,10 +26,10 @@
     "provisioning": {
         "strategy": "installer-iso",
         "source": {
-            "url": "https://download.opensuse.org/distribution/leap/16.0/offline/Leap-16.0-offline-installer-x86_64-Build178.27.install.iso",
-            "version": "16.0-Build178.27",
-            "sha512": "94411793a1878b3558211c8bbe4f3823c3c5212cc2dd9f9e4532a18be7eddd3be14db5a3bb47a2f36dd957e190ea706cd45af16bce218dfc00f71e64a8469971",
-            "releasesUrl": "https://download.opensuse.org/distribution/leap/16.0/offline/"
+            "url": "https://download.opensuse.org/distribution/leap/16.1/offline/Leap-16.1-offline-installer-x86_64-Build60.2.install.iso",
+            "version": "16.1-Build60.2",
+            "sha512": "c95738ba232a36eb31dfdf3e5f663beb672232410894ab04b1bfe0c7a803a622868a90fe631fc6c89418eca9ad181979b8817a52fdec3c203a9a5b7b997ba051",
+            "releasesUrl": "https://download.opensuse.org/distribution/leap/16.1/offline/"
         },
         "seed": {
             "template": "opensuse-agama-profile"

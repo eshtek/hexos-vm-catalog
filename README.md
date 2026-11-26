@@ -39,7 +39,7 @@ package runtime that guest has, which is what decides which apps are offered on 
 | [Kubuntu 26.04 LTS](kubuntu-26.04.json) | `flatpak` | Ubuntu with the KDE Plasma desktop, installed hands-free from the official ISO |
 | [Linux Mint 22.3 Cinnamon](mint-22.3.json) | `flatpak` | Cinnamon desktop, installed hands-free from the official ISO |
 | [Omarchy 4](omarchy.json) | `flatpak` | DHH's Arch + Hyprland desktop, installed hands-free via the ISO's own autoinstall |
-| [openSUSE Leap 16.0](opensuse-leap-16.json) | `flatpak` | Fixed-release SLE-based desktop, installed hands-free by Agama |
+| [openSUSE Leap 16.1](opensuse-leap-16.json) | `flatpak` | Fixed-release SLE-based desktop, installed hands-free by Agama |
 | [Pop!_OS 24.04 LTS](pop-os-24.04.json) | `flatpak` | System76's COSMIC desktop, installed hands-free from the official ISO |
 | [SteamOS](steamos.json) | `flatpak` | Valve's Steam Deck OS from the official recovery image; Gaming Mode needs a passed-through AMD GPU |
 | [Ubuntu Desktop 26.04 LTS](ubuntu-desktop-26.04.json) | `flatpak` | The Ubuntu desktop, installed hands-free from Canonical's official installer |

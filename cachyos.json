@@ -19,8 +19,8 @@
         "strategy": "installer-iso",
         "source": {
             "url": "https://build.cachyos.org/ISO/desktop/{version}/cachyos-desktop-linux-{version}.iso",
-            "version": "260809",
-            "sha256": "959f6577f45e25ee9fd8c220fd221b08e4ea79412c7315c0f922dd6d86d5e33c",
+            "version": "261123",
+            "sha256": "bb9d4c4091ef6445e78f1a67052d9d3f22bdff2608f3b2e226bac99bb0b708ec",
             "releasesUrl": "https://build.cachyos.org/ISO/desktop/"
         },
         "seed": {
