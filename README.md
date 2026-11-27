@@ -17,6 +17,7 @@ Grouped by `category`, which is how the HexOS UI groups them too.
 | [Debian 12 (Bookworm)](debian-12.json) | Official Debian cloud image, for workloads pinned to oldstable |
 | [Debian 13 (Trixie)](debian-13.json) | Official Debian cloud image, configured on first boot |
 | [Fedora 44](fedora-44.json) | Official Fedora Cloud Base image, configured on first boot |
+| [Fedora 45](fedora-45.json) | Official Fedora Cloud Base image, configured on first boot |
 | [Fedora CoreOS](fedora-coreos.json) | Minimal auto-updating container host, configured by Ignition |
 | [Flatcar Container Linux](flatcar.json) | Immutable auto-updating container host, configured by Ignition |
 | [Rocky Linux 9](rocky-9.json) | Official Rocky GenericCloud image, RHEL-compatible |
@@ -35,11 +36,13 @@ package runtime that guest has, which is what decides which apps are offered on 
 | [Bazzite](bazzite.json) | `flatpak` | Gaming-focused atomic KDE desktop from Universal Blue; offers GPU passthrough |
 | [CachyOS](cachyos.json) | `flatpak` | Performance-tuned Arch with KDE Plasma, installed hands-free by its own headless installer |
 | [Fedora KDE Plasma Desktop 44](fedora-kde-44.json) | `flatpak` | KDE Plasma, from the same Fedora network installer as Workstation |
+| [Fedora KDE Plasma Desktop 45](fedora-kde-45.json) | `flatpak` | KDE Plasma, from the same Fedora network installer as Workstation |
 | [Fedora Workstation 44](fedora-workstation-44.json) | `flatpak` | GNOME desktop, installed hands-free by Fedora's network installer |
+| [Fedora Workstation 45](fedora-workstation-45.json) | `flatpak` | GNOME desktop, installed hands-free by Fedora's network installer |
 | [Kubuntu 26.04 LTS](kubuntu-26.04.json) | `flatpak` | Ubuntu with the KDE Plasma desktop, installed hands-free from the official ISO |
 | [Linux Mint 22.3 Cinnamon](mint-22.3.json) | `flatpak` | Cinnamon desktop, installed hands-free from the official ISO |
 | [Omarchy 4](omarchy.json) | `flatpak` | DHH's Arch + Hyprland desktop, installed hands-free via the ISO's own autoinstall |
-| [openSUSE Leap 16.0](opensuse-leap-16.json) | `flatpak` | Fixed-release SLE-based desktop, installed hands-free by Agama |
+| [openSUSE Leap 16.1](opensuse-leap-16.json) | `flatpak` | Fixed-release SLE-based desktop, installed hands-free by Agama |
 | [Pop!_OS 24.04 LTS](pop-os-24.04.json) | `flatpak` | System76's COSMIC desktop, installed hands-free from the official ISO |
 | [SteamOS](steamos.json) | `flatpak` | Valve's Steam Deck OS from the official recovery image; Gaming Mode needs a passed-through AMD GPU |
 | [Ubuntu Desktop 26.04 LTS](ubuntu-desktop-26.04.json) | `flatpak` | The Ubuntu desktop, installed hands-free from Canonical's official installer |

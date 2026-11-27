@@ -33,7 +33,9 @@ One row per file. When adding images, record where it came from, who made it, an
 | `ubuntu-desktop-26.04/screenshots/applications-menu.jpg` | [Ubuntu 26.04 LTS applications menu - English.png](https://commons.wikimedia.org/wiki/File:Ubuntu_26.04_LTS_applications_menu_-_English.png) | Canonical Limited | GPL | matches the version we ship |
 | `ubuntu-desktop-26.04/screenshots/quick-menu.jpg` | [Ubuntu 26.04 LTS Quick menu - English.png](https://commons.wikimedia.org/wiki/File:Ubuntu_26.04_LTS_Quick_menu_-_English.png) | Canonical Limited | GPL | matches the version we ship |
 | `fedora-workstation-44/screenshots/desktop.jpg` | [Fedora 44 Workstation.png](https://commons.wikimedia.org/wiki/File:Fedora_44_Workstation.png) | The Fedora Project | GPL | matches the version we ship |
+| `fedora-workstation-45/screenshots/desktop.jpg` | [Fedora 44 Workstation.png](https://commons.wikimedia.org/wiki/File:Fedora_44_Workstation.png) | The Fedora Project | GPL | Fedora 44 Workstation (we ship 45) |
 | `fedora-kde-44/screenshots/desktop.jpg` | [Fedora 42 KDE Plasma Desktop English.png](https://commons.wikimedia.org/wiki/File:Fedora_42_KDE_Plasma_Desktop_English.png) | The Fedora Project | GPL | **Fedora 42 KDE (we ship 44)** — no Fedora KDE 43/44 shot exists on Commons |
+| `fedora-kde-45/screenshots/desktop.jpg` | [Fedora 42 KDE Plasma Desktop English.png](https://commons.wikimedia.org/wiki/File:Fedora_42_KDE_Plasma_Desktop_English.png) | The Fedora Project | GPL | **Fedora 42 KDE (we ship 45)**: no newer Fedora KDE shot exists on Commons |
 | `bazzite/screenshots/desktop-gnome.jpg` | [Bazzite 42 GNOME default desktop - English.png](https://commons.wikimedia.org/wiki/File:Bazzite_42_GNOME_default_desktop_-_English.png) | The Bazzite Team | GPL | Bazzite 42 (we ship the Fedora 41 base build) |
 | `bazzite/screenshots/menu-kde.jpg` | [Bazzite 42 KDE Menu - English.png](https://commons.wikimedia.org/wiki/File:Bazzite_42_KDE_Menu_-_English.png) | The Bazzite Team | GPL | Bazzite 42 (we ship the Fedora 41 base build) |
 | `bazzite/screenshots/files.jpg` | [Bazzite 42 GNOME Files 48.4.1 dark - English.png](https://commons.wikimedia.org/wiki/File:Bazzite_42_GNOME_Files_48.4.1_dark_-_English.png) | The Bazzite Team | GPL | Bazzite 42 (we ship the Fedora 41 base build) |
@@ -41,11 +43,11 @@ One row per file. When adding images, record where it came from, who made it, an
 | `cachyos/screenshots/desktop-kde.jpg` | [CachyOS KDE Desktop.jpg](https://commons.wikimedia.org/wiki/File:CachyOS_KDE_Desktop.jpg) | ptr1337 | GPL | rolling release, version not stated |
 | `cachyos/screenshots/theme-nord.jpg` | [CachyOS Nord Theme KDE.png](https://commons.wikimedia.org/wiki/File:CachyOS_Nord_Theme_KDE.png) | ptr1337 | GPL | rolling release, version not stated |
 | `cachyos/screenshots/desktop-xfce.jpg` | [CachyOS XFCE.png](https://commons.wikimedia.org/wiki/File:CachyOS_XFCE.png) | ptr1337 | GPL | rolling release, version not stated |
-| `opensuse-leap-16/screenshots/desktop.jpg` | [OpenSUSE Leap 16.0 screenshot.webp](https://commons.wikimedia.org/wiki/File:OpenSUSE_Leap_16.0_screenshot.webp) | Software: openSUSE and KDE developersWallpaper: openSUSEScreenshot: Di | GPL | matches the version we ship |
-| `opensuse-leap-16/screenshots/desktop-dark.jpg` | [OpenSUSE Leap 16.0 dark mode screenshot.webp](https://commons.wikimedia.org/wiki/File:OpenSUSE_Leap_16.0_dark_mode_screenshot.webp) | Software: openSUSE and KDE developersWallpaper: openSUSEScreenshot: Di | GPL | matches the version we ship |
-| `opensuse-leap-16/screenshots/desktop-gnome.jpg` | [OpenSUSE Leap 16.0 GNOME screenshot.webp](https://commons.wikimedia.org/wiki/File:OpenSUSE_Leap_16.0_GNOME_screenshot.webp) | Software: openSUSE and GNOME developersWallpaper: openSUSEScreenshot:  | GPL | matches the version we ship |
-| `opensuse-leap-16/screenshots/desktop-alt.jpg` | [Opensuse 16.0 Leap.png](https://commons.wikimedia.org/wiki/File:Opensuse_16.0_Leap.png) | openSUSE Project | GPL | matches the version we ship |
-| `omarchy/screenshots/quattro.jpg` | [v4.0.0 release notes](https://github.com/basecamp/omarchy/releases/tag/v4.0.0) | David Heinemeier Hansson | not stated (author-published release screenshot; includes the author's webcam overlay) | Omarchy 4.0.0 — matches the version we ship |
+| `opensuse-leap-16/screenshots/desktop.jpg` | [OpenSUSE Leap 16.0 screenshot.webp](https://commons.wikimedia.org/wiki/File:OpenSUSE_Leap_16.0_screenshot.webp) | Software: openSUSE and KDE developersWallpaper: openSUSEScreenshot: Di | GPL | Leap 16.0 (we pin 16.1, same series) |
+| `opensuse-leap-16/screenshots/desktop-dark.jpg` | [OpenSUSE Leap 16.0 dark mode screenshot.webp](https://commons.wikimedia.org/wiki/File:OpenSUSE_Leap_16.0_dark_mode_screenshot.webp) | Software: openSUSE and KDE developersWallpaper: openSUSEScreenshot: Di | GPL | Leap 16.0 (we pin 16.1, same series) |
+| `opensuse-leap-16/screenshots/desktop-gnome.jpg` | [OpenSUSE Leap 16.0 GNOME screenshot.webp](https://commons.wikimedia.org/wiki/File:OpenSUSE_Leap_16.0_GNOME_screenshot.webp) | Software: openSUSE and GNOME developersWallpaper: openSUSEScreenshot:  | GPL | Leap 16.0 (we pin 16.1, same series) |
+| `opensuse-leap-16/screenshots/desktop-alt.jpg` | [Opensuse 16.0 Leap.png](https://commons.wikimedia.org/wiki/File:Opensuse_16.0_Leap.png) | openSUSE Project | GPL | Leap 16.0 (we pin 16.1, same series) |
+| `omarchy/screenshots/quattro.jpg` | [v4.0.0 release notes](https://github.com/omacom/omarchy/releases/tag/v4.0.0) | David Heinemeier Hansson | not stated (author-published release screenshot; includes the author's webcam overlay) | Omarchy 4.0.0 (we pin 4.5.0, same series) |
 | `omarchy/screenshots/theme-gruvbox.jpg` | [Omarchy Gruvbox theme.png](https://commons.wikimedia.org/wiki/File:Omarchy_Gruvbox_theme.png) | David Heinemeier Hansson | GPL | version not stated upstream |
 | `omarchy/screenshots/theme-nord.jpg` | [Omarchy Nord theme.png](https://commons.wikimedia.org/wiki/File:Omarchy_Nord_theme.png) | David Heinemeier Hansson | GPL | version not stated upstream |
 | `omarchy/screenshots/theme-ristretto.jpg` | [Omarchy Ristretto theme.png](https://commons.wikimedia.org/wiki/File:Omarchy_Ristretto_theme.png) | David Heinemeier Hansson | GPL | version not stated upstream |
@@ -60,8 +62,8 @@ An empty `screenshots` array is a decision, not an omission — the detail sheet
 a gallery. `bun run validate` warns about it so the gap stays visible; the warning is expected for:
 
 - **The server images** — `almalinux-9`, `almalinux-10`, `debian-12`, `debian-13`, `fedora-44`,
-  `fedora-coreos`, `flatcar`, `rocky-9`, `rocky-10`, `ubuntu-24.04`, `ubuntu-26.04`. These boot to a
-  console login and have no desktop; five invented frames would misrepresent what the user gets.
+  `fedora-45`, `fedora-coreos`, `flatcar`, `rocky-9`, `rocky-10`, `ubuntu-24.04`, `ubuntu-26.04`.
+  These boot to a console login and have no desktop; five invented frames would misrepresent what the user gets.
   A screenshot of a login prompt is not worth 200 KB in a cloned repo.
 - **Windows** — `windows-10`, `windows-11`. See below.
 

@@ -1,0 +1,52 @@
+{
+    "id": "fedora-kde-45",
+    "name": "Fedora KDE Plasma Desktop 45",
+    "description": "A fast-moving Linux desktop with a highly configurable, Windows-familiar interface. Fedora 45 with KDE Plasma installs hands-free from Fedora's network installer.",
+    "icon": "_icons/fedora.svg",
+    "website": "https://fedoraproject.org/kde/",
+    "screenshots": [
+        "fedora-kde-45/screenshots/desktop.jpg"
+    ],
+    "category": "desktop",
+    "truenasVersion": ">=25.04.2.6",
+    "apps": {
+        "runtime": "flatpak"
+    },
+    "provisioning": {
+        "strategy": "installer-iso",
+        "source": {
+            "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/45/Everything/x86_64/iso/Fedora-Everything-netinst-x86_64-{version}.iso",
+            "version": "45-1.4",
+            "sha256": "42abc36792f91575b2f541db19110cc661864819031e57cd5f5c9ec764ebbddf",
+            "releasesUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/45/Everything/x86_64/iso/"
+        },
+        "seed": {
+            "template": "fedora-kde-kickstart"
+        }
+    },
+    "resources": {
+        "minMemoryMb": 4096,
+        "recMemoryMb": 8192,
+        "minVcpus": 2,
+        "recVcpus": 4,
+        "maxUsefulVcpus": 6,
+        "diskGb": 64
+    },
+    "guest": {
+        "firmware": "UEFI",
+        "diskBus": "VIRTIO",
+        "nicModel": "VIRTIO",
+        "tpm": false,
+        "secureBoot": false,
+        "hypervEnlightenments": false,
+        "autostart": false,
+        "passthrough": [
+            "gpu",
+            "usb",
+            "usb-controller"
+        ],
+        "readiness": {
+            "type": "phone-home"
+        }
+    }
+}

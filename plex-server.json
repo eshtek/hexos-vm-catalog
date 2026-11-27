@@ -15,10 +15,10 @@
         "strategy": "image",
         "source": {
             "url": "https://cloud-images.ubuntu.com/releases/resolute/{version}/ubuntu-26.04-server-cloudimg-amd64.img",
-            "version": "release-20261016",
+            "version": "release-20261108",
             "format": "qcow2",
             "compression": "none",
-            "sha256": "5645d0318ad21f643ebb1ac4567514620e9893380b07b0201fda163baa5b7eb5",
+            "sha256": "7b90593f5532b49b7e3fe3d2743f0d1f0d822e5b07cebcd8e00c0df8069ecab9",
             "releasesUrl": "https://cloud-images.ubuntu.com/releases/resolute/"
         },
         "firstBoot": {
